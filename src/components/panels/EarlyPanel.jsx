@@ -66,10 +66,10 @@ function KpiChip({ label, value, accent, warn }) {
 // ─── Main export ─────────────────────────────────────────────
 
 export function EarlyPanel({ plan, result, earliest, mcResult, totalAtRetirement, sustainable }) {
-  const { snaps, depleted, bridgeShortfall } = result;
+  const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
-  const endVal = snaps[snaps.length - 1]?.total ?? 0;
+  const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
   const heroNum = earliest !== null ? String(earliest) : "75+";
   const heroOk = onTrack && survives;

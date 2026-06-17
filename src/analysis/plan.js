@@ -77,6 +77,9 @@ export const DEFAULTS = {
   hsaAnnualContrib: 0, // annual HSA contribution until retirement
   monthlyIrmaaSurcharge: 0, // IRMAA Medicare Part B/D surcharge at 65+
   stateSsExemptRate: 0,     // 0 = SS fully taxable at state rate; 1 = fully exempt
+
+  // Estate assumptions
+  assumeStepUpBasis: true, // heirs inherit brokerage at market value (unrealized gains erased)
 };
 
 /** Normalize raw inputs into a plan with derived fields. */
@@ -178,6 +181,7 @@ export function simParamsAt(plan, age, overrides = {}) {
     guardrailLower: overrides.guardrailLower ?? plan.guardrailLower,
     monthlyIrmaaSurcharge: overrides.monthlyIrmaaSurcharge ?? plan.monthlyIrmaaSurcharge,
     stateSsExemptRate: overrides.stateSsExemptRate ?? plan.stateSsExemptRate,
+    assumeStepUpBasis: overrides.assumeStepUpBasis ?? plan.assumeStepUpBasis,
   };
 }
 

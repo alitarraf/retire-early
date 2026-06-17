@@ -8,12 +8,14 @@
 //    - monthlyExpense is ALREADY inflated to the retirement date.
 //    - ssBenefit is in TODAY's dollars; the engine inflates it.
 //
-//  Output: { snaps, depleted, bridgeShortfall }
+//  Output: { snaps, depleted, bridgeShortfall, estateGainTax }
 //    - snaps: yearly { age, roth, brokerage, k401, cd, muni, total }
 //    - depleted: age money runs out, or null if it lasts to lifeExpect.
 //        Fires ONLY when all funds (incl. the unlocked 401k) are gone.
 //    - bridgeShortfall: count of months before 59.5 where accessible
 //        funds fell short while the 401k was still locked.
+//    - estateGainTax: 0 when assumeStepUpBasis=true; otherwise the LTCG
+//        tax on the brokerage embedded gain at end of simulation.
 //
 //  Draw order (preserve / test):
 //    1 Roth contributions  2 Roth earnings (59.5+)  3 Converted Roth
@@ -21,7 +23,7 @@
 //    6 401k (59.5+, effective bracket)  7 CD / cash
 // ─────────────────────────────────────────────────────────────
 
-import { effectiveFedRate, marginalFedRate } from "./tax.js";
+import { federalTax, taxableSsAmount } from "./tax.js";
 import { rmdFactor } from "./rmd.js";
 import { DEFAULT_FILING_STATUS, ACA } from "../constants/brackets.js";
 
@@ -57,6 +59,7 @@ export function simulate({
   hsaBalance = 0,     // HSA at retirement; grows at stockReturn; draws are tax-free (medical)
   monthlyIrmaaSurcharge = 0, // IRMAA Medicare surcharge added to expenses at age 65+
   stateSsExemptRate = 0,     // fraction of SS income exempt from state tax (0=none, 1=full)
+  assumeStepUpBasis = true,  // heirs inherit brokerage at market value; false = gains taxed at ltcgRate
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const mi = inflationRate / 100 / 12;
@@ -80,8 +83,15 @@ export function simulate({
   let rmdForThisYear = 0;  // gross annual RMD target set at each year start
   let rmdWithdrawnThisYear = 0; // gross 401k drawn so far this calendar year
 
+  // Ordinary-income tracking — trailing-year model for marginal-rate calculations.
+  // Captures gross 401k draws + SEPP + Roth conversions (not SS, not LTCG gains).
+  let priorYearOrdIncome = 0; // prior year total ordinary income; feeds next year's rate base
+  let yearOrdAccum = 0;       // current year accumulator; saved to priorYearOrdIncome at year end
+  let taxableSsFrac = 0;      // fraction of gross SS that is federally taxable (set at year start)
+  let drawBase = 0;           // annual income base for marginal-delta rate calc (set at year start)
+
   // ACA MAGI tracking — trailing model: prior-year MAGI determines current-year premium status.
-  // MAGI sources: traditional 401k draws, Roth conversions, brokerage gains, 85% of SS.
+  // MAGI sources: traditional 401k draws, Roth conversions, brokerage gains, actual taxable SS.
   // Roth draws and muni income do NOT count. Applies to ages 55–64 (pre-Medicare) only.
   let magiYearAccum = 0;     // running MAGI total for the current calendar year
   let priorYearMagi = 0;     // MAGI from the prior year; used at year start to set premium status
@@ -113,6 +123,20 @@ export function simulate({
         acaPremiumActive = priorYearMagi >= fpl * ACA.cliffMultiple;
         magiYearAccum = 0;
       }
+
+      // SS provisional income — compute taxable fraction for this year using prior-year
+      // ordinary income as the "other income" base (trailing-year model, same as ACA).
+      const ss1Est = age >= ssAge ? ssBenefit * Math.pow(1 + mi, m) : 0;
+      const ss2Est = age >= ss2Age ? ss2Benefit * Math.pow(1 + mi, m) : 0;
+      const annualSsEst = (ss1Est + ss2Est) * 12;
+      const taxableSsAnnualEst = taxableSsAmount(annualSsEst, priorYearOrdIncome, filingStatus);
+      taxableSsFrac = annualSsEst > 0 ? taxableSsAnnualEst / annualSsEst : 0;
+      // drawBase: taxable SS is the only income that stacks BELOW 401k draws.
+      // Prior-year 401k income is NOT added here — it is the same income category and
+      // double-counting it would inflate the marginal rate on year-2+ draws.
+      // priorYearOrdIncome is still used for SS provisional income above (taxableSsAnnualEst).
+      drawBase = taxableSsAnnualEst;
+      yearOrdAccum = 0;
     }
 
     // Roth conversion ladder — once per bridge year.
@@ -121,10 +145,12 @@ export function simulate({
       const conv = Math.min(annualRothConversion, k);
       if (conv > 0) {
         k -= conv;
-        const tax = conv * (marginalFedRate(conv, filingStatus) + stateTaxRate / 100);
+        // Tax on conversion: marginal delta from drawBase (stacked on other income this year).
+        const convFedTax = federalTax(drawBase + conv, filingStatus) - federalTax(drawBase, filingStatus);
+        const tax = convFedTax + conv * stateTaxRate / 100;
         cd = Math.max(0, cd - Math.min(tax, cd));
         tranches.push({ avail: age + 5, amt: conv });
-        // Roth conversions are ordinary income → count toward ACA MAGI.
+        yearOrdAccum += conv;
         if (monthlyAcaFullPremium > 0) magiYearAccum += conv;
       }
     }
@@ -142,16 +168,22 @@ export function simulate({
     // Unlock tranches that have cleared both the 5y lock and 59.5.
     for (const t of tranches) if (age >= t.avail && t.amt > 0) { rv += t.amt; t.amt = 0; }
 
-    // Social Security, inflated; up to 85% of the household total taxable.
+    // Social Security, inflated; taxable fraction from provisional income formula (IRC §86).
     const ss1 = age >= ssAge ? ssBenefit * Math.pow(1 + mi, m) : 0;
     const ss2 = age >= ss2Age ? ss2Benefit * Math.pow(1 + mi, m) : 0;
     const grossSS = ss1 + ss2;
     const effectiveSsStateTaxRate = stateTaxRate * (1 - stateSsExemptRate);
-    const ss = grossSS > 0
-      ? grossSS * (1 - 0.85 * (effectiveFedRate(grossSS * 12, filingStatus) + effectiveSsStateTaxRate / 100))
-      : 0;
-    // SS is taxable income: up to 85% counts toward ACA MAGI.
-    if (monthlyAcaFullPremium > 0 && grossSS > 0) magiYearAccum += 0.85 * grossSS;
+    let ss = 0;
+    if (grossSS > 0) {
+      const taxableMonthly = grossSS * taxableSsFrac;
+      const taxableAnnual = taxableMonthly * 12;
+      // Federal tax: SS occupies [0, taxableSS]; draws occupy [taxableSS, taxableSS+draw].
+      // Using base=0 here avoids double-counting the priorYearOrdIncome bracket slice.
+      // priorYearOrdIncome is still used above for provisional income (taxable fraction).
+      const ssFedTax = federalTax(taxableAnnual, filingStatus) / 12;
+      ss = grossSS - ssFedTax - grossSS * effectiveSsStateTaxRate / 100;
+      if (monthlyAcaFullPremium > 0) magiYearAccum += taxableMonthly;
+    }
 
     let need = Math.max(0, spend - ss);
     // ACA healthcare premium: full price when prior-year MAGI crossed the FPL cliff.
@@ -164,12 +196,17 @@ export function simulate({
     // After-tax income reduces need; any excess is banked in CD for later use.
     if (annualSepp > 0 && age < seppEnd && k > 0) {
       const seppGross = Math.min(annualSepp / 12, k);
-      const seppEff = Math.min(0.9, effectiveFedRate(seppGross * 12, filingStatus) + stateTaxRate / 100);
+      const seppD = seppGross * 12;
+      const seppFedRate = seppD > 0
+        ? (federalTax(drawBase + seppD, filingStatus) - federalTax(drawBase, filingStatus)) / seppD
+        : 0;
+      const seppEff = seppFedRate + stateTaxRate / 100;
       k -= seppGross;
       const seppNet = seppGross * (1 - seppEff);
       const applied = Math.min(need, seppNet);
       need -= applied;
       cd += seppNet - applied; // excess SEPP income → CD
+      yearOrdAccum += seppGross;
       if (monthlyAcaFullPremium > 0) magiYearAccum += seppGross;
     }
 
@@ -194,12 +231,24 @@ export function simulate({
     // Rule of 55 unlocks the 401k from retireAge; otherwise locked until 59.5.
     const k401Accessible = age >= 59.5 || rule55;
     if (need > 0 && k401Accessible && k > 0) {
-      const eff = Math.min(0.9, effectiveFedRate(need * 12, filingStatus) + stateTaxRate / 100);
-      const draw = Math.min(need / Math.max(0.01, 1 - eff), k);
+      // Gross-up via 3-iteration solver: rate = marginal delta at (drawBase + annualized draw).
+      let gross = need;
+      for (let i = 0; i < 3; i++) {
+        const d = gross * 12;
+        const fedRate = d > 0
+          ? (federalTax(drawBase + d, filingStatus) - federalTax(drawBase, filingStatus)) / d
+          : 0;
+        gross = need / Math.max(0.01, 1 - fedRate - stateTaxRate / 100);
+      }
+      const draw = Math.min(gross, k);
       k -= draw;
-      need -= draw * (1 - eff);
+      const d = draw * 12;
+      const fedRate = d > 0
+        ? (federalTax(drawBase + d, filingStatus) - federalTax(drawBase, filingStatus)) / d
+        : 0;
+      need -= draw * (1 - fedRate - stateTaxRate / 100);
       rmdWithdrawnThisYear += draw;
-      // Traditional 401k withdrawals are ordinary income → count toward ACA MAGI.
+      yearOrdAccum += draw;
       if (monthlyAcaFullPremium > 0) magiYearAccum += draw;
     }
     if (need > 0 && cd > 0) { const d = Math.min(need, cd); cd -= d; need -= d; }
@@ -216,11 +265,14 @@ export function simulate({
     // This must run before the snapshot so the snapshot reflects the forced draw.
     if (m % 12 === 11 && rmdForThisYear > rmdWithdrawnThisYear && k > 0) {
       const shortfall = Math.min(rmdForThisYear - rmdWithdrawnThisYear, k);
-      const eff = Math.min(0.9, effectiveFedRate(shortfall, filingStatus) + stateTaxRate / 100);
-      const net = shortfall * (1 - eff);
+      const rmdFedRate = shortfall > 0
+        ? (federalTax(drawBase + shortfall, filingStatus) - federalTax(drawBase, filingStatus)) / shortfall
+        : 0;
+      const net = shortfall * (1 - rmdFedRate - stateTaxRate / 100);
       k -= shortfall;
       bk += net;
       bb += net; // basis = value added (no embedded gain on new cash)
+      yearOrdAccum += shortfall;
     }
     // Guyton-Klinger guardrails: annual spending adjustment based on withdrawal rate.
     // WR = net annual portfolio draw (spending minus guaranteed income) / portfolio total.
@@ -239,6 +291,7 @@ export function simulate({
     // Save year-end balances for next year's calculations.
     if (m % 12 === 11) {
       priorYearEndK = k;
+      priorYearOrdIncome = yearOrdAccum;
       if (monthlyAcaFullPremium > 0) priorYearMagi = magiYearAccum;
     }
 
@@ -258,5 +311,6 @@ export function simulate({
     }
   }
 
-  return { snaps, depleted, bridgeShortfall };
+  const estateGainTax = assumeStepUpBasis ? 0 : Math.max(0, bk - bb) * brokerageLtcgRate / 100;
+  return { snaps, depleted, bridgeShortfall, estateGainTax };
 }

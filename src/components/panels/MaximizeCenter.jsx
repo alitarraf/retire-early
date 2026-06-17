@@ -46,8 +46,8 @@ function heroFmt(n) {
 }
 
 export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, optimal }) {
-  const { snaps } = result;
-  const endVal = snaps[snaps.length - 1]?.total ?? 0;
+  const { snaps, estateGainTax = 0 } = result;
+  const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
   const convBetter = optimal.amount > 0 && optimal.endVal > optimal.baseEnd;
 
   return (

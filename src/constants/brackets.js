@@ -111,6 +111,17 @@ export const ACA = {
   cliffMultiple: 4.0, // 400% FPL cliff is back for 2026
 };
 
+// ── Social Security provisional income thresholds (IRC §86) ──
+// NOT inflation-adjusted — unchanged since 1983/1993 as enacted.
+// Provisional Income = other AGI + ½ gross SS.
+// Below T1: 0% taxable. T1–T2: up to 50%. Above T2: up to 85%.
+export const SS_PROVISIONAL_THRESHOLDS = {
+  single: [25000, 34000],
+  mfj:    [32000, 44000],
+  hoh:    [25000, 34000],
+  mfs:    [0, 0],
+};
+
 // ── RMD constants (SECURE 2.0) ───────────────────────────────
 // Birth-year threshold that determines RMD start age.
 // Born ≤ 1959 → RMD age 73; born ≥ 1960 → RMD age 75.

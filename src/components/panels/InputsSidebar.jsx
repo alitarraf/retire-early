@@ -403,6 +403,15 @@ export function InputsSidebar({ inputs, set, plan }) {
             <NumInput value={previewWithdrawal} onChange={setPreviewWithdrawal} prefix="$" step={5000} width={130} />
           </Field>
           <BracketBar annual={previewWithdrawal} stateTaxRate={plan.effectiveStateTax} filingStatus={inputs.filingStatus} />
+          <Divider />
+          <SubTitle>Estate assumptions</SubTitle>
+          <Field label="Step-up in basis at death" hint="Heirs inherit brokerage at market value — unrealized gains erased">
+            <Toggle
+              value={inputs.assumeStepUpBasis ? "yes" : "no"}
+              onChange={(v) => set("assumeStepUpBasis")(v === "yes")}
+              options={[{ value: "yes", label: "Step-up on" }, { value: "no", label: "No step-up" }]}
+            />
+          </Field>
         </AccSection>
 
         {/* ── Strategy ─────────────────────────────────── */}

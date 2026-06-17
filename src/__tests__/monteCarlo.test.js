@@ -110,7 +110,7 @@ describe("monteCarlo(): determinism with seed", () => {
   it("different seeds produce different results", () => {
     const r1 = monteCarlo({ ...base }, { n: 100, seed: 1 });
     const r2 = monteCarlo({ ...base }, { n: 100, seed: 2 });
-    // Extremely unlikely to be identical with different seeds.
-    expect(r1.successRate).not.toBe(r2.successRate);
+    // medianEndTotal is a continuous value — essentially impossible to match across seeds.
+    expect(r1.medianEndTotal).not.toBe(r2.medianEndTotal);
   });
 });

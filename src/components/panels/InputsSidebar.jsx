@@ -5,6 +5,7 @@ import { useState } from "react";
 import { NumInput, Select, Toggle } from "../ui.jsx";
 import { BracketBar } from "../charts/BracketBar.jsx";
 import { marginalFedRate } from "../../engine/tax.js";
+import { fraForBirthYear } from "../../engine/socialSecurity.js";
 import {
   STATE_TAXES, EMPLOYMENT_BRACKETS, LTCG_RATES, CONTRIB_LIMITS,
   FILING_STATUS, FILING_STATUS_LABELS, TAX_YEAR,
@@ -105,6 +106,38 @@ function AccSection({ title, summary, isOpen, onToggle, children }) {
   );
 }
 
+// Repeater for one-time / lump-sum expenses: an editable list of { age, amount }.
+function OneTimeExpenses({ value, onChange, defaultAge }) {
+  const list = value ?? [];
+  const update = (i, patch) => onChange(list.map((e, j) => (j === i ? { ...e, ...patch } : e)));
+  const add = () => onChange([...list, { age: defaultAge, amount: 25000 }]);
+  const remove = (i) => onChange(list.filter((_, j) => j !== i));
+  return (
+    <div>
+      {list.map((e, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: "#7C9A92", flexShrink: 0 }}>at age</span>
+          <NumInput value={e.age} onChange={(v) => update(i, { age: v })} min={1} max={105} width={48} />
+          <NumInput value={e.amount} onChange={(v) => update(i, { amount: v })} prefix="$" step={5000} width={88} />
+          <button
+            onClick={() => remove(i)}
+            style={{ border: "none", background: "#f0f5f4", color: "#c0392b", borderRadius: 6, cursor: "pointer", fontSize: 14, lineHeight: 1, width: 24, height: 26, flexShrink: 0 }}
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={add}
+        style={{ border: "1px dashed #b0c4be", background: "#fafcfc", color: "#3d8c78", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "5px 10px", marginTop: 2 }}
+      >
+        + Add one-time expense
+      </button>
+    </div>
+  );
+}
+
 // Caption text per section — pinned at sidebar bottom
 const CAPTIONS = {
   profile: "Filing status sets your federal tax brackets and standard deduction. Retire age and life expectancy frame the entire projection.",
@@ -115,6 +148,9 @@ const CAPTIONS = {
   tax: "Employment bracket applies only to interest while working. Retirement withdrawals use 2026 brackets on the actual draw — typically far lower than your working rate.",
   strategy: "Roth conversions during the bridge fill low brackets cheaply. Rule of 55 unlocks your 401k penalty-free if you left that employer at 55+. Guardrails auto-adjust spending based on withdrawal rate.",
   healthcare: "Enter ACA only if your monthly expenses above do not already include health insurance — otherwise you'll double-count it. At 65 Medicare replaces ACA. IRMAA applies at higher incomes.",
+  estate: "Step-up in basis erases unrealized brokerage gains for your heirs — leave it on unless you plan to liquidate before death. The legacy target is the estate you want to leave; results show the gap.",
+  advanced: "Birth year sets your exact RMD start age (73 vs 75) and Full Retirement Age. One-time expenses are lump costs in today's dollars. Phase multipliers model the go-go / slow-go / no-go spending curve.",
+  scenario: "Stress Test replays a sharp early-retirement crash (sequence-of-returns risk) as an illustrative downside, separate from the headline verdict. Monte Carlo (Retire Early tab) averages 500 random paths.",
 };
 
 const FILING_SHORT = { single: "Single", mfj: "MFJ", hoh: "HOH" };
@@ -403,15 +439,6 @@ export function InputsSidebar({ inputs, set, plan }) {
             <NumInput value={previewWithdrawal} onChange={setPreviewWithdrawal} prefix="$" step={5000} width={130} />
           </Field>
           <BracketBar annual={previewWithdrawal} stateTaxRate={plan.effectiveStateTax} filingStatus={inputs.filingStatus} />
-          <Divider />
-          <SubTitle>Estate assumptions</SubTitle>
-          <Field label="Step-up in basis at death" hint="Heirs inherit brokerage at market value — unrealized gains erased">
-            <Toggle
-              value={inputs.assumeStepUpBasis ? "yes" : "no"}
-              onChange={(v) => set("assumeStepUpBasis")(v === "yes")}
-              options={[{ value: "yes", label: "Step-up on" }, { value: "no", label: "No step-up" }]}
-            />
-          </Field>
         </AccSection>
 
         {/* ── Strategy ─────────────────────────────────── */}
@@ -496,6 +523,113 @@ export function InputsSidebar({ inputs, set, plan }) {
               options={[{ value: "0", label: "None" }, { value: "0.5", label: "50%" }, { value: "1", label: "Full" }]}
             />
           </Field>
+        </AccSection>
+
+        {/* ── Estate & Legacy ──────────────────────────── */}
+        <AccSection
+          title="Estate"
+          summary={`Step-up ${inputs.assumeStepUpBasis ? "on" : "off"} · target ${inputs.legacyTarget > 0 ? fmtK(inputs.legacyTarget) : "none"}`}
+          isOpen={open === "estate"}
+          onToggle={() => toggle("estate")}
+        >
+          <SubTitle>Estate &amp; legacy planning</SubTitle>
+          <Field label="Step-up in basis at death" hint="Heirs inherit brokerage at market value — unrealized gains erased">
+            <Toggle
+              value={inputs.assumeStepUpBasis ? "yes" : "no"}
+              onChange={(v) => set("assumeStepUpBasis")(v === "yes")}
+              options={[{ value: "yes", label: "Step-up on" }, { value: "no", label: "No step-up" }]}
+            />
+          </Field>
+          <Field label="Legacy target" hint="Estate you want to leave behind (today's $); 0 = none">
+            <NumInput value={inputs.legacyTarget} onChange={set("legacyTarget")} prefix="$" step={50000} width={130} />
+          </Field>
+          <div style={{ fontSize: 10, color: "#9db4ae" }}>
+            Results show your projected estate at {inputs.lifeExpect} versus this target.
+          </div>
+        </AccSection>
+
+        {/* ── Advanced Inputs ──────────────────────────── */}
+        <AccSection
+          title="Advanced"
+          summary={`b.${plan.birthYear} · ${inputs.oneTimeExpenses?.length ?? 0} lump · phase ${inputs.goGoMult}/${inputs.slowGoMult}/${inputs.noGoMult}`}
+          isOpen={open === "advanced"}
+          onToggle={() => toggle("advanced")}
+        >
+          <SubTitle>Birth year</SubTitle>
+          <Field label="Birth year override" hint="0 = derive from your age. Sets exact RMD age & FRA.">
+            <NumInput value={inputs.birthYear} onChange={set("birthYear")} min={0} max={TAX_YEAR} step={1} width={90} />
+          </Field>
+          <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 4 }}>
+            Using <strong style={{ color: "#1a2e28" }}>{plan.birthYear}</strong> → RMDs at{" "}
+            <strong style={{ color: "#1a2e28" }}>{plan.rmdAge}</strong>, FRA{" "}
+            <strong style={{ color: "#1a2e28" }}>{fraForBirthYear(plan.birthYear).toFixed(2).replace(/\.?0+$/, "")}</strong>.
+          </div>
+          <Divider />
+          <SubTitle>One-time expenses</SubTitle>
+          <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 8 }}>
+            Lump costs in today's $ (wedding, home repair, new car). Inflated to the spend year and funded from the draw order.
+          </div>
+          <OneTimeExpenses
+            value={inputs.oneTimeExpenses}
+            onChange={set("oneTimeExpenses")}
+            defaultAge={Math.min(inputs.retireAge + 5, inputs.lifeExpect - 1)}
+          />
+          <Divider />
+          <SubTitle>Phase spending (go-go / slow-go / no-go)</SubTitle>
+          <Grid3>
+            <Field label="Go-go ×">
+              <NumInput value={inputs.goGoMult} onChange={set("goGoMult")} step={0.05} min={0} max={3} width={56} />
+            </Field>
+            <Field label="Slow-go ×">
+              <NumInput value={inputs.slowGoMult} onChange={set("slowGoMult")} step={0.05} min={0} max={3} width={56} />
+            </Field>
+            <Field label="No-go ×">
+              <NumInput value={inputs.noGoMult} onChange={set("noGoMult")} step={0.05} min={0} max={3} width={56} />
+            </Field>
+          </Grid3>
+          <Grid2>
+            <Field label="Slow-go starts at">
+              <NumInput value={inputs.slowGoAge} onChange={set("slowGoAge")} min={inputs.retireAge} max={105} width={70} />
+            </Field>
+            <Field label="No-go starts at">
+              <NumInput value={inputs.noGoAge} onChange={set("noGoAge")} min={inputs.slowGoAge} max={110} width={70} />
+            </Field>
+          </Grid2>
+          <div style={{ fontSize: 10, color: "#9db4ae" }}>
+            1.0 = no change. Typical glide path: go-go 1.1, slow-go 1.0, no-go 0.8.
+          </div>
+        </AccSection>
+
+        {/* ── Scenario Testing ─────────────────────────── */}
+        <AccSection
+          title="Scenario"
+          summary={inputs.scenarioMode === "stress" ? `Stress −${inputs.stressDropPct}% × ${inputs.stressYears}y` : "Deterministic"}
+          isOpen={open === "scenario"}
+          onToggle={() => toggle("scenario")}
+        >
+          <SubTitle>Scenario testing</SubTitle>
+          <Field label="Mode">
+            <Toggle
+              value={inputs.scenarioMode}
+              onChange={set("scenarioMode")}
+              options={[{ value: "deterministic", label: "Deterministic" }, { value: "stress", label: "Stress Test" }]}
+            />
+          </Field>
+          {inputs.scenarioMode === "stress" && (
+            <>
+              <Grid2>
+                <Field label="Crash size" hint="Annual return in crash years">
+                  <NumInput value={inputs.stressDropPct} onChange={set("stressDropPct")} suffix="%" step={5} min={0} max={90} width={62} />
+                </Field>
+                <Field label="Crash years" hint="Starting at retirement">
+                  <NumInput value={inputs.stressYears} onChange={set("stressYears")} min={1} max={10} width={62} />
+                </Field>
+              </Grid2>
+              <div style={{ fontSize: 10, color: "#9db4ae" }}>
+                Adds a downside card to the results. Your headline verdict stays on the base assumptions.
+              </div>
+            </>
+          )}
         </AccSection>
 
       </div>

@@ -78,8 +78,23 @@ export const DEFAULTS = {
   monthlyIrmaaSurcharge: 0, // IRMAA Medicare Part B/D surcharge at 65+
   stateSsExemptRate: 0,     // 0 = SS fully taxable at state rate; 1 = fully exempt
 
-  // Estate assumptions
+  // Estate & legacy
   assumeStepUpBasis: true, // heirs inherit brokerage at market value (unrealized gains erased)
+  legacyTarget: 0,         // desired estate at death, today's $; 0 = none (display-only gap)
+
+  // Advanced inputs
+  birthYear: 0,            // 0 = derive from currentAge; else authoritative for RMD start age
+  oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $ (weddings, repairs, …)
+  goGoMult: 1,             // phase spending multiplier, retire → slowGoAge
+  slowGoMult: 1,           // phase spending multiplier, slowGoAge → noGoAge
+  noGoMult: 1,             // phase spending multiplier, noGoAge+
+  slowGoAge: 70,           // age the slow-go phase begins
+  noGoAge: 80,             // age the no-go phase begins
+
+  // Scenario testing
+  scenarioMode: "deterministic", // "deterministic" | "stress"
+  stressDropPct: 30,             // crash magnitude (%) applied in the early stress years
+  stressYears: 3,                // number of consecutive early-crash years
 };
 
 /** Normalize raw inputs into a plan with derived fields. */
@@ -93,7 +108,8 @@ export function makePlan(raw) {
   const depositAfterTaxRate = p.cashDepositRate * (1 - accumulationOrdinaryRate / 100);
   const annualEmployerMatch = (p.salary * p.employerMatchPct) / 100;
   const total401kAnnual = p.k401AnnualContrib + annualEmployerMatch;
-  const birthYear = TAX_YEAR - p.currentAge;
+  // birthYear (if explicitly supplied) is authoritative for the RMD start age; otherwise derive it.
+  const birthYear = p.birthYear > 0 ? p.birthYear : TAX_YEAR - p.currentAge;
   const rmdAge = birthYear >= RMD_BIRTH_YEAR_THRESHOLD ? 75 : 73;
   const { contributions: rothContribNow, earnings: rothEarningsNow } = splitRoth(
     p.rothTotal,
@@ -122,6 +138,7 @@ export function makePlan(raw) {
     ss2Benefit: p.hasSpouse ? p.spouseSsBenefit : 0,
     ss2Age: p.spouseSsAge,
     rmdAge,
+    birthYear, // derived (or explicit) birth year used for RMD age
   };
 }
 
@@ -182,6 +199,16 @@ export function simParamsAt(plan, age, overrides = {}) {
     monthlyIrmaaSurcharge: overrides.monthlyIrmaaSurcharge ?? plan.monthlyIrmaaSurcharge,
     stateSsExemptRate: overrides.stateSsExemptRate ?? plan.stateSsExemptRate,
     assumeStepUpBasis: overrides.assumeStepUpBasis ?? plan.assumeStepUpBasis,
+    // One-time expenses: entered in today's $; inflate to retire-date $ (same basis as monthlyExpense)
+    // and keep only entries that land within the simulated window (retirement → life expectancy).
+    oneTimeExpenses: (overrides.oneTimeExpenses ?? plan.oneTimeExpenses ?? [])
+      .filter((e) => e && e.amount > 0 && e.age >= age && e.age < plan.lifeExpect)
+      .map((e) => ({ age: e.age, amount: e.amount * Math.pow(1 + plan.inflationRate / 100, yrs) })),
+    goGoMult: overrides.goGoMult ?? plan.goGoMult,
+    slowGoMult: overrides.slowGoMult ?? plan.slowGoMult,
+    noGoMult: overrides.noGoMult ?? plan.noGoMult,
+    slowGoAge: overrides.slowGoAge ?? plan.slowGoAge,
+    noGoAge: overrides.noGoAge ?? plan.noGoAge,
   };
 }
 

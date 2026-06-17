@@ -2,6 +2,7 @@
 // Monte Carlo card → portfolio chart. Phase breakdown and sensitivity
 // levers live in RightRail.jsx to the right.
 import { StackedChart } from "../charts/StackedChart.jsx";
+import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
 import { fmt, pct } from "../../format.js";
 
 // ─── Module-scope atoms ──────────────────────────────────────
@@ -65,7 +66,7 @@ function KpiChip({ label, value, accent, warn }) {
 
 // ─── Main export ─────────────────────────────────────────────
 
-export function EarlyPanel({ plan, result, earliest, mcResult, totalAtRetirement, sustainable }) {
+export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, totalAtRetirement, sustainable }) {
   const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -228,6 +229,11 @@ export function EarlyPanel({ plan, result, earliest, mcResult, totalAtRetirement
           </div>
         </div>
       )}
+
+      {/* ── Stress test / transparency / legacy ──────── */}
+      <StressCard stressResult={stressResult} plan={plan} />
+      <TaxTransparency plan={plan} result={result} />
+      <LegacyGap plan={plan} endVal={endVal} />
 
       {/* ── Chart ────────────────────────────────────── */}
       <div

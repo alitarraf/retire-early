@@ -6,6 +6,7 @@ import { marginalValues } from "./analysis/marginalValue.js";
 import { optimalConversion } from "./analysis/optimalConversion.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
 import { monteCarlo } from "./engine/monteCarlo.js";
+import { stressTest } from "./analysis/stressTest.js";
 import { InputsSidebar } from "./components/panels/InputsSidebar.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
 import { RightRail } from "./components/panels/RightRail.jsx";
@@ -37,6 +38,15 @@ export default function App() {
   const mcResult = useMemo(
     () => (mode === "early" ? monteCarlo(mainSimParams, { n: 500, seed: 42 }) : null),
     [mainSimParams, mode],
+  );
+
+  // Deterministic stress test — only when the Scenario Testing section is in stress mode.
+  const stressResult = useMemo(
+    () =>
+      plan.scenarioMode === "stress"
+        ? stressTest(mainSimParams, { dropPct: plan.stressDropPct, years: plan.stressYears })
+        : null,
+    [mainSimParams, plan.scenarioMode, plan.stressDropPct, plan.stressYears],
   );
 
   // Maximize-mode analysis
@@ -175,6 +185,7 @@ export default function App() {
               result={result}
               earliest={earliest}
               mcResult={mcResult}
+              stressResult={stressResult}
               totalAtRetirement={totalAtRetirement}
               sustainable={sustainable}
             />
@@ -188,6 +199,7 @@ export default function App() {
               totalAtRetirement={totalAtRetirement}
               sustainable={sustainable}
               optimal={optimal}
+              stressResult={stressResult}
             />
             <MaximizeRail
               plan={plan}

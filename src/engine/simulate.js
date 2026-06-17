@@ -27,6 +27,30 @@ import { federalTax, taxableSsAmount } from "./tax.js";
 import { rmdFactor } from "./rmd.js";
 import { DEFAULT_FILING_STATUS, ACA } from "../constants/brackets.js";
 
+// Gross-up solver for a tax-deferred (401k) withdrawal: find the monthly PRE-tax draw
+// whose after-tax value equals `needMonthly`, where the effective rate is the marginal
+// federal rate over [base, base + annualized draw] plus the flat state rate.
+//
+// net(gross) is monotonically increasing in gross (marginal tax < 100%), so a bisection
+// converges robustly. The previous 3-iteration fixed point could stall when the draw
+// straddled a bracket boundary (the marginal rate jumps mid-interval); bisection does not.
+export function grossUpMonthly(needMonthly, base, filingStatus, stateRateFrac) {
+  if (needMonthly <= 0) return 0;
+  const netOf = (g) => {
+    const d = g * 12;
+    const fedRate = d > 0 ? (federalTax(base + d, filingStatus) - federalTax(base, filingStatus)) / d : 0;
+    return g * (1 - fedRate - stateRateFrac);
+  };
+  let lo = needMonthly; // net ≤ gross, so the answer is at least the net needed
+  let hi = needMonthly / Math.max(0.01, 1 - 0.37 - stateRateFrac) + 1; // top-bracket upper bound
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (netOf(mid) < needMonthly) lo = mid;
+    else hi = mid;
+  }
+  return hi; // bias to the high side so we never under-withdraw to cover the need
+}
+
 export function simulate({
   retireAge,
   lifeExpect,
@@ -60,6 +84,12 @@ export function simulate({
   monthlyIrmaaSurcharge = 0, // IRMAA Medicare surcharge added to expenses at age 65+
   stateSsExemptRate = 0,     // fraction of SS income exempt from state tax (0=none, 1=full)
   assumeStepUpBasis = true,  // heirs inherit brokerage at market value; false = gains taxed at ltcgRate
+  oneTimeExpenses = [],      // [{ age, amount }] lump expenses in RETIRE-DATE $; inflated per month like spend
+  goGoMult = 1,              // spending multiplier, retireAge → slowGoAge (active/"go-go" years)
+  slowGoMult = 1,            // spending multiplier, slowGoAge → noGoAge (slower years)
+  noGoMult = 1,              // spending multiplier, noGoAge+ (low-activity years)
+  slowGoAge = Infinity,      // age the slow-go phase begins
+  noGoAge = Infinity,        // age the no-go phase begins
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const mi = inflationRate / 100 / 12;
@@ -99,7 +129,12 @@ export function simulate({
 
   const tranches = []; // converted-Roth tranches awaiting their 5y unlock
   const scheduled = new Set();
+  const firedOneTime = new Set(); // one-time expenses already applied (by index)
   const snaps = [];
+  // Phase-based spending: multiply the base monthly spend by the phase factor for the current age.
+  const phaseMult = (a) => (a >= noGoAge ? noGoMult : a >= slowGoAge ? slowGoMult : goGoMult);
+  // Transparency capture — first SS-active taxable fraction and first 401k effective draw rate.
+  const taxSummary = { ssTaxableFrac: null, k401EffRate: null };
   const totalMonths = (lifeExpect - retireAge) * 12;
 
   for (let m = 0; m < totalMonths; m++) {
@@ -137,6 +172,8 @@ export function simulate({
       // priorYearOrdIncome is still used for SS provisional income above (taxableSsAnnualEst).
       drawBase = taxableSsAnnualEst;
       yearOrdAccum = 0;
+      // Transparency: record the SS taxable fraction the first year SS is active.
+      if (annualSsEst > 0 && taxSummary.ssTaxableFrac === null) taxSummary.ssTaxableFrac = taxableSsFrac;
     }
 
     // Roth conversion ladder — once per bridge year.
@@ -185,7 +222,18 @@ export function simulate({
       if (monthlyAcaFullPremium > 0) magiYearAccum += taxableMonthly;
     }
 
-    let need = Math.max(0, spend - ss);
+    // Phase-based spending: scale the inflating base spend by the active phase multiplier.
+    const effSpend = spend * phaseMult(age);
+    let need = Math.max(0, effSpend - ss);
+    // One-time / lump-sum expenses: fire once when age reaches the entry's age.
+    // Amounts are in retire-date $; inflate per month like spend, then add to this month's need.
+    for (let i = 0; i < oneTimeExpenses.length; i++) {
+      const e = oneTimeExpenses[i];
+      if (!firedOneTime.has(i) && e && e.amount > 0 && age >= e.age) {
+        firedOneTime.add(i);
+        need += e.amount * Math.pow(1 + mi, m);
+      }
+    }
     // ACA healthcare premium: full price when prior-year MAGI crossed the FPL cliff.
     // Applies pre-Medicare only (age < 65). Simplified: below cliff = fully subsidized.
     if (monthlyAcaFullPremium > 0 && age < 65 && acaPremiumActive) need += monthlyAcaFullPremium;
@@ -231,15 +279,8 @@ export function simulate({
     // Rule of 55 unlocks the 401k from retireAge; otherwise locked until 59.5.
     const k401Accessible = age >= 59.5 || rule55;
     if (need > 0 && k401Accessible && k > 0) {
-      // Gross-up via 3-iteration solver: rate = marginal delta at (drawBase + annualized draw).
-      let gross = need;
-      for (let i = 0; i < 3; i++) {
-        const d = gross * 12;
-        const fedRate = d > 0
-          ? (federalTax(drawBase + d, filingStatus) - federalTax(drawBase, filingStatus)) / d
-          : 0;
-        gross = need / Math.max(0.01, 1 - fedRate - stateTaxRate / 100);
-      }
+      // Gross-up via bisection: rate = marginal delta at (drawBase + annualized draw).
+      const gross = grossUpMonthly(need, drawBase, filingStatus, stateTaxRate / 100);
       const draw = Math.min(gross, k);
       k -= draw;
       const d = draw * 12;
@@ -247,6 +288,7 @@ export function simulate({
         ? (federalTax(drawBase + d, filingStatus) - federalTax(drawBase, filingStatus)) / d
         : 0;
       need -= draw * (1 - fedRate - stateTaxRate / 100);
+      if (taxSummary.k401EffRate === null) taxSummary.k401EffRate = fedRate + stateTaxRate / 100;
       rmdWithdrawnThisYear += draw;
       yearOrdAccum += draw;
       if (monthlyAcaFullPremium > 0) magiYearAccum += draw;
@@ -268,10 +310,25 @@ export function simulate({
       const rmdFedRate = shortfall > 0
         ? (federalTax(drawBase + shortfall, filingStatus) - federalTax(drawBase, filingStatus)) / shortfall
         : 0;
-      const net = shortfall * (1 - rmdFedRate - stateTaxRate / 100);
+      const tax = shortfall * (rmdFedRate + stateTaxRate / 100);
       k -= shortfall;
-      bk += net;
-      bb += net; // basis = value added (no embedded gain on new cash)
+      // Cash-flow model: reinvest the FULL gross RMD into the taxable brokerage (new cash, so
+      // basis = value, no embedded gain), then pay the income tax explicitly from cash (cd)
+      // first, then brokerage (bk). This is slightly more conservative than netting the tax out
+      // of the RMD proceeds, because it parks the un-needed RMD in an LTCG-exposed account while
+      // draining tax-free cash to settle the bill — total wealth still drops by exactly `tax`.
+      bk += shortfall;
+      bb += shortfall;
+      let taxDue = tax;
+      const fromCd = Math.min(taxDue, cd);
+      cd -= fromCd;
+      taxDue -= fromCd;
+      if (taxDue > 0) {
+        const fromBk = Math.min(taxDue, bk);
+        bk -= fromBk;
+        bb = Math.max(0, bb - fromBk); // tax settled from the just-added basis (no LTCG on it)
+        taxDue -= fromBk;
+      }
       yearOrdAccum += shortfall;
     }
     // Guyton-Klinger guardrails: annual spending adjustment based on withdrawal rate.
@@ -281,7 +338,7 @@ export function simulate({
       const pendingGuard = tranches.reduce((s, t) => s + t.amt, 0);
       const total = rc + re + rv + pendingGuard + bk + hsa + k + cd + mn;
       if (total > 0) {
-        const netDraw = Math.max(0, spend - grossSS) * 12; // annualized portfolio-only draw
+        const netDraw = Math.max(0, effSpend - grossSS) * 12; // annualized portfolio-only draw
         const wr = netDraw / total;
         if (guardrailUpper > 0 && wr > guardrailUpper) spend *= 0.9;
         else if (guardrailLower > 0 && wr < guardrailLower) spend *= 1.1;
@@ -312,5 +369,5 @@ export function simulate({
   }
 
   const estateGainTax = assumeStepUpBasis ? 0 : Math.max(0, bk - bb) * brokerageLtcgRate / 100;
-  return { snaps, depleted, bridgeShortfall, estateGainTax };
+  return { snaps, depleted, bridgeShortfall, estateGainTax, taxSummary };
 }

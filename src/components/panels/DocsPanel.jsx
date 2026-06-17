@@ -139,6 +139,18 @@ export function DocsPanel() {
       <Field name="72(t) SEPP">Substantially Equal Periodic Payments — commit to a fixed annual 401k draw for 5 years or until 59½ (whichever is longer). Useful when Rule of 55 doesn't apply and you don't have enough Roth contributions to bridge the gap.</Field>
       <Field name="Spending guardrails">Guyton-Klinger dynamic spending. Upper guardrail: if your portfolio withdrawal rate exceeds the threshold, spending is cut 10% for the next year. Lower guardrail: if WR drops below the threshold (portfolio growing fast), spending is raised 10%. WR is calculated as net portfolio draw (spend minus SS) ÷ total portfolio. Typical: upper 5–6%, lower 3%.</Field>
 
+      <H3>Estate &amp; Legacy</H3>
+      <Field name="Step-up in basis">When on (the default), your heirs inherit taxable brokerage holdings at the date-of-death market value — all unrealized capital gains are erased and never taxed. When off, the embedded gain is taxed at your long-term capital gains rate and subtracted from the reported estate. This only affects the estate figure, not your spending during life.</Field>
+      <Field name="Legacy target">The estate you want to leave behind, in today's dollars. The results inflate it to your life-expectancy year and show whether your plan clears it (surplus) or falls short (shortfall). This is a display-only comparison — it does not change the spending the engine assumes.</Field>
+
+      <H3>Advanced inputs</H3>
+      <Field name="Birth year override">Leave at 0 to derive your birth year from your current age. Set it explicitly for precision: it determines your exact Required Minimum Distribution start age (73 for born ≤1959, 75 for born ≥1960 under SECURE 2.0) and your Social Security Full Retirement Age (shown as a hint). RMD age is authoritative from birth year; FRA stays a manual field you can still override.</Field>
+      <Field name="One-time expenses">Lump costs you expect at a specific age — a wedding, roof replacement, a new car, a big trip. Enter each as an age and a today's-dollar amount; the engine inflates it to that year and funds it through the normal draw order. Entries before your retirement age are ignored (the model only spends in retirement). Add as many as you like.</Field>
+      <Field name="Phase spending (go-go / slow-go / no-go)">Retirement spending is rarely flat. The "go-go" years (active, early) often cost more; the "no-go" years (less travel, later) often cost less. Set a multiplier for each phase (1.0 = no change) and the ages where slow-go and no-go begin. A common glide path is go-go 1.1, slow-go 1.0, no-go 0.8.</Field>
+
+      <H3>Scenario testing</H3>
+      <Field name="Deterministic vs Stress Test">Deterministic mode uses your mean return every year. Stress Test replays a sharp crash — your chosen drop (e.g. −30%) for the first few retirement years, then a reversion to the mean. Retiring straight into a downturn is the worst case for sequence-of-returns risk; the stress card shows whether the plan still survives and what estate remains. It is illustrative and shown alongside — never replacing — your headline verdict. The Retire Early tab also runs a 500-path Monte Carlo for a probabilistic view.</Field>
+
       {/* ── Outputs ── */}
       <H2>Reading the results — Retire Early tab</H2>
 
@@ -171,6 +183,9 @@ export function DocsPanel() {
           {desc}
         </div>
       ))}
+
+      <H3>Tax transparency, legacy &amp; stress cards</H3>
+      <P>Below the headline, both tabs surface three optional cards. <strong>Tax transparency</strong> shows the fraction of your Social Security that is federally taxable in the first year you claim (provisional-income formula, up to 85%) and the effective marginal rate on your first 401k withdrawal — so you can see the tax model at work, not just its output. <strong>Legacy target</strong> (when set) compares your projected estate against your inflated target. <strong>Stress test</strong> (when Scenario Testing is in Stress mode) shows the early-crash downside.</P>
 
       {/* ── Maximize ── */}
       <H2>Reading the results — Maximize Portfolio tab</H2>
@@ -222,7 +237,7 @@ export function DocsPanel() {
       {/* ── Caveats ── */}
       <H2>Limitations & assumptions</H2>
       <Callout tone="warn">
-        This is a planning tool, not financial advice. It does not account for: one-time large expenses (weddings, medical, home repairs), variable income in semi-retirement, Social Security claiming optimization for couples, state tax on all income types (only 401k and brokerage are state-taxed; some states treat income differently), or changes to tax law. Verify Social Security projections at ssa.gov and tax figures with a CPA before making major decisions.
+        This is a planning tool, not financial advice. It does not account for: variable income in semi-retirement, Social Security claiming optimization for couples, state tax on all income types (only 401k and brokerage are state-taxed; some states treat income differently), or changes to tax law. One-time large expenses and a declining spending curve <em>can</em> now be modeled via the Advanced inputs. Verify Social Security projections at ssa.gov and tax figures with a CPA before making major decisions.
       </Callout>
       {[
         ["All returns are nominal", "The stock return you enter is the nominal rate (before inflation). Real return = stock return − inflation. Default: 10% − 3% = 7% real."],
@@ -231,6 +246,8 @@ export function DocsPanel() {
         ["Tax brackets are 2026 IRS figures", "Tax law changes frequently. All brackets are in the constants file and can be updated for any year."],
         ["Spouse SS is treated as a pooled benefit", "The model adds spouse SS income to the household pool at the spouse SS age. Spousal benefit optimization (e.g. file-and-suspend strategies) is not modeled."],
         ["Monte Carlo uses σ=12% annually", "This is a typical equity volatility estimate. Bond-heavy portfolios would have lower standard deviation; your actual sequence of returns will differ."],
+        ["Forced RMDs are reinvested, not spent", "When a Required Minimum Distribution is larger than your spending need, the full pre-tax amount is reinvested in your taxable brokerage and the income tax is paid from cash (then brokerage). This models a retiree who doesn't need the RMD to live on — it moves money out of the tax-deferred account but keeps it invested."],
+        ["Phase spending & one-time costs are your estimates", "The go-go/slow-go/no-go multipliers and any one-time expenses you enter are illustrative inputs, not predictions. Real spending curves vary widely; use them to pressure-test, not to forecast precisely."],
       ].map(([title, desc]) => (
         <div key={title} style={{ marginBottom: 10, fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
           <strong style={{ color: "#1a2e28" }}>{title}. </strong>{desc}

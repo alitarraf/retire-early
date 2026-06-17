@@ -8,6 +8,21 @@
  * @param {number} fra       Full Retirement Age (e.g. 67 for born 1960+).
  * @returns {number} Multiplier to apply to the PIA (Primary Insurance Amount).
  */
+/**
+ * Full Retirement Age (in decimal years) for a given birth year, per the SSA schedule.
+ * 1937 or earlier → 65; 1943–1954 → 66; 1960 or later → 67; with 2-month/yr ramps between.
+ *
+ * @param {number} birthYear  Four-digit birth year.
+ * @returns {number} FRA in years (e.g. 66.5 = 66 years 6 months).
+ */
+export function fraForBirthYear(birthYear) {
+  if (birthYear <= 1937) return 65;
+  if (birthYear <= 1942) return 65 + (birthYear - 1937) * (2 / 12);
+  if (birthYear <= 1954) return 66;
+  if (birthYear <= 1959) return 66 + (birthYear - 1954) * (2 / 12);
+  return 67;
+}
+
 export function ssClaimFactor(claimAge, fra) {
   const monthsDiff = Math.round((claimAge - fra) * 12);
   if (monthsDiff >= 0) {

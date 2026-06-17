@@ -108,6 +108,29 @@ Two-mode tab bar; a derived-values "sanity strip"; a left input panel and a righ
 
 2025 single-filer values: `STD_DEDUCTION = 14600`; 7-tier `FED_BRACKETS`; 401k limit `23000`; Roth IRA limit `7000`; a `STATE_TAXES` table (~19 states, flat effective rates). **Known simplification:** state tax is applied as a flat rate to all income types (several states treat SS/retirement income differently — see §9 P5).
 
+> **Constants update:** the live constants file is now `TAX_YEAR = 2026` (MFJ default), with 2026 brackets, `STD_DEDUCTION` and contribution limits (`k401 = 24500`, `rothIra = 7500`, HSA family `8550`). Verify against final IRS publications before relying on projections.
+
+### 4.7 Recent additions (roadmap P0–P5 + tax accuracy + medium pass) — *shipped*
+
+The full P0–P5 roadmap below is **built**, and the simulation engine has since gained tax-accuracy and usability work:
+
+- **Engine (`simulate()`):** RMDs (SECURE 2.0 age 73/75 + Uniform Lifetime table), ACA MAGI cliff, Rule of 55, 72(t) SEPP, Monte Carlo via a per-year `returnSeries` hook, Guyton-Klinger guardrails, IRMAA, HSA, state SS exemption, SS provisional-income taxation (up to 85%), marginal-rate traditional withdrawals, and **step-up in basis** (`assumeStepUpBasis`) — heirs inherit brokerage at market value unless toggled off, in which case the embedded gain is taxed into the estate.
+- **Medium pass (this PRD — `PRD_Next_Medium_Roadmap_June2026.md`):**
+  - **One-time / lump-sum expenses** — an editable list of `{ age, amount }` (today's $), inflated to the spend year and funded through the draw order.
+  - **Phase-based spending** — go-go / slow-go / no-go multipliers with configurable boundary ages (identity defaults preserve prior behavior).
+  - **Birth-year override** — authoritative for the RMD start age; surfaces the SSA Full Retirement Age as a hint.
+  - **Legacy / estate target** — projected estate vs an inflated target (display-only gap).
+  - **Deterministic stress test** — an early-crash bad-sequence run shown as an illustrative downside card, separate from the headline verdict.
+  - **Tax transparency** — `simulate()` now also returns `taxSummary` (`ssTaxableFrac`, `k401EffRate`) surfaced in both result panels.
+- **Priority 3 robustness (PRD §3.5):**
+  - **Marginal-rate solver** — the 401k gross-up now uses a 50-step **bisection** (`grossUpMonthly`) instead of a 3-iteration fixed point, which converges robustly even when a draw straddles a federal bracket boundary. Identical to the old result except on bracket-straddling draws (where bisection is strictly more accurate).
+  - **RMD tax cash-flow** — a forced RMD now reinvests the **full gross** into the taxable brokerage and pays the income tax explicitly from cash (`cd`) then brokerage (`bk`). This is slightly more conservative than netting the tax out of the proceeds; total wealth still drops by exactly the tax. (Degenerates to the prior behavior when `cd = 0`.)
+- **Updated outputs:** `simulate()` now returns `{ snaps, depleted, bridgeShortfall, estateGainTax, taxSummary }`.
+- **UI:** the left accordion sidebar gained **Estate**, **Advanced**, and **Scenario** sections; the in-app "How it works" tab documents all of the above.
+- **Tests:** regression coverage added in `src/__tests__/roadmap.test.js` (one-time firing/inflation, phase multipliers, birth-year→RMD, FRA schedule, stress monotonicity, tax-summary capture, default inertness) and `src/__tests__/priority3.test.js` (solver convergence across a bracket boundary, RMD tax cash-flow with `cd > 0`, step-up on/off estate gain tax, low-provisional-income SS taxation). Full suite: **122 passing**.
+
+> **Still display-only:** the legacy target shows a projected-estate-vs-target gap; it does not feed the sustainable-spend search (a defensible MVP choice, noted for future work).
+
 ---
 
 ## 5. Input variable catalog (complete)
@@ -209,6 +232,8 @@ The five hand-validated scenarios from the handoff brief, reframed as **acceptan
 ---
 
 ## 9. Planned features — roadmap
+
+> **Status (2026-06-17):** P0–P5 below are all **shipped** (see §4.7). The descriptions are retained for design rationale and tax-year detail. Remaining future work has moved to `PRD_Next_Medium_Roadmap_June2026.md` §7: deeper Monte Carlo visualization, a multi-year bracket-filling Roth optimizer, post-65 healthcare modeling, and per-state income-type exclusion tables.
 
 Ordered by impact on the early-retiree persona. Each item: rule, tax-year detail, engine hook.
 

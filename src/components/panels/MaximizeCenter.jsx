@@ -2,6 +2,7 @@
 // Hero: portfolio at retirement (big number) → KPI chips → optimal
 // Roth conversion card → portfolio chart.
 import { StackedChart } from "../charts/StackedChart.jsx";
+import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
 import { fmt, pct } from "../../format.js";
 
 function KpiChip({ label, value, accent }) {
@@ -45,7 +46,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, optimal }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, optimal, stressResult }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
   const convBetter = optimal.amount > 0 && optimal.endVal > optimal.baseEnd;
@@ -187,6 +188,11 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
           </div>
         )}
       </div>
+
+      {/* ── Stress test / transparency / legacy ──────── */}
+      <StressCard stressResult={stressResult} plan={plan} />
+      <TaxTransparency plan={plan} result={result} />
+      <LegacyGap plan={plan} endVal={endVal} />
 
       {/* ── Chart ────────────────────────────────────── */}
       <div

@@ -25,7 +25,7 @@
 
 import { federalTax, taxableSsAmount } from "./tax.js";
 import { rmdFactor } from "./rmd.js";
-import { DEFAULT_FILING_STATUS, ACA } from "../constants/brackets.js";
+import { DEFAULT_FILING_STATUS, ACA, STD_DEDUCTION } from "../constants/brackets.js";
 
 // Gross-up solver for a tax-deferred (401k) withdrawal: find the monthly PRE-tax draw
 // whose after-tax value equals `needMonthly`, where the effective rate is the marginal
@@ -90,6 +90,8 @@ export function simulate({
   noGoMult = 1,              // spending multiplier, noGoAge+ (low-activity years)
   slowGoAge = Infinity,      // age the slow-go phase begins
   noGoAge = Infinity,        // age the no-go phase begins
+  conversionCeiling = 0,     // bracket-fill: convert up to this TAXABLE-income top each year; 0 = use fixed amount
+  conversionEndAge = 59.5,   // conversions allowed while age < this (59.5 = bridge only; raise for RMD-prep years)
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const mi = inflationRate / 100 / 12;
@@ -129,6 +131,7 @@ export function simulate({
 
   const tranches = []; // converted-Roth tranches awaiting their 5y unlock
   const scheduled = new Set();
+  const conversions = []; // per-year Roth conversions actually performed: { age, amount }
   const firedOneTime = new Set(); // one-time expenses already applied (by index)
   const snaps = [];
   // Phase-based spending: multiply the base monthly spend by the phase factor for the current age.
@@ -176,19 +179,51 @@ export function simulate({
       if (annualSsEst > 0 && taxSummary.ssTaxableFrac === null) taxSummary.ssTaxableFrac = taxableSsFrac;
     }
 
-    // Roth conversion ladder — once per bridge year.
-    if (annualRothConversion > 0 && age < 59.5 && !scheduled.has(yr) && m % 12 === 0) {
+    // Roth conversion ladder — once per eligible year. Two modes:
+    //   • Fixed: convert `annualRothConversion` each year.
+    //   • Bracket-fill (conversionCeiling > 0): convert up to the amount that brings this year's
+    //     ordinary income to (ceiling taxable income + standard deduction), net of income already
+    //     stacked below (drawBase ≈ taxable SS). This "fills the bracket" cheaply.
+    // Eligible while age < conversionEndAge (default 59.5 = bridge only; the optimizer raises it
+    // to capture RMD-prep years). drawBase same-year 401k draws are not subtracted (approximation).
+    const convMode = conversionCeiling > 0 ? "fill" : annualRothConversion > 0 ? "fixed" : null;
+    if (convMode && age < conversionEndAge && !scheduled.has(yr) && m % 12 === 0) {
       scheduled.add(yr);
-      const conv = Math.min(annualRothConversion, k);
+      const target = convMode === "fill"
+        ? Math.max(0, conversionCeiling + (STD_DEDUCTION[filingStatus] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS]) - drawBase)
+        : annualRothConversion;
+      let conv = Math.min(target, k);
       if (conv > 0) {
-        k -= conv;
         // Tax on conversion: marginal delta from drawBase (stacked on other income this year).
-        const convFedTax = federalTax(drawBase + conv, filingStatus) - federalTax(drawBase, filingStatus);
-        const tax = convFedTax + conv * stateTaxRate / 100;
-        cd = Math.max(0, cd - Math.min(tax, cd));
-        tranches.push({ avail: age + 5, amt: conv });
-        yearOrdAccum += conv;
-        if (monthlyAcaFullPremium > 0) magiYearAccum += conv;
+        const taxOf = (amt) =>
+          (federalTax(drawBase + amt, filingStatus) - federalTax(drawBase, filingStatus)) + amt * stateTaxRate / 100;
+        let tax = taxOf(conv);
+        // You can only convert as much as you can pay tax on from liquid funds (cd + bk). Without
+        // this, a large bracket-fill with little cash would be silently under-taxed — and the
+        // optimizer would "discover" that fiction. Scale the conversion down to what's affordable.
+        const liquid = cd + bk;
+        if (tax > liquid && tax > 0) {
+          conv *= liquid / tax;
+          tax = taxOf(conv);
+        }
+        if (conv > 0) {
+          k -= conv;
+          // Pay the conversion tax from cash (cd) first, then brokerage (bk).
+          let taxDue = tax;
+          const fromCd = Math.min(taxDue, cd);
+          cd -= fromCd;
+          taxDue -= fromCd;
+          if (taxDue > 0) {
+            const fromBk = Math.min(taxDue, bk);
+            bk -= fromBk;
+            bb = Math.max(0, bb - fromBk);
+            taxDue -= fromBk;
+          }
+          tranches.push({ avail: age + 5, amt: conv });
+          yearOrdAccum += conv;
+          conversions.push({ age: Math.round(age), amount: conv });
+          if (monthlyAcaFullPremium > 0) magiYearAccum += conv;
+        }
       }
     }
 
@@ -369,5 +404,5 @@ export function simulate({
   }
 
   const estateGainTax = assumeStepUpBasis ? 0 : Math.max(0, bk - bb) * brokerageLtcgRate / 100;
-  return { snaps, depleted, bridgeShortfall, estateGainTax, taxSummary };
+  return { snaps, depleted, bridgeShortfall, estateGainTax, taxSummary, conversions };
 }

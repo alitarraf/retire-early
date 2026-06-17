@@ -62,6 +62,8 @@ export const DEFAULTS = {
 
   // Strategy
   annualRothConversion: 0,
+  conversionCeiling: 0,      // bracket-fill target (taxable-income top); 0 = fixed amount above
+  conversionEndAge: 59.5,    // conversions allowed while age < this (optimizer may raise to ~72)
   rule55: false,
   annualSepp: 0,
   guardrailUpper: 0,
@@ -188,6 +190,8 @@ export function simParamsAt(plan, age, overrides = {}) {
     ss2Benefit: overrides.ss2Benefit ?? plan.ss2Benefit,
     ss2Age: overrides.ss2Age ?? plan.ss2Age,
     annualRothConversion: overrides.annualRothConversion ?? plan.annualRothConversion,
+    conversionCeiling: overrides.conversionCeiling ?? plan.conversionCeiling,
+    conversionEndAge: overrides.conversionEndAge ?? plan.conversionEndAge,
     filingStatus: plan.filingStatus,
     rmdAge: overrides.rmdAge ?? plan.rmdAge,
     monthlyAcaFullPremium: overrides.monthlyAcaFullPremium ?? plan.monthlyAcaFullPremium,

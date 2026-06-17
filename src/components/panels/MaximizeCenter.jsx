@@ -3,7 +3,7 @@
 // Roth conversion card → portfolio chart.
 import { StackedChart } from "../charts/StackedChart.jsx";
 import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
-import { fmt, pct } from "../../format.js";
+import { fmt, fmtK, pct } from "../../format.js";
 
 function KpiChip({ label, value, accent }) {
   return (
@@ -46,10 +46,12 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, optimal, stressResult }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, stressResult }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
-  const convBetter = optimal.amount > 0 && optimal.endVal > optimal.baseEnd;
+  const opt = dynamicOpt ?? { type: "none", gain: 0, schedule: [] };
+  const convBetter = opt.type === "fill" && opt.gain > 0;
+  const bracketLabel = `${Math.round(opt.rate * 100)}%`;
 
   return (
     <div
@@ -115,8 +117,8 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
             accent
           />
           <KpiChip
-            label="Optimal Roth conversion"
-            value={convBetter ? `${fmt(optimal.amount)}/yr` : "None"}
+            label="Roth conversion strategy"
+            value={convBetter ? `Fill ${bracketLabel}` : "None"}
           />
           <KpiChip label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} />
         </div>
@@ -142,7 +144,7 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
             marginBottom: 12,
           }}
         >
-          Optimal Roth conversion
+          Dynamic Roth conversion optimizer
         </div>
         {convBetter ? (
           <div
@@ -154,23 +156,66 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
             }}
           >
             <div style={{ fontSize: 10, fontWeight: 700, color: "#3d8c78", marginBottom: 4 }}>
-              RECOMMENDED
+              RECOMMENDED STRATEGY
             </div>
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 700,
-                fontFamily: "'JetBrains Mono', monospace",
-                color: "#1a2e28",
-              }}
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#1a2e28", lineHeight: 1.25 }}>
+              Fill to the top of the {bracketLabel} bracket
+            </div>
+            <div style={{ fontSize: 12, color: "#5aa88c", marginTop: 2 }}>
+              each year through age {opt.endAge}
+            </div>
+
+            <div style={{ display: "flex", gap: 28, margin: "12px 0 4px", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#3d8c78" }}>
+                  +{fmt(Math.round(opt.gain))}
+                </div>
+                <div style={{ fontSize: 10, color: "#9db4ae" }}>Added estate at {plan.lifeExpect}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#1a2e28" }}>
+                  {fmtK(opt.totalConverted)}
+                </div>
+                <div style={{ fontSize: 10, color: "#9db4ae" }}>Total converted</div>
+              </div>
+              {opt.rmdReduction > 0 && (
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#1a2e28" }}>
+                    −{fmtK(opt.rmdReduction)}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#9db4ae" }}>401k at RMD age {opt.rmdAge}</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ fontSize: 11, color: "#5aa88c", marginTop: 4, lineHeight: 1.5 }}>
+              Estate with plan: <strong>{fmt(Math.round(opt.estateWith))}</strong> vs no conversions:{" "}
+              <strong>{fmt(Math.round(opt.estateBase))}</strong>.
+            </div>
+
+            {/* Per-year schedule (nominal future $) */}
+            <div style={{ marginTop: 10, borderTop: "1px solid #d6ebe2", paddingTop: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#7C9A92", marginBottom: 6 }}>
+                Recommended schedule <span style={{ fontWeight: 400, textTransform: "none" }}>(nominal $)</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {opt.schedule.slice(0, 10).map((c, i) => (
+                  <div key={i} style={{ background: "#fff", border: "1px solid #cfe6dc", borderRadius: 6, padding: "3px 7px", fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: "#1a2e28" }}>
+                    <span style={{ color: "#9db4ae" }}>{c.age}</span> {fmtK(c.amount)}
+                  </div>
+                ))}
+                {opt.schedule.length > 10 && (
+                  <div style={{ fontSize: 10, color: "#9db4ae", alignSelf: "center" }}>+{opt.schedule.length - 10} more</div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => onApplyOptimized?.(opt)}
+              style={{ marginTop: 12, width: "100%", border: "none", borderRadius: 8, cursor: "pointer", background: "#1a2e28", color: "#7ecfbb", fontSize: 12, fontWeight: 700, padding: "9px 0" }}
             >
-              {fmt(optimal.amount)}/yr
-            </div>
-            <div style={{ fontSize: 11, color: "#5aa88c", marginTop: 6, lineHeight: 1.5 }}>
-              Estate with conversion:{" "}
-              <strong>{fmt(Math.round(optimal.endVal))}</strong> vs no conversion:{" "}
-              <strong>{fmt(Math.round(optimal.baseEnd))}</strong>
-            </div>
+              Apply these conversions →
+            </button>
           </div>
         ) : (
           <div
@@ -183,8 +228,9 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
               lineHeight: 1.5,
             }}
           >
-            No Roth conversion improves the estate in this scenario — 401k withdrawals are already
-            at a low effective rate, or the tax cost outweighs the benefit.
+            No multi-year Roth conversion strategy improves the estate in this scenario — your 401k
+            withdrawals are already at a low effective rate, there isn't enough cash to pay the
+            conversion tax, or the tax cost outweighs the benefit.
           </div>
         )}
       </div>
@@ -217,12 +263,13 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, o
         >
           Portfolio over time
         </div>
-        <StackedChart snaps={snaps} ssAge={plan.ssAge} />
+        <StackedChart snaps={snaps} ssAge={plan.ssAge} stressSnaps={stressResult?.snaps} />
       </div>
 
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>
         Sustainable spend = max monthly draw where money lasts to age {plan.lifeExpect} (binary
-        search). Optimal conversion = exhaustive $0–$60k search in $5k steps. Planning model only.
+        search). Conversion optimizer = multi-year "fill to top of bracket" search; conversions are
+        funded from cash/brokerage and capped at what you can afford to pay tax on. Planning model only.
       </div>
     </div>
   );

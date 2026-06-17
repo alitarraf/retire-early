@@ -3,7 +3,7 @@ import { DEFAULTS, makePlan, runMain, projectAtRetirement, simParamsAt } from ".
 import { earliestRetireAge } from "./analysis/earliestRetireAge.js";
 import { sensitivity } from "./analysis/sensitivity.js";
 import { marginalValues } from "./analysis/marginalValue.js";
-import { optimalConversion } from "./analysis/optimalConversion.js";
+import { dynamicOptimizer } from "./analysis/dynamicOptimizer.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
 import { monteCarlo } from "./engine/monteCarlo.js";
 import { stressTest } from "./analysis/stressTest.js";
@@ -52,10 +52,16 @@ export default function App() {
   // Maximize-mode analysis
   const atRetirement = useMemo(() => projectAtRetirement(plan), [plan]);
   const marginalRows = useMemo(() => (mode === "maximize" ? marginalValues(plan) : []), [plan, mode]);
-  const optimal = useMemo(
-    () => (mode === "maximize" ? optimalConversion(plan) : { amount: 0, endVal: 0, baseEnd: 0 }),
-    [plan, mode],
-  );
+  const dynamicOpt = useMemo(() => (mode === "maximize" ? dynamicOptimizer(plan) : null), [plan, mode]);
+
+  // "Apply these conversions" — writes the recommended bracket-fill strategy into the plan inputs.
+  const applyOptimized = (opt) =>
+    setInputs((prev) => ({
+      ...prev,
+      conversionCeiling: opt.ceiling,
+      conversionEndAge: opt.endAge,
+      annualRothConversion: 0,
+    }));
 
   // Un-gated: used in Early mode KPI chip and Maximize mode hero
   const sustainable = useMemo(() => sustainableSpend(plan), [plan]);
@@ -178,6 +184,36 @@ export default function App() {
           >
             <DocsPanel />
           </div>
+        ) : !result ? (
+          <div
+            style={{
+              gridColumn: "2 / 4",
+              background: "#f0f5f4",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "28px 36px",
+            }}
+          >
+            <div
+              style={{
+                maxWidth: 360,
+                textAlign: "center",
+                background: "#fff",
+                borderRadius: 14,
+                padding: "24px 28px",
+                boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#c97c1a", marginBottom: 8 }}>
+                Check the retirement age
+              </div>
+              <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
+                Your retire age ({inputs.retireAge}) must be greater than your current age (
+                {inputs.currentAge}) to run a projection. Adjust either value in the sidebar.
+              </div>
+            </div>
+          </div>
         ) : mode === "early" ? (
           <>
             <EarlyPanel
@@ -198,7 +234,8 @@ export default function App() {
               result={result}
               totalAtRetirement={totalAtRetirement}
               sustainable={sustainable}
-              optimal={optimal}
+              dynamicOpt={dynamicOpt}
+              onApplyOptimized={applyOptimized}
               stressResult={stressResult}
             />
             <MaximizeRail

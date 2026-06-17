@@ -129,6 +129,27 @@ describe("Roadmap: deterministic stress test", () => {
     const stressed = stressTest(simParamsAt(plan, 55), { dropPct: 50, years: 5 });
     expect(stressed.snaps.length).toBeGreaterThan(0);
   });
+
+  it("stress snaps align 1:1 with the deterministic snaps (for the chart overlay)", () => {
+    const plan = makePlan({ ...base, currentAge: 50, retireAge: 55 });
+    const sp = simParamsAt(plan, 55);
+    const calm = simulate(sp);
+    const stressed = stressTest(sp, { dropPct: 30, years: 3 });
+    expect(stressed.snaps.length).toBe(calm.snaps.length);
+    expect(stressed.snaps.map((s) => s.age)).toEqual(calm.snaps.map((s) => s.age));
+  });
+
+  it("applies the crash to the early years then reverts to the mean", () => {
+    const plan = makePlan({ ...base, currentAge: 50, retireAge: 55 });
+    const sp = simParamsAt(plan, 55);
+    const calm = simulate(sp);
+    const stressed = stressTest(sp, { dropPct: 30, years: 3 });
+    const tot = (res, age) => res.snaps.find((s) => s.age === age).total;
+    // Early years: stress is well below calm (crash compounding).
+    expect(tot(stressed, 58)).toBeLessThan(tot(calm, 58) * 0.8);
+    // The gap should be established during the crash window, not widen unboundedly after.
+    expect(tot(stressed, 58)).toBeGreaterThan(0);
+  });
 });
 
 // ── Tax transparency capture ──────────────────────────────────

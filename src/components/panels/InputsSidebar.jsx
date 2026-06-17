@@ -8,7 +8,7 @@ import { marginalFedRate } from "../../engine/tax.js";
 import { fraForBirthYear } from "../../engine/socialSecurity.js";
 import {
   STATE_TAXES, EMPLOYMENT_BRACKETS, LTCG_RATES, CONTRIB_LIMITS,
-  FILING_STATUS, FILING_STATUS_LABELS, TAX_YEAR,
+  FILING_STATUS, FILING_STATUS_LABELS, TAX_YEAR, FED_BRACKETS,
 } from "../../constants/brackets.js";
 import { fmt, fmtK, pct } from "../../format.js";
 
@@ -444,11 +444,33 @@ export function InputsSidebar({ inputs, set, plan }) {
         {/* ── Strategy ─────────────────────────────────── */}
         <AccSection
           title="Strategy"
-          summary={`Roth ${fmtK(inputs.annualRothConversion)}/yr · R55 ${inputs.rule55 ? "on" : "off"} · SEPP ${fmtK(inputs.annualSepp)}/yr · GK ${inputs.guardrailUpper > 0 ? "on" : "off"}`}
+          summary={`Roth ${
+            inputs.conversionCeiling > 0
+              ? `fill ${Math.round((FED_BRACKETS[inputs.filingStatus]?.find((b) => b.upTo === inputs.conversionCeiling)?.rate ?? 0) * 100)}%`
+              : `${fmtK(inputs.annualRothConversion)}/yr`
+          } · R55 ${inputs.rule55 ? "on" : "off"} · SEPP ${fmtK(inputs.annualSepp)}/yr · GK ${inputs.guardrailUpper > 0 ? "on" : "off"}`}
           isOpen={open === "strategy"}
           onToggle={() => toggle("strategy")}
         >
           <SubTitle>Roth conversion ladder</SubTitle>
+          {inputs.conversionCeiling > 0 && (
+            <div style={{ background: "#f0faf6", border: "1px solid #a3d9c7", borderRadius: 8, padding: "9px 11px", marginBottom: 9 }}>
+              <div style={{ fontSize: 10, color: "#2a6e56", lineHeight: 1.5 }}>
+                <strong>Optimizer active:</strong> fill to top of the{" "}
+                {Math.round((FED_BRACKETS[inputs.filingStatus]?.find((b) => b.upTo === inputs.conversionCeiling)?.rate ?? 0) * 100)}% bracket
+                each year through age {inputs.conversionEndAge}. The fixed amount below is ignored.
+              </div>
+              <button
+                onClick={() => {
+                  set("conversionCeiling")(0);
+                  set("conversionEndAge")(59.5);
+                }}
+                style={{ marginTop: 6, border: "1px solid #a3d9c7", background: "#fff", color: "#2a6e56", borderRadius: 6, cursor: "pointer", fontSize: 10, fontWeight: 700, padding: "3px 9px" }}
+              >
+                Clear optimizer strategy
+              </button>
+            </div>
+          )}
           <Field label={`Convert 401k → Roth/yr (bridge: ${inputs.retireAge}→59½)`}>
             <NumInput value={inputs.annualRothConversion} onChange={set("annualRothConversion")} prefix="$" step={5000} width={130} />
           </Field>

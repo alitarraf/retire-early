@@ -1,7 +1,14 @@
 // Stacked portfolio-over-time chart with phase-shaded background.
-export function StackedChart({ snaps, ssAge }) {
+// When `stressSnaps` is supplied (Scenario Testing in Stress mode), a red
+// total-portfolio line for the stress scenario is overlaid on the bars.
+export function StackedChart({ snaps, ssAge, stressSnaps = null }) {
   if (!snaps.length) return null;
-  const maxVal = Math.max(...snaps.map((s) => s.total), 1);
+  const hasStress = Array.isArray(stressSnaps) && stressSnaps.length > 0;
+  const maxVal = Math.max(
+    ...snaps.map((s) => s.total),
+    ...(hasStress ? stressSnaps.map((s) => s.total) : []),
+    1,
+  );
   const W = 460;
   const H = 160;
   const YPAD = 36;
@@ -66,6 +73,29 @@ export function StackedChart({ snaps, ssAge }) {
             );
           });
         })}
+        {hasStress && (() => {
+          const pts = stressSnaps
+            .map((s, i) => {
+              const x = YPAD + i * (barW + 1) + barW / 2;
+              const y = H - (Math.max(0, s.total) / maxVal) * H;
+              return `${x.toFixed(1)},${y.toFixed(1)}`;
+            })
+            .join(" ");
+          // First snapshot where the stress portfolio is depleted, for an end-marker.
+          const depIdx = stressSnaps.findIndex((s) => s.total < 1);
+          return (
+            <g>
+              <polyline points={pts} fill="none" stroke="#c0392b" strokeWidth={1.8} strokeLinejoin="round" />
+              {depIdx > 0 && (
+                <circle cx={YPAD + depIdx * (barW + 1) + barW / 2} cy={H} r={3} fill="#c0392b" />
+              )}
+              <line x1={W - 86} y1={8} x2={W - 72} y2={8} stroke="#c0392b" strokeWidth={1.8} />
+              <text x={W - 68} y={11} fontSize={8} fill="#c0392b" fontWeight="700">
+                Stress test
+              </text>
+            </g>
+          );
+        })()}
         {snaps
           .filter((s) => s.age % 5 === 0)
           .map((s) => {

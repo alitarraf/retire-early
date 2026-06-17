@@ -131,6 +131,18 @@ The full P0–P5 roadmap below is **built**, and the simulation engine has since
 
 > **Still display-only:** the legacy target shows a projected-estate-vs-target gap; it does not feed the sustainable-spend search (a defensible MVP choice, noted for future work).
 
+### 4.8 Dynamic Roth conversion optimizer (`PRD_Dynamic_Optimizer_June2026.md`) — *shipped*
+
+Replaces the single-amount grid search in the live UI with a **multi-year "fill to top of X% bracket" optimizer**:
+
+- **Engine (`simulate()`):** the Roth conversion ladder gained a **bracket-fill mode** (`conversionCeiling` = a taxable-income top to fill to each year) and a configurable **`conversionEndAge`** (default 59.5 = bridge only; the optimizer raises it to ~72 to capture RMD-prep years). Per-year conversions are reported via a new `conversions` output. Crucially, the conversion **tax is now funded from cash then brokerage and the conversion is capped at what that liquid can pay** — closing an artifact where a large bracket-fill with little cash was silently tax-free.
+- **Analysis (`dynamicOptimizer.js`):** runs the baseline + the 10/12/22/24% bracket ceilings over the window, picks the max net estate (step-up applied), and returns the recommended bracket, the per-year schedule, total converted, and the future-RMD reduction. ~5 simulations per run — well within budget.
+- **UI (`MaximizeCenter.jsx`):** the "Optimal Roth conversion" card is now the **dynamic optimizer** — recommended strategy, estate with/without, schedule (nominal $), RMD-reduction insight, and an **"Apply these conversions"** button. The Strategy sidebar section shows when an optimizer strategy is active with a one-click **Clear**.
+- **`optimalConversion.js`** is retained (still unit-tested) but no longer used in the live UI.
+- **Tests:** `src/__tests__/dynamicOptimizer.test.js` — bracket-fill identity/ceiling math, `conversionEndAge` window extension, the **affordability/artifact guard** (no fictitious gain when the tax can't be funded), estate improvement, and RMD reduction. Full suite: **132 passing**.
+
+> **v1 scope & ACA/IRMAA handling:** estate-maximization objective only (sustainable-spend objective and per-year withdrawal-order optimization remain future work); the bracket-fill ignores same-year 401k draws when sizing the conversion (a minor approximation in post-59½ years). ACA MAGI cliffs and the IRMAA lookback are respected **implicitly, not as hard constraints**: each conversion feeds `magiYearAccum`, so when the user has entered an ACA premium (or is in IRMAA range) a bracket-fill that crosses the cliff raises premiums, lowers the estate, and is therefore not chosen by the objective. There is no explicit cliff-avoidance term — if no ACA premium is entered, the cliff is invisible to the optimizer. Explicit ACA/IRMAA-aware ceiling selection is future work.
+
 ---
 
 ## 5. Input variable catalog (complete)
@@ -233,7 +245,7 @@ The five hand-validated scenarios from the handoff brief, reframed as **acceptan
 
 ## 9. Planned features — roadmap
 
-> **Status (2026-06-17):** P0–P5 below are all **shipped** (see §4.7). The descriptions are retained for design rationale and tax-year detail. Remaining future work has moved to `PRD_Next_Medium_Roadmap_June2026.md` §7: deeper Monte Carlo visualization, a multi-year bracket-filling Roth optimizer, post-65 healthcare modeling, and per-state income-type exclusion tables.
+> **Status (2026-06-17):** P0–P5 below are all **shipped** (see §4.7), as is the **dynamic multi-year Roth conversion optimizer** (`PRD_Dynamic_Optimizer_June2026.md`). The descriptions are retained for design rationale and tax-year detail. Remaining future work: deeper Monte Carlo visualization, post-65 healthcare modeling, per-state income-type exclusion tables, and dynamic per-year withdrawal-order optimization.
 
 Ordered by impact on the early-retiree persona. Each item: rule, tax-year detail, engine hook.
 

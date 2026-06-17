@@ -196,8 +196,12 @@ export function DocsPanel() {
       <H3>Marginal value of $1,000/yr</H3>
       <P>For each account type, adds $1,000/yr to contributions and measures the increase in estate value at death. Accounts with higher marginal value are where your next savings dollar goes furthest — accounting for taxes, growth, and draw order.</P>
 
-      <H3>Optimal Roth conversion</H3>
-      <P>Tests every $5k annual conversion amount from $0 to $60k during the bridge, runs the full simulation for each, and picks the amount that maximizes estate value. A conversion is only recommended if it improves the estate — if the tax cost today outweighs the long-term benefit, the recommendation is $0.</P>
+      <H3>Dynamic Roth conversion optimizer</H3>
+      <P>Instead of a single fixed annual amount, the optimizer evaluates a multi-year <strong>"fill to the top of the X% bracket each year"</strong> strategy across a window (your retire age through ~72, capturing both the bridge and the years before RMDs begin). For each candidate bracket (10/12/22/24%) it runs the full simulation and keeps the one that maximizes your net estate at life expectancy.</P>
+      <P>Filling low brackets while your income is low converts tax-deferred 401k dollars cheaply, grows them tax-free in the Roth, and <strong>shrinks your future Required Minimum Distributions</strong> (which would otherwise be taxed as ordinary income later). The card shows the recommended bracket, the added estate vs. doing nothing, the total converted, the reduction in your 401k at RMD age, and the year-by-year conversion schedule (in nominal future dollars).</P>
+      <Callout>
+        Conversions are only as large as you can <strong>pay the tax on</strong> from cash then brokerage — a conversion you can't fund is scaled down, so the optimizer never recommends a strategy that depends on phantom tax-free conversions. "Apply these conversions" writes the strategy into your plan; the Strategy section then shows it's active with a one-click way to clear it.
+      </Callout>
 
       {/* ── Engine ── */}
       <H2>How the simulation engine works</H2>

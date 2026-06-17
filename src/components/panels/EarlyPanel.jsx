@@ -258,7 +258,7 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
         >
           Portfolio over time
         </div>
-        <StackedChart snaps={snaps} ssAge={plan.ssAge} />
+        <StackedChart snaps={snaps} ssAge={plan.ssAge} stressSnaps={stressResult?.snaps} />
       </div>
 
       {/* Footnote */}

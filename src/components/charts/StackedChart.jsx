@@ -25,8 +25,8 @@ export function StackedChart({ snaps, ssAge }) {
     v >= 1e6 ? `$${(v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1)}M` : `$${(v / 1000).toFixed(0)}k`;
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <svg width={W} height={H + 34} style={{ display: "block" }}>
+    <div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H + 34}`} style={{ display: "block" }}>
         {ticks.map((v) => {
           const y = H - (v / maxVal) * H;
           return (

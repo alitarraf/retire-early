@@ -58,6 +58,23 @@ export function DocsPanel() {
         </p>
       </div>
 
+      {/* ── Two tabs ── */}
+      <H2>The two tabs</H2>
+      <P>Both tabs share the same sidebar inputs and the same month-by-month simulation engine. The difference is what they solve for.</P>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, margin: "4px 0 16px" }}>
+        <div style={{ background: "#fff", border: "2px solid #3d8c78", borderRadius: 12, padding: "16px 18px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#3d8c78", marginBottom: 8 }}>Retire Early</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2e28", marginBottom: 8 }}>When can I retire?</div>
+          <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>Retirement age is the <strong>output</strong>. A binary search runs the simulation across ages 30–75 to find the youngest age where money lasts to your life expectancy. Sensitivity rows show which levers move that date. Monte Carlo stress-tests it against 500 randomized return sequences.</div>
+        </div>
+        <div style={{ background: "#fff", border: "2px solid #1a2e28", borderRadius: 12, padding: "16px 18px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1a2e28", marginBottom: 8 }}>Maximize Portfolio</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1a2e28", marginBottom: 8 }}>How well can I retire?</div>
+          <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>Retirement age is a <strong>fixed input</strong>. The model solves for sustainable spend, finds the optimal Roth conversion amount, and shows where your next savings dollar does the most good — after taxes, growth, and draw order.</div>
+        </div>
+      </div>
+      <Callout>In practice: use <strong>Retire Early</strong> to find your exit window, then switch to <strong>Maximize</strong> to fine-tune strategy once you've locked in a target age.</Callout>
+
       {/* ── Getting started ── */}
       <H2>Getting started</H2>
       <P>Fill in the left panel top to bottom. The results update live as you type. The minimum useful set:</P>

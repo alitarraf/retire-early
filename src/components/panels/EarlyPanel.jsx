@@ -1,171 +1,205 @@
-// Right column for Retire Early mode. Output priority: earliest-age
-// headline → verdict → sensitivity levers → phase breakdown → chart.
-import { Card, Label, BigNum } from "../ui.jsx";
+// Center column for Retire Early mode: hero verdict → KPI chips →
+// Monte Carlo card → portfolio chart. Phase breakdown and sensitivity
+// levers live in RightRail.jsx to the right.
 import { StackedChart } from "../charts/StackedChart.jsx";
 import { fmt, pct } from "../../format.js";
 
-export function EarlyPanel({ plan, result, earliest, sensitivityRows, mcResult }) {
+// ─── Module-scope atoms ──────────────────────────────────────
+
+function BridgeWarning({ months }) {
+  return (
+    <div
+      style={{
+        background: "#fff8e8",
+        border: "1px solid #f5d9a0",
+        borderRadius: 10,
+        padding: "10px 14px",
+        marginBottom: 18,
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#c97c1a", marginBottom: 3 }}>
+        ⚠ Bridge gap: {months} months
+      </div>
+      <div style={{ fontSize: 11, color: "#a06010", lineHeight: 1.5 }}>
+        Accessible funds run short before 59½. Add to munis or brokerage, or use the Roth conversion ladder.
+      </div>
+    </div>
+  );
+}
+
+function KpiChip({ label, value, accent, warn }) {
+  return (
+    <div
+      style={{
+        background: accent ? "#1a2e28" : warn ? "#fff3f0" : "#f0f5f4",
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: warn ? "1px solid #f5c0b0" : "none",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          fontWeight: 700,
+          color: accent ? "#7ecfbb" : warn ? "#c0392b" : "#9db4ae",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          marginBottom: 5,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: accent ? "#fff" : warn ? "#c0392b" : "#1a2e28",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main export ─────────────────────────────────────────────
+
+export function EarlyPanel({ plan, result, earliest, mcResult, totalAtRetirement, sustainable }) {
   const { snaps, depleted, bridgeShortfall } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
-  const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
-  const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
-  const endVal = snaps[snaps.length - 1]?.total || 0;
+  const endVal = snaps[snaps.length - 1]?.total ?? 0;
+
+  const heroNum = earliest !== null ? String(earliest) : "75+";
+  const heroOk = onTrack && survives;
+  const heroWarn = !onTrack && earliest !== null;
+  const heroColor = earliest === null ? "#c0392b" : onTrack ? "#1a2e28" : "#c97c1a";
+
+  let heroStatus;
+  if (earliest === null) {
+    heroStatus = "Even at 75, money doesn't last — reduce spending or increase savings";
+  } else if (onTrack) {
+    const ahead = plan.retireAge - earliest;
+    heroStatus =
+      ahead > 0
+        ? `✓ ${ahead} year${ahead > 1 ? "s" : ""} ahead of your target (${plan.retireAge})`
+        : `✓ Right on target — money lasts to age ${plan.lifeExpect}`;
+  } else {
+    const need = earliest - plan.retireAge;
+    heroStatus = `⚠ Need ${need} more year${need > 1 ? "s" : ""} — adjust a lever →`;
+  }
+
+  const mcColor =
+    !mcResult
+      ? "#9db4ae"
+      : mcResult.successRate >= 0.9
+      ? "#3d8c78"
+      : mcResult.successRate >= 0.75
+      ? "#c97c1a"
+      : "#c0392b";
 
   return (
-    <div style={{ flex: "1 1 300px", minWidth: 0, display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Earliest age */}
-      <Card
-        accent={onTrack}
-        warn={!onTrack && earliest !== null}
+    <div
+      style={{
+        background: "#f0f5f4",
+        height: "100%",
+        overflowY: "auto",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* ── Hero ─────────────────────────────────────── */}
+      <div
         style={{
-          border: !onTrack && earliest !== null ? "1.5px solid #f5d9a0" : "none",
-          background: !onTrack && earliest !== null ? "#fffbf0" : onTrack ? "#1a2e28" : "#fff3f0",
+          padding: "28px 24px 22px",
+          background: "#fff",
+          margin: "14px 14px 0",
+          borderRadius: 16,
+          boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
         }}
       >
-        <Label accent={onTrack} warn={!onTrack && earliest === null}>
-          Earliest you can retire
-        </Label>
-        <BigNum accent={onTrack} warn={!onTrack && earliest === null}>
-          {earliest !== null ? `Age ${earliest}` : "> Age 75"}
-        </BigNum>
-        <div style={{ fontSize: 11, marginTop: 4, color: onTrack ? "#7ecfbb" : earliest !== null ? "#c97c1a" : "#c0392b" }}>
-          {earliest === null
-            ? "Even at 75, money doesn't last — reduce spending or increase savings"
-            : onTrack
-            ? plan.retireAge - earliest > 0
-              ? `✓ ${plan.retireAge - earliest} year${plan.retireAge - earliest > 1 ? "s" : ""} earlier than your target of ${plan.retireAge}`
-              : `✓ Right on target — money lasts to age ${plan.lifeExpect}`
-            : `Need ${earliest - plan.retireAge} more year${earliest - plan.retireAge > 1 ? "s" : ""}. Adjust a lever below.`}
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.12em",
+            color: "#9db4ae",
+            marginBottom: 8,
+          }}
+        >
+          Earliest retirement
         </div>
-      </Card>
-
-      {/* Verdict */}
-      <Card accent={survives} warn={!survives}>
-        <Label accent={survives} warn={!survives}>
-          {survives ? `✓ Retiring at ${plan.retireAge} works` : `⚠ Retiring at ${plan.retireAge} — runs out`}
-        </Label>
-        <BigNum accent={survives} warn={!survives}>
-          {survives ? `Lasts to age ${plan.lifeExpect}` : `At age ${depleted?.toFixed(1)}`}
-        </BigNum>
-        <div style={{ fontSize: 11, marginTop: 4, color: survives ? "#7ecfbb" : "#e07060" }}>
-          {survives
-            ? `Remaining at ${plan.lifeExpect}: ${fmt(endVal)}`
-            : earliest
-            ? `Retire at ${earliest} instead — see levers below`
-            : "Increase savings or reduce spending"}
+        <div
+          style={{
+            fontSize: 88,
+            fontWeight: 800,
+            lineHeight: 1,
+            fontFamily: "'JetBrains Mono', monospace",
+            color: heroColor,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {heroNum}
         </div>
-        {survives && bridgeShortfall > 0 && (
-          <div style={{ marginTop: 10, background: "#fff8e8", border: "1px solid #f5d9a0", borderRadius: 8, padding: "8px 12px" }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#c97c1a", marginBottom: 2 }}>
-              ⚠ Bridge gap: {bridgeShortfall} months
-            </div>
-            <div style={{ fontSize: 10, color: "#a06010", lineHeight: 1.5 }}>
-              Accessible funds short before 59½. Add to munis or brokerage, or use the Roth conversion ladder.
-            </div>
-          </div>
-        )}
-      </Card>
-
-      {/* Sensitivity */}
-      <Card>
-        <Label>What moves your retirement age?</Label>
-        <div style={{ fontSize: 11, color: "#9db4ae", marginBottom: 12, lineHeight: 1.5 }}>
-          Each row changes one thing and re-runs the full simulation. Green = earlier retirement. All else equal.
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            marginTop: 10,
+            marginBottom: 22,
+            color: heroOk ? "#3d8c78" : heroWarn ? "#c97c1a" : "#c0392b",
+          }}
+        >
+          {heroStatus}
         </div>
-        {sensitivityRows.map(({ label, newEarliest, delta }) => {
-          const noChange = delta === null || delta === 0;
-          return (
-            <div key={label} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #eef2f1" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ fontSize: 12, color: "#4a5e58" }}>{label}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {newEarliest && (
-                    <span style={{ fontSize: 11, color: "#9db4ae", fontFamily: "'JetBrains Mono',monospace" }}>→ age {newEarliest}</span>
-                  )}
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      fontFamily: "'JetBrains Mono',monospace",
-                      minWidth: 70,
-                      textAlign: "right",
-                      color: delta > 0 ? "#3d8c78" : noChange ? "#b0c4be" : "#c0392b",
-                    }}
-                  >
-                    {delta > 0 ? `−${delta} yr${delta > 1 ? "s" : ""}` : noChange ? "no change" : `+${Math.abs(delta ?? 0)} yr`}
-                  </span>
-                </div>
-              </div>
-              {delta > 0 && (
-                <div style={{ background: "#eef2f1", borderRadius: 99, height: 4, overflow: "hidden" }}>
-                  <div style={{ width: `${Math.min(100, (delta / 10) * 100)}%`, height: "100%", background: "#3d8c78", borderRadius: 99, minWidth: 6 }} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5 }}>
-          Bar = years gained (max 10). Full simulation — taxes, SS, inflation, draw order.
+
+        {bridgeShortfall > 0 && <BridgeWarning months={bridgeShortfall} />}
+
+        {/* KPI chips */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+          <KpiChip label={`Portfolio at ${plan.retireAge}`} value={fmt(totalAtRetirement)} />
+          <KpiChip label="Sustainable spend" value={`${fmt(Math.round(sustainable))}/mo`} accent />
+          <KpiChip
+            label="MC success (500)"
+            value={mcResult ? `${Math.round(mcResult.successRate * 100)}%` : "—"}
+          />
+          <KpiChip label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} warn={!survives} />
         </div>
-      </Card>
+      </div>
 
-      {/* Phase breakdown */}
-      <Card>
-        <Label>Phase Breakdown</Label>
-        {[
-          {
-            color: "#f0a500",
-            age: `${plan.retireAge}→59½`,
-            title: "Bridge",
-            balance: snap59,
-            desc: `Roth contributions (free) → Munis → Brokerage (${pct(plan.brokerageLtcgRate)} LTCG). 401k locked.${
-              plan.annualRothConversion > 0 ? ` Converting ${fmt(plan.annualRothConversion)}/yr → Roth.` : ""
-            }`,
-          },
-          {
-            color: "#3d8c78",
-            age: `59½→${plan.ssAge}`,
-            title: "Early Retirement",
-            balance: snapSS,
-            desc: `Roth earnings free. 401k at retirement bracket (not ${plan.employmentBracket}%). No SS.`,
-          },
-          {
-            color: "#1a2e28",
-            age: `${plan.ssAge}+`,
-            title: "Full SS",
-            desc: `SS ${fmt(plan.ssBenefit)}/mo${plan.ss2Benefit > 0 ? ` + spouse ${fmt(plan.ss2Benefit)}/mo` : ""} offsets spend. 401k covers the gap.`,
-          },
-        ].map((ph) => (
-          <div key={ph.title} style={{ borderLeft: `3px solid ${ph.color}`, paddingLeft: 12, marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: ph.color }}>
-              {ph.title} <span style={{ fontWeight: 400, color: "#9db4ae" }}>Age {ph.age}</span>
-            </div>
-            <div style={{ fontSize: 11, color: "#4a5e58", lineHeight: 1.5, marginTop: 2 }}>{ph.desc}</div>
-            {ph.balance && (
-              <div style={{ fontSize: 11, fontFamily: "'JetBrains Mono',monospace", color: "#1a2e28", marginTop: 3 }}>
-                Portfolio: {fmt(ph.balance.total)}
-              </div>
-            )}
-          </div>
-        ))}
-      </Card>
-
-      {/* Monte Carlo */}
+      {/* ── Monte Carlo ──────────────────────────────── */}
       {mcResult && (
-        <Card>
-          <Label>Monte Carlo — 500 Scenarios</Label>
-          <div style={{ display: "flex", gap: 24, marginBottom: 10 }}>
+        <div
+          style={{
+            margin: "12px 14px 0",
+            background: "#fff",
+            borderRadius: 14,
+            padding: "16px 20px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              color: "#9db4ae",
+              marginBottom: 12,
+            }}
+          >
+            Monte Carlo — 500 scenarios
+          </div>
+          <div style={{ display: "flex", gap: 28, marginBottom: 12 }}>
             <div>
               <div
                 style={{
-                  fontSize: 26,
+                  fontSize: 30,
                   fontWeight: 700,
-                  fontFamily: "'JetBrains Mono',monospace",
-                  color:
-                    mcResult.successRate >= 0.9 ? "#3d8c78"
-                    : mcResult.successRate >= 0.75 ? "#c97c1a"
-                    : "#c0392b",
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: mcColor,
                 }}
               >
                 {Math.round(mcResult.successRate * 100)}%
@@ -173,35 +207,59 @@ export function EarlyPanel({ plan, result, earliest, sensitivityRows, mcResult }
               <div style={{ fontSize: 10, color: "#9db4ae" }}>Success rate</div>
             </div>
             <div>
-              <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: "#1a2e28" }}>
+              <div
+                style={{
+                  fontSize: 30,
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: "#1a2e28",
+                }}
+              >
                 {fmt(mcResult.medianEndTotal)}
               </div>
               <div style={{ fontSize: 10, color: "#9db4ae" }}>Median estate</div>
             </div>
           </div>
-          <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6, marginTop: 4 }}>
-            <strong style={{ color: "#4a5e58" }}>What this measures:</strong> each of 500 runs uses the same{" "}
-            {pct(plan.stockReturn)} mean return but randomizes the <em>sequence</em> — a crash at 57 vs. 75 has very
-            different consequences even with the same lifetime average. The gap between the deterministic verdict above
-            and this success rate is your sequence-of-returns risk.
+          <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6 }}>
+            Each run uses the same {pct(plan.stockReturn)} mean return but randomizes the{" "}
+            <em>sequence</em> — a crash at 57 vs 75 has very different consequences even with the
+            same lifetime average. The gap between the deterministic verdict above and this rate is
+            your sequence-of-returns risk.
           </div>
-          <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5, marginTop: 6 }}>
-            Returns drawn from N({pct(plan.stockReturn)}, σ=12%) per year. Success = money lasts to age {plan.lifeExpect}.
-            Higher return assumption → higher success rate by design (the mean shifts, not just the spread).
-          </div>
-        </Card>
+        </div>
       )}
 
-      {/* Chart */}
-      <Card>
-        <Label>Portfolio Over Time</Label>
+      {/* ── Chart ────────────────────────────────────── */}
+      <div
+        style={{
+          margin: "12px 14px",
+          background: "#fff",
+          borderRadius: 14,
+          padding: "16px 20px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          flex: 1,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "#9db4ae",
+            marginBottom: 12,
+          }}
+        >
+          Portfolio over time
+        </div>
         <StackedChart snaps={snaps} ssAge={plan.ssAge} />
-      </Card>
+      </div>
 
-      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 4px" }}>
-        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+) → Munis → HSA → Brokerage → 401k
-        (59½+) → CD. 401k withdrawals use 2026 {plan.filingStatus.toUpperCase()} brackets on the actual amount drawn.
-        Planning model only.
+      {/* Footnote */}
+      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>
+        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
+        Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses 2026{" "}
+        {plan.filingStatus.toUpperCase()} brackets on actual draw. Planning model only.
       </div>
     </div>
   );

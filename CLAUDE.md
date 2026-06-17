@@ -1,0 +1,73 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+npm install          # install dependencies
+npm run dev          # dev server → http://localhost:5173
+npm test             # run regression suite (vitest run, CI gate)
+npm run test:watch   # vitest in watch mode (interactive dev)
+npm run build        # production build
+```
+
+To run a single test file: `npx vitest run src/__tests__/tax.test.js`
+
+## Architecture
+
+The app has three distinct layers. Code in a lower layer must never import from a higher one.
+
+```
+constants/brackets.js          ← TAX_YEAR=2026 single source of truth
+engine/ (tax.js, accounts.js, simulate.js)   ← pure computation, no React
+analysis/ (plan.js + five analysis routines) ← call engine; pure JS
+components/ + App.jsx          ← React UI; calls analysis
+```
+
+### Engine (`src/engine/`)
+
+`simulate()` is the crown jewel: a pure, side-effect-free month-by-month drawdown that every analysis routine calls repeatedly with varied inputs. Its draw order is a tested invariant — never change it without updating the regression tests:
+
+1. Roth contributions → 2. Roth earnings (59.5+) → 3. Converted Roth (59.5+ AND 5-year lock) → 4. Munis → 5. Brokerage (LTCG on gain fraction) → 6. 401k (59.5+, effective bracket) → 7. CD/cash
+
+`simulate()` returns `{ snaps, depleted, bridgeShortfall }`. `depleted` fires only when ALL funds including the unlocked 401k are exhausted; a locked-401k shortfall is counted in `bridgeShortfall` instead (Scenario B test).
+
+### Analysis (`src/analysis/`)
+
+`plan.js` is the hub: `makePlan(rawInputs)` normalizes UI state into a plan object; `projectTo(plan, yrs)` grows per-account balances forward; `runAt(plan, age)` combines both and calls `simulate()`. Every other analysis file imports from `plan.js`, not directly from the engine.
+
+The five analysis routines are each independent binary/grid searches that call `runAt` in a loop:
+- `earliestRetireAge.js` — binary search for earliest safe exit age
+- `sensitivity.js` — delta analysis for the Retire Early levers
+- `marginalValue.js` — value of +$1k/yr per account type (Maximize panel)
+- `optimalConversion.js` — best annual Roth conversion amount
+- `sustainableSpend.js` — max safe monthly spend at the configured retirement age
+
+### UI (`src/components/`, `src/App.jsx`)
+
+`App.jsx` holds all state via `useState`, derives a `plan` from it via `makePlan`, and passes results down as props. Two right-panel variants (`EarlyPanel`, `MaximizePanel`) swap based on a mode toggle.
+
+**Never define components inside a render body.** All primitives are real top-level components in `ui.jsx` or their own files so React preserves input focus on every keystroke.
+
+### Tax constants
+
+All tax figures (brackets, standard deduction, contribution limits, state rates, ACA/FPL) live in `src/constants/brackets.js` under `TAX_YEAR = 2026`. The annual update is a single-file edit; verify against final IRS publications before relying on projections.
+
+## WSL2 / Hot Reload
+
+When running on WSL2 with the project on a Windows-mounted drive (`/mnt/d/`), inotify doesn't fire on file changes and the HMR websocket fails. Fix in `vite.config.js`:
+
+```js
+server: {
+  host: true,
+  hmr: { host: "localhost" },
+  watch: { usePolling: true, interval: 300 },
+},
+```
+
+`usePolling` makes Vite detect file changes on the Windows filesystem. `host: true` + `hmr.host: "localhost"` lets the Windows browser reach the WSL server via localhost.
+
+## Test suite
+
+`src/__tests__/` contains regression invariants A–E that lock in the engine's correctness. These are the M0 gate; all must pass before any engine change is merged. Tests use vitest with `environment: "node"` (no DOM).

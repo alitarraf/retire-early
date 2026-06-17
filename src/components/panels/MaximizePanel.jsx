@@ -14,7 +14,8 @@ export function MaximizePanel({ plan, result, atRetirement, marginalRows, optima
     atRetirement.k401 +
     atRetirement.brokerage +
     atRetirement.cashDeposit +
-    atRetirement.muniBonds;
+    atRetirement.muniBonds +
+    (atRetirement.hsaBalance ?? 0);
   const estateValue = snaps[snaps.length - 1]?.total ?? 0;
   const maxMarginal = Math.max(...marginalRows.map((m) => m.gain), 1);
   const convBetter = optimal.amount > 0 && optimal.endVal > optimal.baseEnd;
@@ -23,6 +24,7 @@ export function MaximizePanel({ plan, result, atRetirement, marginalRows, optima
     { label: "Roth contributions", val: atRetirement.rothContributions, color: "#3d8c78", note: `Existing + ${fmt(plan.rothAnnualContrib)}/yr × ${plan.yearsToRetire} yrs — always free` },
     { label: "Roth earnings", val: atRetirement.rothEarnings, color: "#7ecfbb", note: "Tax-free after 59½" },
     { label: "401k", val: atRetirement.k401, color: "#1a2e28", note: `${fmt(plan.total401kAnnual)}/yr → retirement bracket on withdrawal` },
+    { label: "HSA", val: atRetirement.hsaBalance ?? 0, color: "#5aada0", note: `${plan.hsaAnnualContrib > 0 ? `${fmt(plan.hsaAnnualContrib)}/yr contributions + ` : ""}grows tax-free, draws tax-free for medical` },
     { label: "Municipal bonds", val: atRetirement.muniBonds, color: "#a8d5c8", note: plan.muniDoubleTaxFree ? `${pct(plan.muniReturn)} yield, 0% tax` : `${pct(plan.muniReturn)} yield, ${pct(plan.effectiveStateTax)} state tax` },
     { label: "Taxable brokerage", val: atRetirement.brokerage, color: "#4a8c7a", note: `Gains taxed at ${pct(plan.brokerageLtcgRate)}` },
     { label: "CD / deposit", val: atRetirement.cashDeposit, color: "#b0c4be", note: `After-tax rate: ${pct(plan.depositAfterTaxRate)}` },

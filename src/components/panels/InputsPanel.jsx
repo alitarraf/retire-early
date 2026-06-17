@@ -14,6 +14,7 @@ import {
   CONTRIB_LIMITS,
   FILING_STATUS,
   FILING_STATUS_LABELS,
+  TAX_YEAR,
 } from "../../constants/brackets.js";
 import { fmt, pct } from "../../format.js";
 
@@ -89,17 +90,51 @@ export function InputsPanel({ inputs, set, plan }) {
         <Row label="Monthly expenses today" hint="Inflation-adjusted to retirement date">
           <NumInput value={inputs.monthlyExpense} onChange={set("monthlyExpense")} prefix="$" step={500} />
         </Row>
-        <Row label="Your SS benefit" hint="Monthly at SS age (today's $)">
-          <NumInput value={inputs.ssBenefit} onChange={set("ssBenefit")} prefix="$" step={100} />
+        <Row label="SS input method">
+          <Toggle
+            value={inputs.ssPia > 0 ? "pia" : "direct"}
+            onChange={(v) => {
+              if (v === "pia") {
+                set("ssPia")(inputs.ssBenefit);
+                set("ssFra")(67);
+              } else {
+                set("ssPia")(0);
+              }
+            }}
+            options={[
+              { value: "direct", label: "Known benefit" },
+              { value: "pia", label: "PIA × age factor" },
+            ]}
+          />
         </Row>
+        {inputs.ssPia > 0 ? (
+          <>
+            <Row label="PIA (benefit at FRA)" hint="From your SSA statement">
+              <NumInput value={inputs.ssPia} onChange={set("ssPia")} prefix="$" step={100} />
+            </Row>
+            <Row label="Full Retirement Age">
+              <NumInput value={inputs.ssFra} onChange={set("ssFra")} min={62} max={70} step={0.5} />
+            </Row>
+            <Note>
+              Claiming at {inputs.ssAge} (FRA {inputs.ssFra}):{" "}
+              <strong style={{ fontFamily: "'JetBrains Mono',monospace" }}>{fmt(Math.round(plan.ssBenefit))}/mo</strong>
+              {" "}({Math.round((plan.ssBenefit / inputs.ssPia) * 100)}% of PIA).
+              Change "Your Social Security at" in Timeline to see effect.
+            </Note>
+          </>
+        ) : (
+          <Row label="Your SS benefit" hint="Monthly at SS age (today's $)">
+            <NumInput value={inputs.ssBenefit} onChange={set("ssBenefit")} prefix="$" step={100} />
+          </Row>
+        )}
         {(() => {
-          const ssInfl = inputs.ssBenefit * Math.pow(1 + inputs.inflationRate / 100, inputs.ssAge - inputs.currentAge);
-          const pct2 = plan.monthlyAtRetirement > 0 ? (ssInfl / plan.monthlyAtRetirement) * 100 : 0;
+          const ssInfl = plan.ssBenefit * Math.pow(1 + inputs.inflationRate / 100, inputs.ssAge - inputs.currentAge);
+          const covPct = plan.monthlyAtRetirement > 0 ? (ssInfl / plan.monthlyAtRetirement) * 100 : 0;
           return (
             <Note>
-              At {inputs.ssAge}: your SS ≈{" "}
+              At {inputs.ssAge}: SS ≈{" "}
               <strong style={{ fontFamily: "'JetBrains Mono',monospace" }}>{fmt(Math.round(ssInfl))}/mo</strong> inflated.{" "}
-              <strong style={{ color: pct2 > 25 ? "#3d8c78" : "#c97c1a" }}>{pct2.toFixed(0)}%</strong> of your{" "}
+              <strong style={{ color: covPct > 25 ? "#3d8c78" : "#c97c1a" }}>{covPct.toFixed(0)}%</strong> of your{" "}
               {fmt(Math.round(plan.monthlyAtRetirement))}/mo spend.
             </Note>
           );
@@ -187,6 +222,50 @@ export function InputsPanel({ inputs, set, plan }) {
         </Row>
       </Collapsible>
 
+      <Collapsible title="HSA (Health Savings Account)" hint="Triple-tax-advantaged; grows & draws tax-free">
+        <Row label="Current HSA balance">
+          <NumInput value={inputs.hsaBalance} onChange={set("hsaBalance")} prefix="$" step={1000} />
+        </Row>
+        <Row
+          label="Annual contribution"
+          hint={`${TAX_YEAR}: $${CONTRIB_LIMITS.hsaFamily.toLocaleString()} family / $${CONTRIB_LIMITS.hsaIndividual.toLocaleString()} individual + $${CONTRIB_LIMITS.hsaCatchup.toLocaleString()} catch-up at 55`}
+        >
+          <NumInput value={inputs.hsaAnnualContrib} onChange={set("hsaAnnualContrib")} prefix="$" step={100} max={CONTRIB_LIMITS.hsaFamily + CONTRIB_LIMITS.hsaCatchup} />
+        </Row>
+        <Note>
+          HSA grows at the stock return rate and draws are modeled as tax-free (qualified medical).
+          In the draw order it sits after munis and before brokerage — more efficient than taxable
+          accounts.
+        </Note>
+      </Collapsible>
+
+      <Collapsible title="Healthcare & Medicare" hint="ACA, IRMAA, state SS exemption">
+        <Row label="ACA full premium" hint="Unsubsidized monthly; 0 = not tracked">
+          <NumInput value={inputs.monthlyAcaFullPremium} onChange={set("monthlyAcaFullPremium")} prefix="$" step={50} />
+        </Row>
+        <Row label="IRMAA surcharge / mo" hint="Medicare Part B+D surcharge at 65+; 0 = none">
+          <NumInput value={inputs.monthlyIrmaaSurcharge} onChange={set("monthlyIrmaaSurcharge")} prefix="$" step={69} />
+        </Row>
+        <Row label="State SS exemption" hint="Many states exempt SS income from state tax">
+          <Toggle
+            value={String(inputs.stateSsExemptRate)}
+            onChange={(v) => set("stateSsExemptRate")(parseFloat(v))}
+            options={[
+              { value: "0", label: "None" },
+              { value: "0.5", label: "50%" },
+              { value: "1", label: "Full" },
+            ]}
+          />
+        </Row>
+        <Note>
+          Enter the ACA premium here only if your monthly expenses above do <strong>not</strong>{" "}
+          already include health insurance — otherwise you'll double-count it. The premium is added
+          on top of expenses only when your income exceeds the ACA subsidy cliff (~$66k/yr for 2
+          people); below that, subsidies are assumed to cover it. At 65, Medicare replaces ACA and
+          the premium stops.
+        </Note>
+      </Collapsible>
+
       {/* ── Assumptions ───────────────────────────────── */}
       <Section title="Assumptions (rates)">
         <Row label="Stock market return" hint="Nominal">
@@ -267,6 +346,50 @@ export function InputsPanel({ inputs, set, plan }) {
             At your projected {fmt(annualSpendAtRetirement)}/yr spend, the effective retirement rate is typically far below your{" "}
             {pct(plan.accumulationOrdinaryRate)} working rate.
           </div>
+        </Collapsible>
+
+        <Collapsible title="Early access (pre-59½)" hint="Rule of 55 or 72(t) SEPP">
+          <Row label="Rule of 55" hint="Left employer at 55+? 401k accessible penalty-free.">
+            <Toggle
+              value={inputs.rule55 ? "yes" : "no"}
+              onChange={(v) => set("rule55")(v === "yes")}
+              options={[{ value: "no", label: "No" }, { value: "yes", label: "Yes" }]}
+            />
+          </Row>
+          <Row label="72(t) SEPP / yr" hint="Substantially Equal Periodic Payments; 0 = none">
+            <NumInput value={inputs.annualSepp} onChange={set("annualSepp")} prefix="$" step={1000} />
+          </Row>
+          <Note>
+            SEPP must continue for 5 years or until 59½ (whichever is longer). Excess SEPP income
+            after covering expenses is banked in CD for later use.
+          </Note>
+        </Collapsible>
+
+        <Collapsible title="Spending guardrails (Guyton-Klinger)" hint="Auto-adjust spending based on withdrawal rate">
+          <Row label="Upper guardrail" hint="Cut 10% if WR exceeds this; 0 = off">
+            <NumInput
+              value={inputs.guardrailUpper * 100}
+              onChange={(v) => set("guardrailUpper")(v / 100)}
+              suffix="% WR"
+              step={0.5}
+              min={0}
+              max={25}
+            />
+          </Row>
+          <Row label="Lower guardrail" hint="Raise 10% if WR falls below this; 0 = off">
+            <NumInput
+              value={inputs.guardrailLower * 100}
+              onChange={(v) => set("guardrailLower")(v / 100)}
+              suffix="% WR"
+              step={0.5}
+              min={0}
+              max={15}
+            />
+          </Row>
+          <Note>
+            WR = net annual portfolio draw (spending minus SS) ÷ total portfolio. Checked each
+            year-end. Typical: upper 5–6%, lower 3%. Set both to 0 to disable.
+          </Note>
         </Collapsible>
 
         <Collapsible title="Roth conversion ladder" hint="Convert 401k → Roth during bridge at low rates">

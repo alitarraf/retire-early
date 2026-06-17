@@ -1,18 +1,21 @@
 import { useState, useMemo } from "react";
-import { DEFAULTS, makePlan, runMain, projectAtRetirement } from "./analysis/plan.js";
+import { DEFAULTS, makePlan, runMain, projectAtRetirement, simParamsAt } from "./analysis/plan.js";
 import { earliestRetireAge } from "./analysis/earliestRetireAge.js";
 import { sensitivity } from "./analysis/sensitivity.js";
 import { marginalValues } from "./analysis/marginalValue.js";
 import { optimalConversion } from "./analysis/optimalConversion.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
+import { monteCarlo } from "./engine/monteCarlo.js";
 import { InputsPanel } from "./components/panels/InputsPanel.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
 import { MaximizePanel } from "./components/panels/MaximizePanel.jsx";
+import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { fmt } from "./format.js";
 
 const TABS = [
   { key: "early", icon: "⏱", label: "Retire Early", sub: "Find your earliest exit" },
   { key: "maximize", icon: "📈", label: "Maximize Portfolio", sub: "Optimize what you build & leave" },
+  { key: "docs", icon: "📖", label: "How it works", sub: "Inputs, outputs & assumptions" },
 ];
 
 export default function App() {
@@ -27,6 +30,13 @@ export default function App() {
   const earliest = useMemo(() => earliestRetireAge(plan), [plan]);
   const sensitivityRows = useMemo(() => (mode === "early" ? sensitivity(plan) : []), [plan, mode]);
 
+  // Monte Carlo (early mode only; seeded so same inputs → same result)
+  const mainSimParams = useMemo(() => simParamsAt(plan, plan.retireAge), [plan]);
+  const mcResult = useMemo(
+    () => (mode === "early" ? monteCarlo(mainSimParams, { n: 500, seed: 42 }) : null),
+    [mainSimParams, mode],
+  );
+
   // Maximize-mode analysis
   const atRetirement = useMemo(() => projectAtRetirement(plan), [plan]);
   const marginalRows = useMemo(() => (mode === "maximize" ? marginalValues(plan) : []), [plan, mode]);
@@ -35,7 +45,8 @@ export default function App() {
 
   const totalAtRetirement =
     atRetirement.rothContributions + atRetirement.rothEarnings + atRetirement.k401 +
-    atRetirement.brokerage + atRetirement.cashDeposit + atRetirement.muniBonds;
+    atRetirement.brokerage + atRetirement.cashDeposit + atRetirement.muniBonds +
+    (atRetirement.hsaBalance ?? 0);
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: "#f0f5f4", minHeight: "100vh" }}>
@@ -82,23 +93,29 @@ export default function App() {
         </div>
       </div>
 
-      {/* Two-column layout: inputs left, outputs right */}
+      {/* Main content */}
       <div style={{ padding: "20px 20px" }}>
-        <div style={{ maxWidth: 980, margin: "0 auto", display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
-          <InputsPanel inputs={inputs} set={set} plan={plan} />
-          {mode === "early" ? (
-            <EarlyPanel plan={plan} result={result} earliest={earliest} sensitivityRows={sensitivityRows} />
-          ) : (
-            <MaximizePanel
-              plan={plan}
-              result={result}
-              atRetirement={atRetirement}
-              marginalRows={marginalRows}
-              optimal={optimal}
-              sustainable={sustainable}
-            />
-          )}
-        </div>
+        {mode === "docs" ? (
+          <div style={{ maxWidth: 980, margin: "0 auto" }}>
+            <DocsPanel />
+          </div>
+        ) : (
+          <div style={{ maxWidth: 980, margin: "0 auto", display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <InputsPanel inputs={inputs} set={set} plan={plan} />
+            {mode === "early" ? (
+              <EarlyPanel plan={plan} result={result} earliest={earliest} sensitivityRows={sensitivityRows} mcResult={mcResult} />
+            ) : (
+              <MaximizePanel
+                plan={plan}
+                result={result}
+                atRetirement={atRetirement}
+                marginalRows={marginalRows}
+                optimal={optimal}
+                sustainable={sustainable}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

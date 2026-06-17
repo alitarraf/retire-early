@@ -4,7 +4,7 @@ import { Card, Label, BigNum } from "../ui.jsx";
 import { StackedChart } from "../charts/StackedChart.jsx";
 import { fmt, pct } from "../../format.js";
 
-export function EarlyPanel({ plan, result, earliest, sensitivityRows }) {
+export function EarlyPanel({ plan, result, earliest, sensitivityRows, mcResult }) {
   const { snaps, depleted, bridgeShortfall } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -151,6 +151,47 @@ export function EarlyPanel({ plan, result, earliest, sensitivityRows }) {
         ))}
       </Card>
 
+      {/* Monte Carlo */}
+      {mcResult && (
+        <Card>
+          <Label>Monte Carlo — 500 Scenarios</Label>
+          <div style={{ display: "flex", gap: 24, marginBottom: 10 }}>
+            <div>
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono',monospace",
+                  color:
+                    mcResult.successRate >= 0.9 ? "#3d8c78"
+                    : mcResult.successRate >= 0.75 ? "#c97c1a"
+                    : "#c0392b",
+                }}
+              >
+                {Math.round(mcResult.successRate * 100)}%
+              </div>
+              <div style={{ fontSize: 10, color: "#9db4ae" }}>Success rate</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: "#1a2e28" }}>
+                {fmt(mcResult.medianEndTotal)}
+              </div>
+              <div style={{ fontSize: 10, color: "#9db4ae" }}>Median estate</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6, marginTop: 4 }}>
+            <strong style={{ color: "#4a5e58" }}>What this measures:</strong> each of 500 runs uses the same{" "}
+            {pct(plan.stockReturn)} mean return but randomizes the <em>sequence</em> — a crash at 57 vs. 75 has very
+            different consequences even with the same lifetime average. The gap between the deterministic verdict above
+            and this success rate is your sequence-of-returns risk.
+          </div>
+          <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5, marginTop: 6 }}>
+            Returns drawn from N({pct(plan.stockReturn)}, σ=12%) per year. Success = money lasts to age {plan.lifeExpect}.
+            Higher return assumption → higher success rate by design (the mean shifts, not just the spread).
+          </div>
+        </Card>
+      )}
+
       {/* Chart */}
       <Card>
         <Label>Portfolio Over Time</Label>
@@ -158,8 +199,9 @@ export function EarlyPanel({ plan, result, earliest, sensitivityRows }) {
       </Card>
 
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 4px" }}>
-        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+) → Munis → Brokerage → 401k (59½+) → CD.
-        401k withdrawals use 2026 {plan.filingStatus.toUpperCase()} brackets on the actual amount drawn. Planning model only.
+        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+) → Munis → HSA → Brokerage → 401k
+        (59½+) → CD. 401k withdrawals use 2026 {plan.filingStatus.toUpperCase()} brackets on the actual amount drawn.
+        Planning model only.
       </div>
     </div>
   );

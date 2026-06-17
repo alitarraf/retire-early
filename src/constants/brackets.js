@@ -68,6 +68,9 @@ export const FED_BRACKETS = {
 export const CONTRIB_LIMITS = {
   k401: 24500,
   rothIra: 7500,
+  hsaIndividual: 4300,  // 2026 HSA limit (self-only)
+  hsaFamily: 8550,      // 2026 HSA limit (family)
+  hsaCatchup: 1000,     // additional catch-up at age 55+
 };
 
 // Long-term capital-gains rate options offered in the UI.
@@ -106,4 +109,22 @@ export const ACA = {
   fplBase: 15650, // household of 1
   fplPerAdditionalPerson: 5500,
   cliffMultiple: 4.0, // 400% FPL cliff is back for 2026
+};
+
+// ── RMD constants (SECURE 2.0) ───────────────────────────────
+// Birth-year threshold that determines RMD start age.
+// Born ≤ 1959 → RMD age 73; born ≥ 1960 → RMD age 75.
+export const RMD_BIRTH_YEAR_THRESHOLD = 1960;
+
+// IRS Uniform Lifetime Table divisors (from IRS Pub 590-B, post-SECURE 2.0).
+// Verify against final IRS publications — these change with inflation adjustments.
+// Key: integer age; value: distribution period divisor used in RMD = balance / divisor.
+export const RMD_UNIFORM_LIFETIME = {
+  73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1,
+  80: 20.2, 81: 19.4, 82: 18.5, 83: 17.7, 84: 16.8, 85: 16.0, 86: 15.2,
+  87: 14.4, 88: 13.7, 89: 12.9, 90: 12.2, 91: 11.5, 92: 10.8, 93: 10.1,
+  94: 9.5,  95: 8.9,  96: 8.4,  97: 7.8,  98: 7.3,  99: 6.8, 100: 6.4,
+ 101: 6.0, 102: 5.6, 103: 5.2, 104: 4.9, 105: 4.6, 106: 4.3, 107: 4.1,
+ 108: 3.9, 109: 3.7, 110: 3.5, 111: 3.4, 112: 3.3, 113: 3.1, 114: 3.0,
+ 115: 2.9, 116: 2.8, 117: 2.7, 118: 2.5, 119: 2.3, 120: 2.0,
 };

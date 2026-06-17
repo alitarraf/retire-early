@@ -9,6 +9,7 @@ export function StackedChart({ snaps, ssAge }) {
   const colors = {
     roth: "#3d8c78",
     muni: "#7ecfbb",
+    hsa: "#5aada0",
     brokerage: "#a8d5c8",
     k401: "#1a2e28",
     cd: "#c8d8d4",
@@ -54,6 +55,7 @@ export function StackedChart({ snaps, ssAge }) {
             ["cd", s.cd],
             ["k401", s.k401],
             ["brokerage", s.brokerage],
+            ["hsa", s.hsa ?? 0],
             ["muni", s.muni],
             ["roth", s.roth],
           ].map(([key, val]) => {
@@ -105,11 +107,12 @@ export function StackedChart({ snaps, ssAge }) {
         {[
           ["roth", "Roth"],
           ["muni", "Munis"],
+          ["hsa", "HSA"],
           ["brokerage", "Brokerage"],
           ["k401", "401k"],
           ["cd", "CD"],
         ].map(([key, label], i) => (
-          <g key={key} transform={`translate(${YPAD + i * 84},${H + 23})`}>
+          <g key={key} transform={`translate(${YPAD + i * 70},${H + 23})`}>
             <rect width={8} height={8} fill={colors[key]} rx={2} />
             <text x={11} y={8} fontSize={9} fill="#7C9A92">
               {label}

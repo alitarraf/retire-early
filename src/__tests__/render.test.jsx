@@ -19,6 +19,8 @@ import { dynamicOptimizer } from "../analysis/dynamicOptimizer.js";
 import { monteCarlo, buildHistogram } from "../engine/monteCarlo.js";
 import { McDistChart } from "../components/charts/McDistChart.jsx";
 import { StackedChart } from "../components/charts/StackedChart.jsx";
+import { ScenarioCard } from "../components/panels/ResultsExtras.jsx";
+import { historicalSequence } from "../analysis/historicalSequence.js";
 import { PortfolioChartCard } from "../components/panels/PortfolioChartCard.jsx";
 import { MonteCarloCard } from "../components/panels/MonteCarloCard.jsx";
 import { RetireAtControl } from "../components/panels/RetireAtControl.jsx";
@@ -137,6 +139,41 @@ describe("render smoke tests", () => {
       <StackedChart snaps={result.snaps} ssAge={plan.ssAge} mcBands={mc.bands} />,
     );
     expect(html).toContain("MC 10–90%");
+    noNaN(html);
+  });
+
+  it("StackedChart renders a historical scenario overlay line + label without NaN", () => {
+    const plan = makePlan({
+      ...DEFAULTS, currentAge: 50, retireAge: 55,
+      scenarioMode: "historical", historicalScenario: "gfc2007", historicalLens: "sp",
+    });
+    const result = runMain(plan);
+    const scen = historicalSequence(simParamsAt(plan, plan.retireAge), { startYear: 2007, lens: "sp" });
+    const html = renderToString(
+      <StackedChart
+        snaps={result.snaps}
+        ssAge={plan.ssAge}
+        scenarioSnaps={scen.snaps}
+        scenarioColor="#7048a8"
+        scenarioLabel="Global financial crisis (2007) · S&P 500"
+      />,
+    );
+    expect(html).toContain("Global financial crisis (2007)"); // legend label
+    expect(html).toContain("#7048a8"); // scenario line color applied
+    noNaN(html);
+  });
+
+  it("ScenarioCard summarizes a historical scenario (outcome + estate + blurb)", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const scen = historicalSequence(simParamsAt(plan, plan.retireAge), { startYear: 2000, lens: "balanced" });
+    const html = renderToString(
+      <ScenarioCard
+        plan={plan}
+        scenario={{ result: scen, color: "#7048a8", label: "Dot-com bust (2000) · 60/40 blend", blurb: "Replays actual returns." }}
+      />,
+    );
+    expect(html).toContain("Dot-com bust (2000)");
+    expect(html).toMatch(/Survives|Depletes by/);
     noNaN(html);
   });
 

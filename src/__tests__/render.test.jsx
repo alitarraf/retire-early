@@ -48,7 +48,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={opt}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
       />,
     );
     expect(html).toContain("Dynamic Roth conversion optimizer");
@@ -74,7 +74,7 @@ describe("render smoke tests", () => {
         sustainable={3000}
         dynamicOpt={opt}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
       />,
     );
     expect(html).toContain("Dynamic Roth conversion optimizer");
@@ -97,7 +97,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={dynamicOptimizer(plan)}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
         mcResult={mcResult}
         onRunMc={() => {}}
       />,
@@ -105,7 +105,7 @@ describe("render smoke tests", () => {
     expect(html).toContain("Portfolio over time");
     expect(html).toContain("Outcome range"); // chart toggle option
     expect(html).toContain("Show details"); // flat disclosure trigger (cards revealed on open)
-    expect(html).toContain("Monte Carlo, tax, stress &amp; legacy"); // disclosure caption
+    expect(html).toContain("Monte Carlo, tax, scenario &amp; legacy"); // disclosure caption
     noNaN(html);
   });
 
@@ -120,7 +120,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={dynamicOptimizer(plan)}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
         mcResult={null}
         onRunMc={() => {}}
       />,
@@ -322,7 +322,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliest}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={41000}
       />,
@@ -342,7 +342,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliestRetireAge(plan)}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={5000}
         retireBy={retireBy}
@@ -363,7 +363,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliestRetireAge(plan)}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={5000}
         retireBy={retireBy}

@@ -275,7 +275,7 @@ export const FIELD_HELP = {
   scenarioMode: {
     label: "Scenario mode",
     context:
-      "Deterministic uses your mean return every year. Stress Test replays a sharp early-retirement crash as an illustrative downside, shown alongside — never replacing — your headline verdict.",
+      "Deterministic uses your mean return every year. Stress Test replays a sharp early-retirement crash, and Historical replays a real bad market sequence — both shown alongside, never replacing, your headline verdict.",
   },
   stressDropPct: {
     label: "Crash size",
@@ -284,6 +284,16 @@ export const FIELD_HELP = {
   stressYears: {
     label: "Crash years",
     context: "How many early-retirement years the crash lasts before reverting to your mean return.",
+  },
+  historicalScenario: {
+    label: "Historical period",
+    context:
+      "Replays the actual market returns from a real bad retirement start (2000, 2007, 2022, or 1973), landing the worst years right at retirement. After recorded history ends, it reverts to your mean return.",
+  },
+  historicalLens: {
+    label: "Returns series",
+    context:
+      "S&P 500 applies all-equity returns to your whole portfolio (most dramatic). 60/40 blend applies a 60% stock / 40% bond return — closer to a balanced retiree's experience.",
   },
 };
 
@@ -299,5 +309,5 @@ export const FIELD_HELP_GROUPS = [
   { title: "Healthcare & Medicare", ids: ["monthlyAcaFullPremium", "monthlyIrmaaSurcharge", "stateSsExemptRate"] },
   { title: "Estate & legacy", ids: ["assumeStepUpBasis", "legacyTarget"] },
   { title: "Advanced", ids: ["birthYear", "oneTimeExpenses", "phaseSpending"] },
-  { title: "Scenario testing", ids: ["scenarioMode", "stressDropPct", "stressYears"] },
+  { title: "Scenario testing", ids: ["scenarioMode", "stressDropPct", "stressYears", "historicalScenario", "historicalLens"] },
 ];

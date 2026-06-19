@@ -14,6 +14,7 @@ import {
   FILING_STATUS, FILING_STATUS_LABELS, TAX_YEAR, FED_BRACKETS,
 } from "../../constants/brackets.js";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
+import { HISTORICAL_SCENARIOS } from "../../constants/historicalReturns.js";
 import { fmt, fmtK, pct } from "../../format.js";
 
 // ─── Module-scope layout atoms ───────────────────────────────
@@ -731,7 +732,13 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
             {/* ── Scenario ─────────────────────────────── */}
             <AccSection
               title="Scenario"
-              summary={inputs.scenarioMode === "stress" ? `Stress −${inputs.stressDropPct}% × ${inputs.stressYears}y` : "Deterministic"}
+              summary={
+                inputs.scenarioMode === "stress"
+                  ? `Stress −${inputs.stressDropPct}% × ${inputs.stressYears}y`
+                  : inputs.scenarioMode === "historical"
+                  ? `Historical: ${HISTORICAL_SCENARIOS.find((s) => s.key === inputs.historicalScenario)?.startYear ?? ""} · ${inputs.historicalLens === "sp" ? "S&P 500" : "60/40"}`
+                  : "Deterministic"
+              }
               isOpen={open === "scenario"}
               onToggle={() => toggle("scenario")}
             >
@@ -740,7 +747,11 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
                 <Toggle
                   value={inputs.scenarioMode}
                   onChange={set("scenarioMode")}
-                  options={[{ value: "deterministic", label: "Deterministic" }, { value: "stress", label: "Stress Test" }]}
+                  options={[
+                    { value: "deterministic", label: "Deterministic" },
+                    { value: "stress", label: "Stress Test" },
+                    { value: "historical", label: "Historical" },
+                  ]}
                 />
               </Field>
               {inputs.scenarioMode === "stress" && (
@@ -755,6 +766,31 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
                   </Grid2>
                   <div style={{ fontSize: 10, color: "#9db4ae" }}>
                     Adds a downside card to the results. Your headline verdict stays on the base assumptions.
+                  </div>
+                </>
+              )}
+              {inputs.scenarioMode === "historical" && (
+                <>
+                  <Field label="Period" hint="Real returns from this start year" help="historicalScenario">
+                    <Select
+                      value={inputs.historicalScenario}
+                      onChange={set("historicalScenario")}
+                      options={HISTORICAL_SCENARIOS.map((s) => ({ value: s.key, label: s.label }))}
+                    />
+                  </Field>
+                  <Field label="Returns" hint="Which series to replay" help="historicalLens">
+                    <Toggle
+                      value={inputs.historicalLens}
+                      onChange={set("historicalLens")}
+                      options={[
+                        { value: "balanced", label: "60/40 blend" },
+                        { value: "sp", label: "S&P 500" },
+                      ]}
+                    />
+                  </Field>
+                  <div style={{ fontSize: 10, color: "#9db4ae" }}>
+                    Replays actual returns from the start year, reverting to your mean once history runs out.
+                    Adds a downside card; your headline verdict stays on the base assumptions.
                   </div>
                 </>
               )}

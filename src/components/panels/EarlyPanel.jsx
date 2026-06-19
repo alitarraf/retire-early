@@ -3,7 +3,7 @@
 // levers live in RightRail.jsx to the right.
 import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
-import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
+import { TaxTransparency, LegacyGap, ScenarioCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
 import { DetailsToggle, InfoDot } from "../ui.jsx";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
@@ -146,7 +146,7 @@ function TargetAgeCard({ plan, retireBy }) {
 
 // ─── Main export ─────────────────────────────────────────────
 
-export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, totalAtRetirement, sustainable, retireBy }) {
+export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy }) {
   const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -156,8 +156,8 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
   // a legacy target, or switching the chart to Outcome range. Still hand-collapsible.
   const [detailsOpen, setDetailsOpen] = useState(false);
   useEffect(() => {
-    if (plan.scenarioMode === "stress" || plan.legacyTarget > 0) setDetailsOpen(true);
-  }, [plan.scenarioMode, plan.legacyTarget, plan.stressDropPct, plan.stressYears]);
+    if (plan.scenarioMode !== "deterministic" || plan.legacyTarget > 0) setDetailsOpen(true);
+  }, [plan.scenarioMode, plan.legacyTarget, plan.stressDropPct, plan.stressYears, plan.historicalScenario, plan.historicalLens]);
 
   const heroNum = earliest !== null ? String(earliest) : "75+";
   const heroOk = onTrack && survives;
@@ -285,7 +285,9 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
         snaps={snaps}
         ssAge={plan.ssAge}
         plan={plan}
-        stressSnaps={stressResult?.snaps}
+        scenarioSnaps={scenario?.result?.snaps}
+        scenarioColor={scenario?.color}
+        scenarioLabel={scenario?.label}
         mcResult={mcResult}
         runs={500}
         onViewChange={(v) => v === "range" && setDetailsOpen(true)}
@@ -298,13 +300,13 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Monte Carlo, tax, stress & legacy"
+          caption="Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
-          <StressCard stressResult={stressResult} plan={plan} />
+          <ScenarioCard scenario={scenario} plan={plan} />
           <TaxTransparency plan={plan} result={result} />
           <LegacyGap plan={plan} endVal={endVal} />
         </>

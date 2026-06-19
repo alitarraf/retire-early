@@ -2,11 +2,12 @@
 // Interactive: hover a year for an exact-composition tooltip (rendered by the
 // parent card, driven by `hover`/`onHover`), click the legend to show/hide an
 // account type (`hidden`/`onToggleHidden`). The parent slices `snaps` (and the
-// `stressSnaps`/`mcBands` overlays) to the zoom window before passing them in,
+// `scenarioSnaps`/`mcBands` overlays) to the zoom window before passing them in,
 // so all geometry below recomputes for the visible range automatically.
 //
-// When `stressSnaps` is supplied (Scenario Testing in Stress mode), a red
-// total-portfolio line for the stress scenario is overlaid on the bars.
+// When `scenarioSnaps` is supplied (Scenario Testing in Stress or Historical
+// mode), a `scenarioColor` total-portfolio line for that scenario overlays the
+// bars, labelled `scenarioLabel`.
 // When `mcBands` is supplied ([{ age, p10, p50, p90 }] from monteCarlo), a
 // shaded 10th–90th-percentile fan with a median line is drawn over the bars.
 import { phase } from "../../theme.js";
@@ -42,7 +43,9 @@ const EMPTY = new Set();
 export function StackedChart({
   snaps,
   ssAge,
-  stressSnaps = null,
+  scenarioSnaps = null,
+  scenarioColor = "#c0392b",
+  scenarioLabel = "Scenario",
   mcBands = null,
   view = null,
   hidden = EMPTY,
@@ -51,17 +54,17 @@ export function StackedChart({
   onHover = null,
 }) {
   if (!snaps.length) return null;
-  // "fan" view shows the Monte Carlo cone alone (no stacked bars, no stress line);
-  // the default shows the stacked composition (optionally with an overlaid fan/stress).
+  // "fan" view shows the Monte Carlo cone alone (no stacked bars, no scenario line);
+  // the default shows the stacked composition (optionally with an overlaid fan/scenario).
   const isFan = view === "fan";
-  const hasStress = !isFan && Array.isArray(stressSnaps) && stressSnaps.length > 0;
+  const hasScenario = !isFan && Array.isArray(scenarioSnaps) && scenarioSnaps.length > 0;
   const hasBands = Array.isArray(mcBands) && mcBands.length > 0;
 
   const colors = STACK_COLORS;
   const visVal = (s, key) => (hidden.has(key) ? 0 : s[key] ?? 0);
   const visTotal = (s) => STACK.reduce((sum, [key]) => sum + visVal(s, key), 0);
 
-  // Scale anchor: the deterministic bars (visible series only), stress line, and
+  // Scale anchor: the deterministic bars (visible series only), scenario line, and
   // the MC *median* — i.e. the central outcome, not the extreme upper tail. The
   // 90th-percentile band can be wildly higher than the plan (a few lucky sequences
   // compound to many multiples), which would otherwise crush the bars into an
@@ -69,7 +72,7 @@ export function StackedChart({
   // central scale; beyond that the band clips at the chart top.
   const baseMax = Math.max(
     ...snaps.map((s) => visTotal(s)),
-    ...(hasStress ? stressSnaps.map((s) => s.total) : []),
+    ...(hasScenario ? scenarioSnaps.map((s) => s.total) : []),
     ...(hasBands ? mcBands.map((b) => b.p50) : []),
     1,
   );
@@ -186,24 +189,24 @@ export function StackedChart({
               </g>
             );
           })()}
-        {hasStress &&
+        {hasScenario &&
           (() => {
-            const pts = stressSnaps
+            const pts = scenarioSnaps
               .map((s, i) => {
                 const x = colCenterX(i, n);
                 const y = H - (Math.max(0, s.total) / maxVal) * plotH;
                 return `${x.toFixed(1)},${y.toFixed(1)}`;
               })
               .join(" ");
-            // First snapshot where the stress portfolio is depleted, for an end-marker.
-            const depIdx = stressSnaps.findIndex((s) => s.total < 1);
+            // First snapshot where the scenario portfolio is depleted, for an end-marker.
+            const depIdx = scenarioSnaps.findIndex((s) => s.total < 1);
             return (
               <g>
-                <polyline points={pts} fill="none" stroke="#c0392b" strokeWidth={1.8} strokeLinejoin="round" />
-                {depIdx > 0 && <circle cx={colCenterX(depIdx, n)} cy={H} r={3} fill="#c0392b" />}
-                <line x1={W - 86} y1={8} x2={W - 72} y2={8} stroke="#c0392b" strokeWidth={1.8} />
-                <text x={W - 68} y={11} fontSize={8} fill="#c0392b" fontWeight="700">
-                  Stress test
+                <polyline points={pts} fill="none" stroke={scenarioColor} strokeWidth={1.8} strokeLinejoin="round" />
+                {depIdx > 0 && <circle cx={colCenterX(depIdx, n)} cy={H} r={3} fill={scenarioColor} />}
+                {/* Right-anchored, color-coded label — handles long historical names. */}
+                <text x={W - 4} y={11} fontSize={8} fill={scenarioColor} fontWeight="700" textAnchor="end">
+                  {scenarioLabel}
                 </text>
               </g>
             );

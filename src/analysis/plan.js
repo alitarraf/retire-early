@@ -97,9 +97,11 @@ export const DEFAULTS = {
   noGoAge: 80,             // age the no-go phase begins
 
   // Scenario testing
-  scenarioMode: "deterministic", // "deterministic" | "stress"
+  scenarioMode: "deterministic", // "deterministic" | "stress" | "historical"
   stressDropPct: 30,             // crash magnitude (%) applied in the early stress years
   stressYears: 3,                // number of consecutive early-crash years
+  historicalScenario: "gfc2007", // HISTORICAL_SCENARIOS key replayed in historical mode
+  historicalLens: "balanced",    // "sp" (all-equity) | "balanced" (60/40) return series
 };
 
 /** Normalize raw inputs into a plan with derived fields. */

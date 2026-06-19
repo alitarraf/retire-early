@@ -19,6 +19,8 @@ import { MaximizeRail } from "./components/panels/MaximizeRail.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { QuickStart } from "./components/panels/QuickStart.jsx";
+import { MobileShell } from "./components/mobile/MobileShell.jsx";
+import { useIsMobile } from "./useIsMobile.js";
 import { fmt } from "./format.js";
 
 const TABS = [
@@ -32,6 +34,7 @@ const QS_KEY = "retire-early.quickStartDismissed";
 
 export default function App() {
   const [mode, setMode] = useState("early");
+  const isMobile = useIsMobile();
   const [inputs, setInputs] = useState(DEFAULTS);
   const set = (key) => (val) => setInputs((prev) => ({ ...prev, [key]: val }));
 
@@ -189,6 +192,42 @@ export default function App() {
     liveAtRetirement.muniBonds +
     (liveAtRetirement.hsaBalance ?? 0);
 
+  // ── Mobile (≤767px): a dedicated single-column shell fed the same props.
+  // All hooks above run unconditionally, so this early return is hook-safe.
+  if (isMobile) {
+    return (
+      <>
+        <MobileShell
+          mode={mode}
+          setMode={setMode}
+          tabs={TABS}
+          inputs={inputs}
+          set={set}
+          plan={livePlan}
+          earliest={earliest}
+          onScrubAge={onScrubAge}
+          onCommitAge={onCommitAge}
+          result={result}
+          mcResult={mcResult}
+          scenario={scenario}
+          totalAtRetirement={totalAtRetirement}
+          sustainable={sustainable}
+          retireBy={retireBy}
+          sensitivityRows={sensitivityRows}
+          applyLever={applyLever}
+          appliedLevers={appliedLevers}
+          undoLevers={undoLevers}
+          atRetirement={atRetirement}
+          marginalRows={marginalRows}
+          dynamicOpt={dynamicOpt}
+          applyOptimized={applyOptimized}
+          onRunMc={() => setMaxMcOn(true)}
+        />
+        {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+      </>
+    );
+  }
+
   return (
     <div
       style={{
@@ -285,8 +324,23 @@ export default function App() {
           minHeight: 0,
         }}
       >
-        {/* Left: accordion inputs (always visible) */}
-        <InputsSidebar inputs={inputs} set={set} plan={livePlan} />
+        {/* Left column: Retire-at command card pinned under the navbar, then the
+            accordion inputs below it (both always visible, all tabs). */}
+        <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", background: "#fafcfc" }}>
+          <RetireAtControl
+            value={livePlan.retireAge}
+            min={plan.currentAge}
+            max={80}
+            earliest={earliest}
+            onScrub={onScrubAge}
+            onCommit={onCommitAge}
+          />
+          {/* flex:1 + minHeight:0 gives InputsSidebar's height:100% a definite
+              height so its pinned bottom caption isn't pushed off-screen. */}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <InputsSidebar inputs={inputs} set={set} plan={livePlan} />
+          </div>
+        </div>
 
         {mode === "docs" ? (
           <div style={{ gridColumn: "2 / 4", background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
@@ -306,16 +360,9 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* Center column: the Retire-at command band, then the results panel */}
+            {/* Center column: the results panel (the Retire-at control now lives
+                pinned at the top of the left sidebar). */}
             <div style={{ gridColumn: 2, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
-              <RetireAtControl
-                value={livePlan.retireAge}
-                min={plan.currentAge}
-                max={80}
-                earliest={earliest}
-                onScrub={onScrubAge}
-                onCommit={onCommitAge}
-              />
               <div style={{ flex: 1, minHeight: 0 }}>
                 {!result ? (
                   <div style={{ height: "100%", background: "#f0f5f4", display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 36px" }}>
@@ -325,7 +372,7 @@ export default function App() {
                       </div>
                       <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
                         Your retire age ({livePlan.retireAge}) must be at least your current age ({inputs.currentAge}).
-                        Nudge the slider above, or lower Your age in the sidebar.
+                        Nudge the slider in the sidebar, or lower Your age there.
                       </div>
                     </div>
                   </div>

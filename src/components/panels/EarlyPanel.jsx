@@ -146,7 +146,7 @@ function TargetAgeCard({ plan, retireBy }) {
 
 // ─── Main export ─────────────────────────────────────────────
 
-export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy }) {
+export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy, embedded = false }) {
   const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -198,10 +198,11 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
     <div
       style={{
         background: "#f0f5f4",
-        height: "100%",
-        overflowY: "auto",
+        height: embedded ? "auto" : "100%",
+        overflowY: embedded ? "visible" : "auto",
         display: "flex",
         flexDirection: "column",
+        paddingBottom: 40,
       }}
     >
       {/* ── Hero ─────────────────────────────────────── */}
@@ -266,7 +267,7 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
         {bridgeShortfall > 0 && <BridgeWarning months={bridgeShortfall} />}
 
         {/* KPI chips */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: embedded ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: 10 }}>
           <KpiChip label={`Portfolio at ${plan.retireAge}`} value={fmt(totalAtRetirement)} />
           <KpiChip label="Sustainable spend" value={`${fmt(Math.round(sustainable))}/mo`} accent />
           <KpiChip

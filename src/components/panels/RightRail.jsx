@@ -4,7 +4,7 @@
 import { fmt, pct } from "../../format.js";
 import { phase as phaseColor } from "../../theme.js";
 
-export function RightRail({ plan, result, sensitivityRows, onApplyLever, appliedLevers = [], onUndoLevers }) {
+export function RightRail({ plan, result, sensitivityRows, onApplyLever, appliedLevers = [], onUndoLevers, embedded = false }) {
   const { snaps } = result;
   const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
   const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
@@ -42,8 +42,8 @@ export function RightRail({ plan, result, sensitivityRows, onApplyLever, applied
     <div
       style={{
         background: "#fafcfc",
-        height: "100%",
-        overflowY: "auto",
+        height: embedded ? "auto" : "100%",
+        overflowY: embedded ? "visible" : "auto",
         display: "flex",
         flexDirection: "column",
       }}

@@ -1,11 +1,11 @@
-// The app's primary lever, a playful command band at the top of the center
-// results column. A big bold "Plan to retire at {age}" headline where the age
-// pops when it changes, a warm "years to go" sub-line, and a sparkle when you
-// land on your earliest possible age. The slider sits centered beneath, with
-// milestone-age ticks (Rule of 55, 59½, SS, Medicare, FRA) that teach as you
-// drag — integer milestones double as click-to-jump targets. Drags report via
-// onScrub (cheap live preview), commits via onCommit — see App.jsx for the
-// no-lag split.
+// The app's primary lever, a compact command card pinned at the top of the
+// left sidebar (under the navbar, above Essentials). A bold "Plan to retire at
+// {age}" headline where the age pops when it changes, a warm "years to go"
+// sub-line, and a sparkle when you land on your earliest possible age. The
+// slider sits beneath, with milestone-age ticks (Rule of 55, 59½, SS, Medicare,
+// FRA) that teach as you drag — integer milestones double as click-to-jump
+// targets. Drags report via onScrub (cheap live preview), commits via onCommit
+// — see App.jsx for the no-lag split.
 import { useState } from "react";
 import { neutral } from "../../theme.js";
 
@@ -17,8 +17,8 @@ const MILESTONES = [
   { age: 67, name: "Full Retirement Age" },
 ];
 
-const STEP_W = 34;
-const STEP_GAP = 14;
+const STEP_W = 28;
+const STEP_GAP = 8;
 
 export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub, onCommit }) {
   const [dragging, setDragging] = useState(false);
@@ -47,9 +47,9 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
     flexShrink: 0,
     border: "1px solid #c4d6d0",
     background: "#fff",
-    borderRadius: 9,
+    borderRadius: 7,
     cursor: "pointer",
-    fontSize: 21,
+    fontSize: 17,
     fontWeight: 700,
     color: "#1a2e28",
     lineHeight: 1,
@@ -63,24 +63,23 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
       style={{
         flexShrink: 0,
         background: "linear-gradient(180deg,#ffffff 0%,#f6fbf9 100%)",
-        borderTop: "2px solid #7ecfbb",
         borderBottom: "1px solid #e2e8e6",
-        padding: "16px 40px 24px",
+        padding: "12px 14px 14px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
       }}
     >
       {/* Headline: Plan to retire at {age} — the age pops on change */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
-        <span style={{ fontSize: 25, fontWeight: 800, color: "#1a2e28", letterSpacing: "-0.01em" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", flexWrap: "wrap", gap: "4px 8px" }}>
+        <span style={{ fontSize: 16, fontWeight: 800, color: "#1a2e28", letterSpacing: "-0.01em" }}>
           Plan to retire at
         </span>
         <span
           key={dragging ? "live" : `v${value}`}
           className="age-pop"
           style={{
-            fontSize: 24,
+            fontSize: 22,
             fontWeight: 800,
             fontFamily: "'JetBrains Mono', monospace",
             lineHeight: 1,
@@ -101,24 +100,24 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
               border: "1px solid #a3d9c7",
               color: "#2a6e56",
               borderRadius: 999,
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: 700,
-              padding: "3px 10px",
+              padding: "2px 8px",
               whiteSpace: "nowrap",
             }}
           >
-            ✨ your earliest
+            ✨ earliest
           </span>
         )}
       </div>
 
       {/* Warm aspirational sub-line */}
-      <div style={{ fontSize: 12, color: "#5aa88c", fontWeight: 600, marginTop: 6, marginBottom: 16, letterSpacing: "0.01em" }}>
+      <div style={{ fontSize: 11, color: "#5aa88c", fontWeight: 600, marginTop: 4, marginBottom: 12, letterSpacing: "0.01em", textAlign: "center" }}>
         {subline}
       </div>
 
-      {/* Slider, centered, spanning most of the column */}
-      <div style={{ width: "100%", maxWidth: 760 }}>
+      {/* Slider, spanning the full sidebar width */}
+      <div style={{ width: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", gap: STEP_GAP }}>
           <button
             type="button"
@@ -157,7 +156,7 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
         </div>
 
         {/* Milestone ticks — inset to align under the slider track */}
-        <div style={{ position: "relative", height: 24, margin: `8px ${STEP_W + STEP_GAP}px 0` }}>
+        <div style={{ position: "relative", height: 20, margin: `6px ${STEP_W + STEP_GAP}px 0` }}>
           {ticks.map((t) => {
             const isEarliest = t.kind === "earliest";
             const active = t.age === value;
@@ -174,13 +173,13 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
                 <div
                   style={{
                     width: isEarliest ? 0 : 2,
-                    height: isEarliest ? 0 : 8,
+                    height: isEarliest ? 0 : 6,
                     margin: "0 auto 2px",
                     background: isEarliest ? "transparent" : markColor,
                     borderRadius: 1,
-                    borderLeft: isEarliest ? "5px solid transparent" : "none",
-                    borderRight: isEarliest ? "5px solid transparent" : "none",
-                    borderTop: isEarliest ? `7px solid ${markColor}` : "none",
+                    borderLeft: isEarliest ? "4px solid transparent" : "none",
+                    borderRight: isEarliest ? "4px solid transparent" : "none",
+                    borderTop: isEarliest ? `6px solid ${markColor}` : "none",
                   }}
                 />
                 {clickable ? (
@@ -188,12 +187,12 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
                     type="button"
                     onClick={() => onCommit(clamp(t.age))}
                     aria-label={isEarliest ? `Earliest age ${t.age}` : t.name}
-                    style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 12, fontWeight: 700, color: labelColor, padding: 0 }}
+                    style={{ border: "none", background: "transparent", cursor: "pointer", fontSize: 10, fontWeight: 700, color: labelColor, padding: 0 }}
                   >
                     {label}
                   </button>
                 ) : (
-                  <span style={{ fontSize: 11, color: labelColor, fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontSize: 9.5, color: labelColor, fontWeight: 600 }}>{label}</span>
                 )}
               </div>
             );

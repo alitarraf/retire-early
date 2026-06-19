@@ -24,8 +24,32 @@ import { historicalSequence } from "../analysis/historicalSequence.js";
 import { PortfolioChartCard } from "../components/panels/PortfolioChartCard.jsx";
 import { MonteCarloCard } from "../components/panels/MonteCarloCard.jsx";
 import { RetireAtControl } from "../components/panels/RetireAtControl.jsx";
+import { MobileShell } from "../components/mobile/MobileShell.jsx";
 
 const noNaN = (html) => expect(html).not.toMatch(/NaN/);
+
+const MOBILE_TABS = [
+  { key: "early", label: "Retire Early" },
+  { key: "maximize", label: "Maximize" },
+  { key: "advice", label: "Get advice" },
+  { key: "docs", label: "How it works" },
+];
+
+function mobileProps(mode = "early") {
+  const inputs = { ...DEFAULTS };
+  const plan = makePlan(inputs);
+  const result = runMain(plan);
+  return {
+    mode, setMode: () => {}, tabs: MOBILE_TABS,
+    inputs, set: () => () => {}, plan,
+    earliest: earliestRetireAge(plan), onScrubAge: () => {}, onCommitAge: () => {},
+    result, mcResult: null, scenario: null,
+    totalAtRetirement: result.snaps[0]?.total ?? 0, sustainable: 5000,
+    retireBy: retireByAge(plan, plan.retireAge),
+    sensitivityRows: [], applyLever: () => {}, appliedLevers: [], undoLevers: () => {},
+    atRetirement: {}, marginalRows: [], dynamicOpt: null, applyOptimized: () => {}, onRunMc: () => {},
+  };
+}
 
 describe("render smoke tests", () => {
   it("App renders without throwing (initial Retire Early mode)", () => {
@@ -279,6 +303,21 @@ describe("render smoke tests", () => {
   it("App renders the full-width Retire-at command band", () => {
     const html = renderToString(<App />);
     expect(html).toContain("Plan to retire at");
+    noNaN(html);
+  });
+
+  it("MobileShell (early) renders hero, folded results, and the input bottom nav", () => {
+    const html = renderToString(<MobileShell {...mobileProps("early")} />);
+    expect(html).toContain("Plan to retire at"); // pinned hero
+    expect(html).toContain("Fine-tune"); // bottom-nav input section
+    expect(html).toContain("Earliest retirement"); // EarlyPanel results folded in
+    noNaN(html);
+  });
+
+  it("MobileShell content tabs (Get advice) hide the hero + input bottom nav", () => {
+    const html = renderToString(<MobileShell {...mobileProps("advice")} />);
+    expect(html).not.toContain("Plan to retire at"); // hero hidden on content pages
+    expect(html).not.toContain("Fine-tune"); // bottom nav hidden on content pages
     noNaN(html);
   });
 

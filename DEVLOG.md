@@ -32,7 +32,7 @@ components/ + App.jsx    React UI
 - **Tests are the gate.** Invariants A–E in `simulate.test.js` + others. When adding engine params, use **identity defaults** (off = byte-identical output) and re-run the full suite after every engine edit.
 - Tax year is 2026, MFJ default. Annual update = single-file edit in `constants/brackets.js`.
 
-**Test suite: 185 passing, 14 files** (was 94 at start of 2026-06-17, 156 at end of that day).
+**Test suite: 194 passing, 15 files** (was 94 at start of 2026-06-17, 156 at end of that day).
 
 ---
 

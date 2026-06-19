@@ -19,6 +19,8 @@ import { MaximizeRail } from "./components/panels/MaximizeRail.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { QuickStart } from "./components/panels/QuickStart.jsx";
+import { MobileShell } from "./components/mobile/MobileShell.jsx";
+import { useIsMobile } from "./useIsMobile.js";
 import { fmt } from "./format.js";
 
 const TABS = [
@@ -32,6 +34,7 @@ const QS_KEY = "retire-early.quickStartDismissed";
 
 export default function App() {
   const [mode, setMode] = useState("early");
+  const isMobile = useIsMobile();
   const [inputs, setInputs] = useState(DEFAULTS);
   const set = (key) => (val) => setInputs((prev) => ({ ...prev, [key]: val }));
 
@@ -188,6 +191,42 @@ export default function App() {
     liveAtRetirement.cashDeposit +
     liveAtRetirement.muniBonds +
     (liveAtRetirement.hsaBalance ?? 0);
+
+  // ── Mobile (≤767px): a dedicated single-column shell fed the same props.
+  // All hooks above run unconditionally, so this early return is hook-safe.
+  if (isMobile) {
+    return (
+      <>
+        <MobileShell
+          mode={mode}
+          setMode={setMode}
+          tabs={TABS}
+          inputs={inputs}
+          set={set}
+          plan={livePlan}
+          earliest={earliest}
+          onScrubAge={onScrubAge}
+          onCommitAge={onCommitAge}
+          result={result}
+          mcResult={mcResult}
+          scenario={scenario}
+          totalAtRetirement={totalAtRetirement}
+          sustainable={sustainable}
+          retireBy={retireBy}
+          sensitivityRows={sensitivityRows}
+          applyLever={applyLever}
+          appliedLevers={appliedLevers}
+          undoLevers={undoLevers}
+          atRetirement={atRetirement}
+          marginalRows={marginalRows}
+          dynamicOpt={dynamicOpt}
+          applyOptimized={applyOptimized}
+          onRunMc={() => setMaxMcOn(true)}
+        />
+        {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+      </>
+    );
+  }
 
   return (
     <div

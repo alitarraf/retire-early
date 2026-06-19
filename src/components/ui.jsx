@@ -35,6 +35,8 @@ export const NumInput = ({ value, onChange, prefix, suffix, step = 1, min = 0, m
       onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
       style={{
         width,
+        maxWidth: "100%",
+        minWidth: 0,
         padding: "6px 8px",
         border: "1px solid #d0deda",
         borderRadius: 6,

@@ -13,7 +13,7 @@ const ROWS = [
   { key: "cashDeposit",       label: "CD / cash",           color: "#9db4ae", note: null },
 ];
 
-export function MaximizeRail({ plan, atRetirement, marginalRows }) {
+export function MaximizeRail({ plan, atRetirement, marginalRows, embedded = false }) {
   const total =
     (atRetirement.rothContributions ?? 0) +
     (atRetirement.rothEarnings ?? 0) +
@@ -29,8 +29,8 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
     <div
       style={{
         background: "#fafcfc",
-        height: "100%",
-        overflowY: "auto",
+        height: embedded ? "auto" : "100%",
+        overflowY: embedded ? "visible" : "auto",
         display: "flex",
         flexDirection: "column",
       }}

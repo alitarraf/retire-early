@@ -50,7 +50,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, embedded = false }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -74,8 +74,8 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
     <div
       style={{
         background: "#f0f5f4",
-        height: "100%",
-        overflowY: "auto",
+        height: embedded ? "auto" : "100%",
+        overflowY: embedded ? "visible" : "auto",
         display: "flex",
         flexDirection: "column",
         paddingBottom: 40,
@@ -141,7 +141,7 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         </div>
 
         {/* KPI chips */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: embedded ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: 10 }}>
           <KpiChip
             label="Sustainable spend"
             value={`${fmt(Math.round(sustainable))}/mo`}

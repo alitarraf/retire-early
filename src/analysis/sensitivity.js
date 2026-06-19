@@ -22,7 +22,10 @@ export function sensitivity(plan) {
     { label: "Spend −$500/mo", ...spend(500) },
     { label: "Spend −$1,000/mo", ...spend(1000) },
     { label: "Spend −$2,000/mo", ...spend(2000) },
-    { label: "Max Roth $7.5k/yr", ov: { rothAnnual: Math.max(0, 7500 - plan.rothAnnualContrib) }, apply: { rothAnnualContrib: 7500 } },
+    // Guard the apply against the no-change case: the preview only ever *adds*
+    // toward 7500 (ov = max(0, 7500 - current)), so apply must never lower an
+    // already-higher contribution — that would silently contradict a "—" row.
+    { label: "Max Roth $7.5k/yr", ov: { rothAnnual: Math.max(0, 7500 - plan.rothAnnualContrib) }, apply: { rothAnnualContrib: Math.max(plan.rothAnnualContrib, 7500) } },
     { label: "Add $50k munis", ov: { muniAdd: 50000 }, apply: { muniBonds: plan.muniBonds + 50000 } },
     { label: "Take SS at 62", ov: { ssAge: 62, ssBenefit: plan.ssBenefit * 0.7 }, apply: { ssAge: 62, ssBenefit: plan.ssBenefit * 0.7 } },
   ];

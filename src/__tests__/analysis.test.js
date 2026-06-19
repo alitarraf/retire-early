@@ -58,6 +58,21 @@ describe("analysis routines return sane shapes", () => {
     if (cut.delta !== null) expect(cut.delta).toBeGreaterThanOrEqual(0);
   });
 
+  it("each lever's apply patch reproduces its previewed earliest age", () => {
+    // The clickable lever writes `apply` (raw-input namespace) into inputs; the
+    // preview simulated `ov` (engine-override namespace). They must agree, or a
+    // click silently contradicts the number the user saw. Re-deriving earliest
+    // from `apply` should land within a year of the previewed `newEarliest`
+    // (the only slack is the Roth lever's splitRoth re-derivation of existing
+    // contributions vs the override's contribution-only add).
+    for (const row of sensitivity(plan)) {
+      if (row.newEarliest == null) continue;
+      const applied = earliestRetireAge(makePlan({ ...row.apply }), { max: 75 });
+      expect(applied, row.label).not.toBeNull();
+      expect(Math.abs(applied - row.newEarliest), row.label).toBeLessThanOrEqual(1);
+    }
+  });
+
   it("marginal values are non-negative", () => {
     for (const r of marginalValues(plan)) expect(r.gain).toBeGreaterThanOrEqual(0);
   });

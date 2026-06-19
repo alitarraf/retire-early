@@ -119,6 +119,24 @@ export default function App() {
       annualRothConversion: 0,
     }));
 
+  // Clickable sensitivity levers. We snapshot `inputs` before the FIRST lever is
+  // applied (the baseline) and track which levers are applied. A lever can only
+  // be applied once (so it can't silently stack, e.g. +$50k munis twice = +$100k),
+  // and "Undo all" reverts to the baseline in one step.
+  const [leverBaseline, setLeverBaseline] = useState(null);
+  const [appliedLevers, setAppliedLevers] = useState([]);
+  const applyLever = (apply, label) => {
+    if (appliedLevers.includes(label)) return;
+    setLeverBaseline((b) => (b == null ? inputs : b));
+    setAppliedLevers((list) => [...list, label]);
+    setInputs((prev) => ({ ...prev, ...apply }));
+  };
+  const undoLevers = () => {
+    if (leverBaseline) setInputs(leverBaseline);
+    setLeverBaseline(null);
+    setAppliedLevers([]);
+  };
+
   // Un-gated: used in Early mode KPI chip and Maximize mode hero
   const sustainable = useMemo(() => sustainableSpend(plan), [plan]);
 
@@ -226,7 +244,7 @@ export default function App() {
           display: "grid",
           gridTemplateColumns: "440px 1fr 320px",
           gap: "1px",
-          background: "#dce8e4",
+          background: "#e2e8e6",
           overflow: "hidden",
           minHeight: 0,
         }}
@@ -305,7 +323,14 @@ export default function App() {
             {/* Right rail (col 3) */}
             {result &&
               (mode === "early" ? (
-                <RightRail plan={livePlan} result={result} sensitivityRows={sensitivityRows} />
+                <RightRail
+                  plan={livePlan}
+                  result={result}
+                  sensitivityRows={sensitivityRows}
+                  onApplyLever={applyLever}
+                  appliedLevers={appliedLevers}
+                  onUndoLevers={undoLevers}
+                />
               ) : (
                 <MaximizeRail plan={livePlan} atRetirement={atRetirement} marginalRows={marginalRows} />
               ))}

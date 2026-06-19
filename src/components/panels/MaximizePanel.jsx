@@ -27,7 +27,7 @@ export function MaximizePanel({ plan, result, atRetirement, marginalRows, optima
     { label: "HSA", val: atRetirement.hsaBalance ?? 0, color: "#5aada0", note: `${plan.hsaAnnualContrib > 0 ? `${fmt(plan.hsaAnnualContrib)}/yr contributions + ` : ""}grows tax-free, draws tax-free for medical` },
     { label: "Municipal bonds", val: atRetirement.muniBonds, color: "#a8d5c8", note: plan.muniDoubleTaxFree ? `${pct(plan.muniReturn)} yield, 0% tax` : `${pct(plan.muniReturn)} yield, ${pct(plan.effectiveStateTax)} state tax` },
     { label: "Taxable brokerage", val: atRetirement.brokerage, color: "#4a8c7a", note: `Gains taxed at ${pct(plan.brokerageLtcgRate)}` },
-    { label: "CD / deposit", val: atRetirement.cashDeposit, color: "#b0c4be", note: `After-tax rate: ${pct(plan.depositAfterTaxRate)}` },
+    { label: "CD / deposit", val: atRetirement.cashDeposit, color: "#9db4ae", note: `After-tax rate: ${pct(plan.depositAfterTaxRate)}` },
   ];
 
   return (
@@ -57,18 +57,18 @@ export function MaximizePanel({ plan, result, atRetirement, marginalRows, optima
         <div style={{ fontSize: 11, color: "#9db4ae", marginBottom: 10 }}>
           Monthly need:{" "}
           <strong style={{ color: "#1a2e28", fontFamily: "'JetBrains Mono',monospace" }}>{fmt(plan.monthlyAtRetirement)}/mo</strong>
-          <span style={{ color: "#b0c4be" }}>
+          <span style={{ color: "#9db4ae" }}>
             {" "}(today's {fmt(plan.monthlyExpense)} × (1+{pct(plan.inflationRate)})^{plan.yearsToRetire})
           </span>
         </div>
         {rows.map((r) => (
-          <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "7px 0", borderBottom: "1px solid #eef2f1" }}>
+          <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "7px 0", borderBottom: "1px solid #e2e8e6" }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div style={{ width: 7, height: 7, borderRadius: 99, background: r.color, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: "#4a5e58" }}>{r.label}</span>
               </div>
-              <div style={{ fontSize: 10, color: "#b0c4be", marginTop: 1, paddingLeft: 12 }}>{r.note}</div>
+              <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 1, paddingLeft: 12 }}>{r.note}</div>
             </div>
             <span style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 600, color: "#1a2e28", fontSize: 12 }}>{fmt(r.val)}</span>
           </div>
@@ -91,12 +91,12 @@ export function MaximizePanel({ plan, result, atRetirement, marginalRows, optima
               <span style={{ fontSize: 12, color: "#4a5e58" }}>{label}</span>
               <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: "#3d8c78" }}>+{fmt(Math.round(gain))}</span>
             </div>
-            <div style={{ background: "#eef2f1", borderRadius: 99, height: 6, overflow: "hidden" }}>
+            <div style={{ background: "#e2e8e6", borderRadius: 99, height: 6, overflow: "hidden" }}>
               <div style={{ width: `${(gain / maxMarginal) * 100}%`, height: "100%", background: "#3d8c78", borderRadius: 99, minWidth: gain > 0 ? 4 : 0 }} />
             </div>
           </div>
         ))}
-        <div style={{ fontSize: 10, color: "#b0c4be", marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 4 }}>
           Gain shown as additional estate value at age {plan.lifeExpect}. Uses full simulation per account.
         </div>
       </Card>

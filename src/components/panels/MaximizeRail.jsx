@@ -10,7 +10,7 @@ const ROWS = [
   { key: "hsaBalance",        label: "HSA",                 color: "#5aada0", note: "Tax-free for medical" },
   { key: "muniBonds",         label: "Munis",               color: "#a8d5c8", note: null },
   { key: "brokerage",         label: "Brokerage",           color: "#4a8c7a", note: null },
-  { key: "cashDeposit",       label: "CD / cash",           color: "#b0c4be", note: null },
+  { key: "cashDeposit",       label: "CD / cash",           color: "#9db4ae", note: null },
 ];
 
 export function MaximizeRail({ plan, atRetirement, marginalRows }) {
@@ -36,7 +36,7 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
       }}
     >
       {/* ── Projected balances TOP ───────────────────── */}
-      <div style={{ padding: "16px", borderBottom: "1px solid #dce8e4" }}>
+      <div style={{ padding: "16px", borderBottom: "1px solid #e2e8e6" }}>
         <div
           style={{
             fontSize: 10,
@@ -68,7 +68,7 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
                 justifyContent: "space-between",
                 alignItems: "flex-start",
                 padding: "6px 0",
-                borderBottom: "1px solid #eef2f1",
+                borderBottom: "1px solid #e2e8e6",
               }}
             >
               <div>
@@ -85,7 +85,7 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
                   <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
                 </div>
                 {dynamicNote && (
-                  <div style={{ fontSize: 10, color: "#b0c4be", marginTop: 1, paddingLeft: 12 }}>
+                  <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 1, paddingLeft: 12 }}>
                     {dynamicNote}
                   </div>
                 )}
@@ -164,7 +164,7 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
             </div>
             <div
               style={{
-                background: "#eef2f1",
+                background: "#e2e8e6",
                 borderRadius: 99,
                 height: 4,
                 overflow: "hidden",
@@ -183,7 +183,7 @@ export function MaximizeRail({ plan, atRetirement, marginalRows }) {
           </div>
         ))}
 
-        <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5, marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
           Gain = additional estate at age {plan.lifeExpect}. Full simulation per account.
         </div>
       </div>

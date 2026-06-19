@@ -9,6 +9,7 @@
 // total-portfolio line for the stress scenario is overlaid on the bars.
 // When `mcBands` is supplied ([{ age, p10, p50, p90 }] from monteCarlo), a
 // shaded 10th–90th-percentile fan with a median line is drawn over the bars.
+import { phase } from "../../theme.js";
 
 // Layout constants are exported so the parent can position the HTML tooltip
 // over the SVG using the exact same column math (single source of truth).
@@ -246,10 +247,10 @@ export function StackedChart({
           const iSS = snaps.findIndex((s) => s.age >= ssAge);
           const candidates = [];
           if (snaps[0] && snaps[0].age < 60 && snaps[0].age < ssAge)
-            candidates.push({ x: YPAD + 2, label: "Bridge", color: "#c97c1a" });
+            candidates.push({ x: YPAD + 2, label: "Bridge", color: phase.bridge });
           if (i60 >= 0 && snaps[i60].age < ssAge)
-            candidates.push({ x: lx(i60), label: "Early", color: "#3d8c78" });
-          if (iSS >= 0) candidates.push({ x: lx(iSS), label: "SS+", color: "#1a2e28" });
+            candidates.push({ x: lx(i60), label: "Early", color: phase.early });
+          if (iSS >= 0) candidates.push({ x: lx(iSS), label: "SS+", color: phase.full });
 
           const drawn = [];
           let lastRight = -Infinity;

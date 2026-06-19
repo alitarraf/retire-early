@@ -109,7 +109,7 @@ export function QuickStart({ onApply, onSkip }) {
             Skip
           </button>
         </div>
-        <div style={{ fontSize: 9, color: "#b0c4be", marginTop: 14, textAlign: "center" }}>
+        <div style={{ fontSize: 9, color: "#9db4ae", marginTop: 14, textAlign: "center" }}>
           Educational planning tool — not financial advice.
         </div>
       </div>

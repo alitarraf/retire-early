@@ -104,7 +104,8 @@ describe("render smoke tests", () => {
     );
     expect(html).toContain("Portfolio over time");
     expect(html).toContain("Outcome range"); // chart toggle option
-    expect(html).toContain("Show details — Monte Carlo"); // MC card now collapsed in details
+    expect(html).toContain("Show details"); // flat disclosure trigger (cards revealed on open)
+    expect(html).toContain("Monte Carlo, tax, stress &amp; legacy"); // disclosure caption
     noNaN(html);
   });
 

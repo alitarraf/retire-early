@@ -1,6 +1,7 @@
 // Reusable input/output primitives. All real top-level components
 // (never defined inside a render body) so React preserves input focus.
 import { useState, useRef } from "react";
+import { slider } from "../theme.js";
 
 export const Section = ({ title, children, accent }) => (
   <div style={{ marginBottom: 22 }}>
@@ -19,18 +20,6 @@ export const Section = ({ title, children, accent }) => (
       {title}
     </div>
     {children}
-  </div>
-);
-
-export const Row = ({ label, children, hint }) => (
-  <div style={{ display: "flex", alignItems: "flex-start", marginBottom: 9, gap: 10 }}>
-    <div style={{ flex: "0 0 170px", fontSize: 12, color: "#4a5e58", paddingTop: 7 }}>
-      {label}
-      {hint && (
-        <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 1, lineHeight: 1.4 }}>{hint}</div>
-      )}
-    </div>
-    <div style={{ flex: 1 }}>{children}</div>
   </div>
 );
 
@@ -87,7 +76,7 @@ export const Select = ({ value, onChange, options, width = 190 }) => (
 
 export const Toggle = ({ value, onChange, options }) => (
   <div
-    style={{ display: "flex", background: "#eef2f1", borderRadius: 8, padding: 3, gap: 2, flexWrap: "wrap" }}
+    style={{ display: "flex", background: "#e2e8e6", borderRadius: 8, padding: 3, gap: 2, flexWrap: "wrap" }}
   >
     {options.map((opt) => (
       <button
@@ -154,6 +143,47 @@ export const Collapsible = ({ title, hint, children, defaultOpen = false, open: 
     </div>
   );
 };
+
+// Flat inline disclosure (Option A): a borderless hairline-rule row, not a
+// button-box. Used to reveal secondary cards that already carry their own
+// elevation, so the revealed content flows as more of the same column rather
+// than nesting inside a bordered shell.
+export const DetailsToggle = ({ open, onToggle, caption }) => (
+  <button
+    type="button"
+    aria-expanded={open}
+    onClick={() => onToggle(!open)}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      width: "100%",
+      background: "transparent",
+      border: "none",
+      cursor: "pointer",
+      padding: "4px 0",
+    }}
+  >
+    <span style={{ fontSize: 12, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>
+      {open ? "Hide details" : "Show details"}
+    </span>
+    <span style={{ flex: 1, height: 1, background: "#dde7e3" }} />
+    {caption && (
+      <span style={{ fontSize: 11, color: "#9db4ae", whiteSpace: "nowrap" }}>{caption}</span>
+    )}
+    <span
+      style={{
+        fontSize: 12,
+        color: "#7C9A92",
+        display: "inline-block",
+        transform: open ? "rotate(180deg)" : "none",
+        transition: "transform 0.2s",
+      }}
+    >
+      ▾
+    </span>
+  </button>
+);
 
 // Small ⓘ that reveals a context popover on hover or keyboard focus.
 // Content comes from constants/fieldHelp.js so docs and tooltips never diverge.
@@ -247,7 +277,6 @@ export const Card = ({ children, accent, warn, style = {} }) => (
       borderRadius: 14,
       padding: 18,
       boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-      border: warn ? "1.5px solid #f5c0b0" : "none",
       ...style,
     }}
   >
@@ -283,10 +312,11 @@ export const BigNum = ({ children, accent, warn, small }) => (
   </div>
 );
 
-// Dual-handle range slider, fully inline-styled (no CSS file in this project, so
-// native <input type=range> thumbs can't be themed). Pointer-drag + arrow-key
-// support; thumbs are real buttons so keyboard focus is visible. Values are
-// clamped so the two handles never cross (lo stays <= hi - 1).
+// Dual-handle range slider. Shares the slider token language (track / thumb)
+// with the native range in RetireAtControl (themed via index.css) so the two
+// controls match. Pointer-drag + arrow-key support; thumbs are real buttons so
+// keyboard focus is visible. Values are clamped so the handles never cross
+// (lo stays <= hi - 1).
 export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
   const trackRef = useRef(null);
   const dragRef = useRef(null);
@@ -347,7 +377,7 @@ export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
         marginLeft: -7,
         marginTop: -7,
         borderRadius: "50%",
-        border: "2px solid #3d8c78",
+        border: `2px solid ${slider.thumbBorder}`,
         background: "#fff",
         boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
         cursor: "grab",
@@ -369,7 +399,7 @@ export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
           height: 4,
           marginTop: -2,
           borderRadius: 2,
-          background: "#e2e8e6",
+          background: slider.track,
         }}
       >
         <div
@@ -379,7 +409,7 @@ export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
             bottom: 0,
             left: `${pctOf(lo)}%`,
             right: `${100 - pctOf(hi)}%`,
-            background: "#7ecfbb",
+            background: slider.active,
             borderRadius: 2,
           }}
         />

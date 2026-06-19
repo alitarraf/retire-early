@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
-import { Collapsible, InfoDot } from "../ui.jsx";
+import { DetailsToggle, InfoDot } from "../ui.jsx";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
 import { fmt, fmtK } from "../../format.js";
 
@@ -16,7 +16,7 @@ function BridgeWarning({ months }) {
     <div
       style={{
         background: "#fff8e8",
-        border: "1px solid #f5d9a0",
+        borderLeft: "3px solid #f0c987",
         borderRadius: 10,
         padding: "10px 14px",
         marginBottom: 18,
@@ -39,7 +39,6 @@ function KpiChip({ label, value, accent, warn }) {
         background: accent ? "#1a2e28" : warn ? "#fff3f0" : "#f0f5f4",
         borderRadius: 10,
         padding: "10px 12px",
-        border: warn ? "1px solid #f5c0b0" : "none",
       }}
     >
       <div
@@ -106,7 +105,7 @@ function TargetAgeCard({ plan, retireBy }) {
           into a taxable brokerage account{pctSalary > 0 ? ` ≈ ${Math.round(pctSalary)}% of salary` : ""} — reachable before 59½, when your 401k is still locked.
         </div>
         {showAlt && (
-          <div style={{ fontSize: 13, color: "#4a5e58", lineHeight: 1.6, marginTop: 12, paddingTop: 10, borderTop: "1px solid #eef2f1" }}>
+          <div style={{ fontSize: 13, color: "#4a5e58", lineHeight: 1.6, marginTop: 12, paddingTop: 10, borderTop: "1px solid #e2e8e6" }}>
             Or keep saving as you are and trim retirement spending to <strong>{fmt(altSpend)}/mo</strong> (today's $).
           </div>
         )}
@@ -137,7 +136,7 @@ function TargetAgeCard({ plan, retireBy }) {
         {`Retire by age ${age}`}
         <InfoDot context={FIELD_HELP.targetRetireAge.context} />
       </div>
-      <div style={{ fontSize: 11, color: "#b0c4be", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: "#9db4ae", marginBottom: 12 }}>
         Change <strong>Retire at</strong> in the sidebar to explore other ages.
       </div>
       {body}
@@ -293,25 +292,23 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
+      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
+          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
-        <Collapsible
-          title="Show details — Monte Carlo, tax, stress & legacy"
+        <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-        >
+          caption="Monte Carlo, tax, stress & legacy"
+        />
+      </div>
+      {detailsOpen && (
+        <>
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <StressCard stressResult={stressResult} plan={plan} />
           <TaxTransparency plan={plan} result={result} />
           <LegacyGap plan={plan} endVal={endVal} />
-        </Collapsible>
-      </div>
-
-      {/* Footnote */}
-      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>
-        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
-        Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses 2026{" "}
-        {plan.filingStatus.toUpperCase()} brackets on actual draw. Planning model only.
-      </div>
+        </>
+      )}
     </div>
   );
 }

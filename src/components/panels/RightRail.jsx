@@ -2,15 +2,16 @@
 // TOP: Phase breakdown (Bridge → Early Retirement → Full SS).
 // BOTTOM: Sensitivity levers (what moves your retirement date?).
 import { fmt, pct } from "../../format.js";
+import { phase as phaseColor } from "../../theme.js";
 
-export function RightRail({ plan, result, sensitivityRows }) {
+export function RightRail({ plan, result, sensitivityRows, onApplyLever, appliedLevers = [], onUndoLevers }) {
   const { snaps } = result;
   const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
   const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
 
   const phases = [
     {
-      color: "#f0a500",
+      color: phaseColor.bridge,
       title: "Bridge",
       ages: `${plan.retireAge}→59½`,
       desc:
@@ -19,14 +20,14 @@ export function RightRail({ plan, result, sensitivityRows }) {
       balance: snap59?.total ?? null,
     },
     {
-      color: "#3d8c78",
+      color: phaseColor.early,
       title: "Early Retirement",
       ages: `59½→${plan.ssAge}`,
       desc: `Roth earnings free. 401k at retirement bracket — not ${plan.employmentBracket}%. No SS.`,
       balance: snapSS?.total ?? null,
     },
     {
-      color: "#1a2e28",
+      color: phaseColor.full,
       title: "Full SS",
       ages: `${plan.ssAge}+`,
       desc:
@@ -48,7 +49,7 @@ export function RightRail({ plan, result, sensitivityRows }) {
       }}
     >
       {/* ── Phases TOP ──────────────────────────────── */}
-      <div style={{ padding: "16px 16px", borderBottom: "1px solid #dce8e4" }}>
+      <div style={{ padding: "16px 16px", borderBottom: "1px solid #e2e8e6" }}>
         <div
           style={{
             fontSize: 10,
@@ -88,6 +89,20 @@ export function RightRail({ plan, result, sensitivityRows }) {
             )}
           </div>
         ))}
+        <div
+          style={{
+            fontSize: 10,
+            color: "#9db4ae",
+            lineHeight: 1.6,
+            marginTop: 2,
+            paddingTop: 12,
+            borderTop: "1px solid #e2e8e6",
+          }}
+        >
+          Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
+          Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses 2026{" "}
+          {plan.filingStatus.toUpperCase()} brackets on actual draw. Planning model only.
+        </div>
       </div>
 
       {/* ── Levers BOTTOM ───────────────────────────── */}
@@ -105,80 +120,137 @@ export function RightRail({ plan, result, sensitivityRows }) {
           Try a lever
         </div>
         <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
-          Each changes one thing and re-runs the full simulation. All else equal.
+          Apply one to write it into your inputs and re-run. Each changes one thing, all else equal.
         </div>
 
-        {sensitivityRows.map(({ label, newEarliest, delta }) => {
+        {appliedLevers.length > 0 && (
+          <div
+            style={{
+              background: "#f0f5f4",
+              borderRadius: 8,
+              padding: "8px 10px",
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                marginBottom: 4,
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#4a5e58" }}>
+                Applied ({appliedLevers.length})
+              </span>
+              <button
+                type="button"
+                onClick={onUndoLevers}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#3d8c78",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                Undo all
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#4a5e58", lineHeight: 1.5 }}>
+              {appliedLevers.join(" · ")}
+            </div>
+          </div>
+        )}
+
+        {sensitivityRows.map(({ label, newEarliest, delta, apply }) => {
           const noChange = delta === null || delta === 0;
+          const applied = appliedLevers.includes(label);
           return (
             <div
               key={label}
-              style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #eef2f1" }}
+              style={{
+                borderBottom: "1px solid #e2e8e6",
+                padding: "0 0 10px",
+                marginBottom: 10,
+                opacity: applied ? 0.6 : 1,
+              }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 4,
+                  gap: 8,
+                  marginBottom: 6,
                 }}
               >
-                <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {newEarliest != null && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "#9db4ae",
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                    >
-                      → {newEarliest}
-                    </span>
-                  )}
-                  <span
+                <span style={{ fontSize: 11, color: "#4a5e58", flex: 1, minWidth: 0 }}>{label}</span>
+                {applied ? (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>
+                    ✓ Applied
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onApplyLever?.(apply, label)}
+                    title={`Apply "${label}" to your inputs`}
                     style={{
-                      fontSize: 11,
+                      flexShrink: 0,
+                      border: "1px solid #3d8c78",
+                      background: "transparent",
+                      color: "#3d8c78",
+                      fontSize: 10,
                       fontWeight: 700,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      minWidth: 44,
-                      textAlign: "right",
-                      color: delta > 0 ? "#3d8c78" : noChange ? "#b0c4be" : "#c0392b",
+                      borderRadius: 6,
+                      padding: "3px 9px",
+                      cursor: "pointer",
                     }}
                   >
-                    {delta > 0
-                      ? `−${delta}yr`
-                      : noChange
-                      ? "—"
-                      : `+${Math.abs(delta ?? 0)}yr`}
-                  </span>
-                </div>
+                    Apply
+                  </button>
+                )}
               </div>
-              {delta > 0 && (
-                <div
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1, background: "#e2e8e6", borderRadius: 99, height: 3, overflow: "hidden" }}>
+                  {delta > 0 && (
+                    <div
+                      style={{
+                        width: `${Math.min(100, (delta / 10) * 100)}%`,
+                        height: "100%",
+                        background: "#3d8c78",
+                        borderRadius: 99,
+                        minWidth: 4,
+                      }}
+                    />
+                  )}
+                </div>
+                {newEarliest != null && (
+                  <span style={{ fontSize: 10, color: "#9db4ae", fontFamily: "'JetBrains Mono', monospace" }}>
+                    → {newEarliest}
+                  </span>
+                )}
+                <span
                   style={{
-                    background: "#eef2f1",
-                    borderRadius: 99,
-                    height: 3,
-                    overflow: "hidden",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    minWidth: 44,
+                    textAlign: "right",
+                    color: delta > 0 ? "#3d8c78" : noChange ? "#9db4ae" : "#c0392b",
                   }}
                 >
-                  <div
-                    style={{
-                      width: `${Math.min(100, (delta / 10) * 100)}%`,
-                      height: "100%",
-                      background: "#3d8c78",
-                      borderRadius: 99,
-                      minWidth: 4,
-                    }}
-                  />
-                </div>
-              )}
+                  {delta > 0 ? `−${delta}yr` : noChange ? "—" : `+${Math.abs(delta ?? 0)}yr`}
+                </span>
+              </div>
             </div>
           );
         })}
 
-        <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5, marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
           Bar = years gained (max 10). Full simulation per row — taxes, SS, inflation, draw order.
         </div>
       </div>

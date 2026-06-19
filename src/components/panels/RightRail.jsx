@@ -2,15 +2,16 @@
 // TOP: Phase breakdown (Bridge → Early Retirement → Full SS).
 // BOTTOM: Sensitivity levers (what moves your retirement date?).
 import { fmt, pct } from "../../format.js";
+import { phase as phaseColor } from "../../theme.js";
 
-export function RightRail({ plan, result, sensitivityRows }) {
+export function RightRail({ plan, result, sensitivityRows, onApplyLever, leverUndo, onUndoLever }) {
   const { snaps } = result;
   const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
   const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
 
   const phases = [
     {
-      color: "#f0a500",
+      color: phaseColor.bridge,
       title: "Bridge",
       ages: `${plan.retireAge}→59½`,
       desc:
@@ -19,14 +20,14 @@ export function RightRail({ plan, result, sensitivityRows }) {
       balance: snap59?.total ?? null,
     },
     {
-      color: "#3d8c78",
+      color: phaseColor.early,
       title: "Early Retirement",
       ages: `59½→${plan.ssAge}`,
       desc: `Roth earnings free. 401k at retirement bracket — not ${plan.employmentBracket}%. No SS.`,
       balance: snapSS?.total ?? null,
     },
     {
-      color: "#1a2e28",
+      color: phaseColor.full,
       title: "Full SS",
       ages: `${plan.ssAge}+`,
       desc:
@@ -48,7 +49,7 @@ export function RightRail({ plan, result, sensitivityRows }) {
       }}
     >
       {/* ── Phases TOP ──────────────────────────────── */}
-      <div style={{ padding: "16px 16px", borderBottom: "1px solid #dce8e4" }}>
+      <div style={{ padding: "16px 16px", borderBottom: "1px solid #e2e8e6" }}>
         <div
           style={{
             fontSize: 10,
@@ -95,7 +96,7 @@ export function RightRail({ plan, result, sensitivityRows }) {
             lineHeight: 1.6,
             marginTop: 2,
             paddingTop: 12,
-            borderTop: "1px solid #eef2f1",
+            borderTop: "1px solid #e2e8e6",
           }}
         >
           Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
@@ -119,15 +120,62 @@ export function RightRail({ plan, result, sensitivityRows }) {
           Try a lever
         </div>
         <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
-          Each changes one thing and re-runs the full simulation. All else equal.
+          Click one to apply it to your inputs and re-run. Each changes one thing, all else equal.
         </div>
 
-        {sensitivityRows.map(({ label, newEarliest, delta }) => {
+        {leverUndo && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+              background: "#f0f5f4",
+              borderRadius: 8,
+              padding: "8px 10px",
+              marginBottom: 12,
+            }}
+          >
+            <span style={{ fontSize: 11, color: "#4a5e58" }}>
+              Applied <strong>{leverUndo.label}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={onUndoLever}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#3d8c78",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
+        {sensitivityRows.map(({ label, newEarliest, delta, apply }) => {
           const noChange = delta === null || delta === 0;
           return (
-            <div
+            <button
+              type="button"
               key={label}
-              style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid #eef2f1" }}
+              onClick={() => onApplyLever?.(apply, label)}
+              title={`Apply "${label}" to your inputs`}
+              style={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                background: "transparent",
+                border: "none",
+                borderBottom: "1px solid #e2e8e6",
+                cursor: "pointer",
+                padding: "0 0 10px",
+                marginBottom: 10,
+              }}
             >
               <div
                 style={{
@@ -157,7 +205,7 @@ export function RightRail({ plan, result, sensitivityRows }) {
                       fontFamily: "'JetBrains Mono', monospace",
                       minWidth: 44,
                       textAlign: "right",
-                      color: delta > 0 ? "#3d8c78" : noChange ? "#b0c4be" : "#c0392b",
+                      color: delta > 0 ? "#3d8c78" : noChange ? "#9db4ae" : "#c0392b",
                     }}
                   >
                     {delta > 0
@@ -171,7 +219,7 @@ export function RightRail({ plan, result, sensitivityRows }) {
               {delta > 0 && (
                 <div
                   style={{
-                    background: "#eef2f1",
+                    background: "#e2e8e6",
                     borderRadius: 99,
                     height: 3,
                     overflow: "hidden",
@@ -188,11 +236,11 @@ export function RightRail({ plan, result, sensitivityRows }) {
                   />
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
 
-        <div style={{ fontSize: 10, color: "#b0c4be", lineHeight: 1.5, marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
           Bar = years gained (max 10). Full simulation per row — taxes, SS, inflation, draw order.
         </div>
       </div>

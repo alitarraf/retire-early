@@ -2,7 +2,7 @@
 import { FIELD_HELP, FIELD_HELP_GROUPS } from "../../constants/fieldHelp.js";
 
 const H2 = ({ children }) => (
-  <div style={{ fontSize: 15, fontWeight: 700, color: "#1a2e28", marginTop: 36, marginBottom: 10, paddingBottom: 8, borderBottom: "2px solid #dce8e4" }}>
+  <div style={{ fontSize: 15, fontWeight: 700, color: "#1a2e28", marginTop: 36, marginBottom: 10, paddingBottom: 8, borderBottom: "2px solid #e2e8e6" }}>
     {children}
   </div>
 );

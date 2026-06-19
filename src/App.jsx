@@ -119,6 +119,18 @@ export default function App() {
       annualRothConversion: 0,
     }));
 
+  // Clickable sensitivity levers: apply the input patch and remember the prior
+  // inputs for a one-step Undo (no toast system, so the banner lives in the rail).
+  const [leverUndo, setLeverUndo] = useState(null);
+  const applyLever = (apply, label) => {
+    setLeverUndo({ prevInputs: inputs, label });
+    setInputs((prev) => ({ ...prev, ...apply }));
+  };
+  const undoLever = () => {
+    if (leverUndo) setInputs(leverUndo.prevInputs);
+    setLeverUndo(null);
+  };
+
   // Un-gated: used in Early mode KPI chip and Maximize mode hero
   const sustainable = useMemo(() => sustainableSpend(plan), [plan]);
 
@@ -226,7 +238,7 @@ export default function App() {
           display: "grid",
           gridTemplateColumns: "440px 1fr 320px",
           gap: "1px",
-          background: "#dce8e4",
+          background: "#e2e8e6",
           overflow: "hidden",
           minHeight: 0,
         }}
@@ -305,7 +317,14 @@ export default function App() {
             {/* Right rail (col 3) */}
             {result &&
               (mode === "early" ? (
-                <RightRail plan={livePlan} result={result} sensitivityRows={sensitivityRows} />
+                <RightRail
+                  plan={livePlan}
+                  result={result}
+                  sensitivityRows={sensitivityRows}
+                  onApplyLever={applyLever}
+                  leverUndo={leverUndo}
+                  onUndoLever={undoLever}
+                />
               ) : (
                 <MaximizeRail plan={livePlan} atRetirement={atRetirement} marginalRows={marginalRows} />
               ))}

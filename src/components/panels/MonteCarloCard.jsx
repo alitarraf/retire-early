@@ -3,6 +3,7 @@
 // probability, best/median/worst final-estate range, and a one-sentence
 // insight. Returns null when there is no result, so callers can pass through safely.
 import { fmt } from "../../format.js";
+import { cardTitleStyle } from "../../theme.js";
 
 const cardStyle = {
   margin: "12px 14px 0",
@@ -12,14 +13,7 @@ const cardStyle = {
   boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
 };
 
-const labelStyle = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  color: "#9db4ae",
-  marginBottom: 12,
-};
+const labelStyle = { ...cardTitleStyle, marginBottom: 12 };
 
 function colorFor(rate) {
   return rate >= 0.9 ? "#3d8c78" : rate >= 0.75 ? "#c97c1a" : "#c0392b";

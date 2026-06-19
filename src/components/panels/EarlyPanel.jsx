@@ -105,7 +105,7 @@ function TargetAgeCard({ plan, retireBy }) {
           into a taxable brokerage account{pctSalary > 0 ? ` ≈ ${Math.round(pctSalary)}% of salary` : ""} — reachable before 59½, when your 401k is still locked.
         </div>
         {showAlt && (
-          <div style={{ fontSize: 13, color: "#4a5e58", lineHeight: 1.6, marginTop: 12, paddingTop: 10, borderTop: "1px solid #eef2f1" }}>
+          <div style={{ fontSize: 13, color: "#4a5e58", lineHeight: 1.6, marginTop: 12, paddingTop: 10, borderTop: "1px solid #e2e8e6" }}>
             Or keep saving as you are and trim retirement spending to <strong>{fmt(altSpend)}/mo</strong> (today's $).
           </div>
         )}
@@ -136,7 +136,7 @@ function TargetAgeCard({ plan, retireBy }) {
         {`Retire by age ${age}`}
         <InfoDot context={FIELD_HELP.targetRetireAge.context} />
       </div>
-      <div style={{ fontSize: 11, color: "#b0c4be", marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color: "#9db4ae", marginBottom: 12 }}>
         Change <strong>Retire at</strong> in the sidebar to explore other ages.
       </div>
       {body}

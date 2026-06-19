@@ -7,6 +7,7 @@
 // onScrub (cheap live preview), commits via onCommit — see App.jsx for the
 // no-lag split.
 import { useState } from "react";
+import { neutral } from "../../theme.js";
 
 const MILESTONES = [
   { age: 55, name: "Rule of 55 — penalty-free 401k" },
@@ -63,7 +64,7 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
         flexShrink: 0,
         background: "linear-gradient(180deg,#ffffff 0%,#f6fbf9 100%)",
         borderTop: "2px solid #7ecfbb",
-        borderBottom: "1px solid #dce8e4",
+        borderBottom: "1px solid #e2e8e6",
         padding: "16px 40px 24px",
         display: "flex",
         flexDirection: "column",
@@ -79,15 +80,12 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
           key={dragging ? "live" : `v${value}`}
           className="age-pop"
           style={{
-            fontSize: 48,
+            fontSize: 24,
             fontWeight: 800,
             fontFamily: "'JetBrains Mono', monospace",
             lineHeight: 1,
             display: "inline-block",
-            background: "linear-gradient(135deg,#1a2e28 0%,#3d8c78 60%,#7ecfbb 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
+            color: neutral.ink,
             animation: "agePop 0.4s cubic-bezier(.2,.8,.3,1.25)",
           }}
         >
@@ -144,7 +142,8 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
             onKeyUp={(e) => onCommit(clamp(Number(e.target.value)))}
             onBlur={(e) => { setDragging(false); onCommit(clamp(Number(e.target.value))); }}
             aria-label="Retire at age"
-            style={{ flex: 1, minWidth: 0, height: 26, accentColor: "#1a2e28", cursor: "pointer" }}
+            className="range"
+            style={{ flex: 1, minWidth: 0, "--pct": `${pct(value)}%` }}
           />
           <button
             type="button"

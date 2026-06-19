@@ -7,6 +7,7 @@ import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
+import { cardTitleStyle } from "../../theme.js";
 
 function KpiChip({ label, value, accent }) {
   return (
@@ -163,16 +164,7 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}
       >
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            color: "#9db4ae",
-            marginBottom: 12,
-          }}
-        >
+        <div style={{ ...cardTitleStyle, marginBottom: 12 }}>
           Dynamic Roth conversion optimizer
         </div>
         {convBetter ? (

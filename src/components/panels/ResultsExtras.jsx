@@ -4,6 +4,7 @@
 //  • StressCard      — illustrative early-crash downside (sequence-of-returns risk).
 import { fmt } from "../../format.js";
 import { TAX_YEAR } from "../../constants/brackets.js";
+import { cardTitleStyle } from "../../theme.js";
 
 const cardStyle = {
   margin: "12px 14px 0",
@@ -13,14 +14,7 @@ const cardStyle = {
   boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
 };
 
-const labelStyle = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  color: "#9db4ae",
-  marginBottom: 12,
-};
+const labelStyle = { ...cardTitleStyle, marginBottom: 12 };
 
 function Stat({ label, value, color }) {
   return (

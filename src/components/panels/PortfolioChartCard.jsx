@@ -12,6 +12,7 @@ import { useState } from "react";
 import { StackedChart, GEO, colCenterX, STACK_COLORS } from "../charts/StackedChart.jsx";
 import { Toggle, RangeSlider } from "../ui.jsx";
 import { pct, fmt } from "../../format.js";
+import { cardTitleStyle } from "../../theme.js";
 
 const cardStyle = {
   margin: "12px 14px",
@@ -22,13 +23,7 @@ const cardStyle = {
   flex: 1,
 };
 
-const labelStyle = {
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: "uppercase",
-  letterSpacing: "0.1em",
-  color: "#9db4ae",
-};
+const labelStyle = cardTitleStyle;
 
 const SERIES_LABEL = { roth: "Roth", muni: "Munis", hsa: "HSA", brokerage: "Brokerage", k401: "401k", cd: "CD" };
 const TOOLTIP_ROWS = ["roth", "muni", "hsa", "brokerage", "k401", "cd"];
@@ -37,7 +32,7 @@ function FanExplainCard({ mcResult, plan, runs }) {
   const successPct = Math.round(mcResult.successRate * 100);
   const color = successPct >= 90 ? "#3d8c78" : successPct >= 75 ? "#c97c1a" : "#c0392b";
   return (
-    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #eef2f1" }}>
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #e2e8e6" }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 24, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color }}>
           {successPct}%

@@ -28,7 +28,7 @@ function Field({ label, hint, help, children }) {
         </span>
         {h && <InfoDot context={h.context} typical={h.typical} />}
       </div>
-      {hint && <div style={{ fontSize: 10, color: "#b0c4be", marginBottom: 2 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 2 }}>{hint}</div>}
       {children}
     </div>
   );
@@ -51,7 +51,7 @@ function Grid3({ children }) {
 }
 
 function Divider() {
-  return <div style={{ borderTop: "1px solid #eef2f1", margin: "10px 0" }} />;
+  return <div style={{ borderTop: "1px solid #e2e8e6", margin: "10px 0" }} />;
 }
 
 function SubTitle({ children }) {
@@ -98,7 +98,7 @@ function GroupLabel({ children }) {
 
 function AccSection({ title, summary, isOpen, onToggle, children }) {
   return (
-    <div style={{ borderBottom: "1px solid #dce8e4" }}>
+    <div style={{ borderBottom: "1px solid #e2e8e6" }}>
       <button
         onClick={onToggle}
         style={{
@@ -129,7 +129,7 @@ function AccSection({ title, summary, isOpen, onToggle, children }) {
         >
           {summary}
         </span>
-        <span style={{ fontSize: 13, color: isOpen ? "#7ecfbb" : "#b0c4be", flexShrink: 0, lineHeight: 1 }}>
+        <span style={{ fontSize: 13, color: isOpen ? "#7ecfbb" : "#9db4ae", flexShrink: 0, lineHeight: 1 }}>
           {isOpen ? "−" : "+"}
         </span>
       </button>
@@ -150,8 +150,8 @@ function FineTuningHeader({ isOpen, onToggle }) {
       style={{
         width: "100%",
         border: "none",
-        borderTop: "1px solid #dce8e4",
-        borderBottom: isOpen ? "1px solid #dce8e4" : "none",
+        borderTop: "1px solid #e2e8e6",
+        borderBottom: isOpen ? "1px solid #e2e8e6" : "none",
         cursor: "pointer",
         padding: "11px 16px",
         display: "flex",
@@ -162,9 +162,9 @@ function FineTuningHeader({ isOpen, onToggle }) {
       }}
     >
       <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.14em", color: "#5aada0", flexShrink: 0 }}>
-        Fine-tuning <span style={{ color: "#b0c4be" }}>(optional)</span>
+        Fine-tuning <span style={{ color: "#9db4ae" }}>(optional)</span>
       </span>
-      <span style={{ flex: 1, fontSize: 11, color: "#b0c4be", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <span style={{ flex: 1, fontSize: 11, color: "#9db4ae", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {isOpen ? "" : "Taxes · Strategy · Healthcare · Estate · Advanced · Scenario"}
       </span>
       <span style={{ fontSize: 13, color: "#5aada0", flexShrink: 0, lineHeight: 1 }}>{isOpen ? "−" : "+"}</span>
@@ -196,7 +196,7 @@ function OneTimeExpenses({ value, onChange, defaultAge }) {
       ))}
       <button
         onClick={add}
-        style={{ border: "1px dashed #b0c4be", background: "#fafcfc", color: "#3d8c78", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "5px 10px", marginTop: 2 }}
+        style={{ border: "1px dashed #9db4ae", background: "#fafcfc", color: "#3d8c78", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600, padding: "5px 10px", marginTop: 2 }}
       >
         + Add one-time expense
       </button>
@@ -490,7 +490,7 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
             <strong style={{ color: "#3d8c78", fontFamily: "'JetBrains Mono', monospace" }}>
               {pct(realReturn)}
             </strong>
-            <span style={{ color: "#b0c4be" }}> = {pct(inputs.stockReturn)} − {pct(inputs.inflationRate)}</span>
+            <span style={{ color: "#9db4ae" }}> = {pct(inputs.stockReturn)} − {pct(inputs.inflationRate)}</span>
           </div>
         </AccSection>
 
@@ -769,7 +769,7 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
         style={{
           padding: "11px 16px",
           background: "#f0f5f4",
-          borderTop: "1px solid #dce8e4",
+          borderTop: "1px solid #e2e8e6",
           flexShrink: 0,
         }}
       >

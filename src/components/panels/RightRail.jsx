@@ -88,6 +88,20 @@ export function RightRail({ plan, result, sensitivityRows }) {
             )}
           </div>
         ))}
+        <div
+          style={{
+            fontSize: 10,
+            color: "#9db4ae",
+            lineHeight: 1.6,
+            marginTop: 2,
+            paddingTop: 12,
+            borderTop: "1px solid #eef2f1",
+          }}
+        >
+          Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
+          Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses 2026{" "}
+          {plan.filingStatus.toUpperCase()} brackets on actual draw. Planning model only.
+        </div>
       </div>
 
       {/* ── Levers BOTTOM ───────────────────────────── */}

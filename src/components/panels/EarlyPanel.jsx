@@ -309,13 +309,6 @@ export function EarlyPanel({ plan, result, earliest, mcResult, stressResult, tot
           <LegacyGap plan={plan} endVal={endVal} />
         </>
       )}
-
-      {/* Footnote */}
-      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>
-        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
-        Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses 2026{" "}
-        {plan.filingStatus.toUpperCase()} brackets on actual draw. Planning model only.
-      </div>
     </div>
   );
 }

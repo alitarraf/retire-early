@@ -6,9 +6,22 @@ import { describe, it, expect } from "vitest";
 import { renderToString } from "react-dom/server";
 import App from "../App.jsx";
 import { MaximizeCenter } from "../components/panels/MaximizeCenter.jsx";
+import { EarlyPanel } from "../components/panels/EarlyPanel.jsx";
 import { InputsSidebar } from "../components/panels/InputsSidebar.jsx";
-import { DEFAULTS, makePlan, runMain } from "../analysis/plan.js";
+import { earliestRetireAge } from "../analysis/earliestRetireAge.js";
+import { retireByAge } from "../analysis/retireByAge.js";
+import { AdvicePanel } from "../components/panels/AdvicePanel.jsx";
+import { QuickStart } from "../components/panels/QuickStart.jsx";
+import { InfoDot } from "../components/ui.jsx";
+import { DEFAULTS, makePlan, runMain, simParamsAt } from "../analysis/plan.js";
+import { buildPlanSummary } from "../analysis/planSummary.js";
 import { dynamicOptimizer } from "../analysis/dynamicOptimizer.js";
+import { monteCarlo, buildHistogram } from "../engine/monteCarlo.js";
+import { McDistChart } from "../components/charts/McDistChart.jsx";
+import { StackedChart } from "../components/charts/StackedChart.jsx";
+import { PortfolioChartCard } from "../components/panels/PortfolioChartCard.jsx";
+import { MonteCarloCard } from "../components/panels/MonteCarloCard.jsx";
+import { RetireAtControl } from "../components/panels/RetireAtControl.jsx";
 
 const noNaN = (html) => expect(html).not.toMatch(/NaN/);
 
@@ -68,13 +81,309 @@ describe("render smoke tests", () => {
     noNaN(html);
   });
 
+  it("MaximizeCenter renders the chart toggle + Show-details Monte Carlo title (MC present)", () => {
+    const plan = makePlan({
+      currentAge: 50, retireAge: 55, lifeExpect: 90, monthlyExpense: 4000,
+      k401Today: 1_500_000, cashDeposit: 300000, rothTotal: 150000, ssBenefit: 2000,
+      filingStatus: "single", stateKey: "No state tax", stateTaxEnabled: false,
+    });
+    const result = runMain(plan);
+    const mcResult = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 50, seed: 42 });
+    const html = renderToString(
+      <MaximizeCenter
+        plan={plan}
+        result={result}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+        sustainable={5000}
+        dynamicOpt={dynamicOptimizer(plan)}
+        onApplyOptimized={() => {}}
+        stressResult={null}
+        mcResult={mcResult}
+        onRunMc={() => {}}
+      />,
+    );
+    expect(html).toContain("Portfolio over time");
+    expect(html).toContain("Outcome range"); // chart toggle option
+    expect(html).toContain("Show details — Monte Carlo"); // MC card now collapsed in details
+    noNaN(html);
+  });
+
+  it("MaximizeCenter offers the Outcome-range toggle even before MC is run (on-demand)", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const html = renderToString(
+      <MaximizeCenter
+        plan={plan}
+        result={result}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+        sustainable={5000}
+        dynamicOpt={dynamicOptimizer(plan)}
+        onApplyOptimized={() => {}}
+        stressResult={null}
+        mcResult={null}
+        onRunMc={() => {}}
+      />,
+    );
+    expect(html).toContain("Outcome range"); // present because onRunMc enables on-demand MC
+    noNaN(html);
+  });
+
+  it("StackedChart renders the MC percentile fan (bands) without NaN", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const mc = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 30, seed: 42 });
+    const html = renderToString(
+      <StackedChart snaps={result.snaps} ssAge={plan.ssAge} mcBands={mc.bands} />,
+    );
+    expect(html).toContain("MC 10–90%");
+    noNaN(html);
+  });
+
+  it("StackedChart view='fan' renders the cone with a deterministic line and no NaN", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const mc = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 30, seed: 42 });
+    const html = renderToString(
+      <StackedChart snaps={result.snaps} ssAge={plan.ssAge} mcBands={mc.bands} view="fan" />,
+    );
+    expect(html).toContain("MC 10–90%");
+    expect(html).toContain("Deterministic"); // faint reference line legend (fan-only)
+    expect(html).not.toContain("Brokerage"); // account legend suppressed in fan view
+    noNaN(html);
+  });
+
+  it("PortfolioChartCard (Early-style: live MC) shows both toggle options", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const mc = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 30, seed: 42 });
+    const html = renderToString(
+      <PortfolioChartCard snaps={result.snaps} ssAge={plan.ssAge} plan={plan} mcResult={mc} />,
+    );
+    expect(html).toContain("Projection");
+    expect(html).toContain("Outcome range");
+    expect(html).toContain("Portfolio over time");
+    noNaN(html);
+  });
+
+  it("PortfolioChartCard fan state renders the cone, success headline and explanation together", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const mc = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 30, seed: 42 });
+    const html = renderToString(
+      <PortfolioChartCard snaps={result.snaps} ssAge={plan.ssAge} plan={plan} mcResult={mc} initialView="range" />,
+    );
+    expect(html).toContain("MC 10–90%"); // the fan band/legend
+    expect(html).toContain("randomized return sequences"); // FanExplainCard headline
+    expect(html).toContain("sequence-of-returns risk"); // explanation
+    // No duplicate "MC 10–90%" label (inline overlay legend is suppressed in fan view).
+    expect(html.match(/MC 10–90%/g)?.length).toBe(1);
+    noNaN(html);
+  });
+
+  it("PortfolioChartCard hides the Outcome-range option when no MC and no onRunMc", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const result = runMain(plan);
+    const html = renderToString(
+      <PortfolioChartCard snaps={result.snaps} ssAge={plan.ssAge} plan={plan} mcResult={null} />,
+    );
+    expect(html).not.toContain("Outcome range");
+    noNaN(html);
+  });
+
+  it("MonteCarloCard renders stats and no longer offers the histogram", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const mc = monteCarlo(simParamsAt(plan, plan.retireAge), { n: 30, seed: 42 });
+    const html = renderToString(<MonteCarloCard mcResult={mc} plan={plan} runs={500} />);
+    expect(html).toContain("Success rate");
+    expect(html).not.toContain("outcome distribution"); // histogram toggle removed
+    noNaN(html);
+  });
+
+  it("McDistChart renders a normal distribution without NaN", () => {
+    const hist = buildHistogram([0, 50_000, 120_000, 300_000, 800_000, 1_500_000], 12);
+    const html = renderToString(
+      <McDistChart histogram={hist} p10={0} p50={300_000} p90={1_500_000} />,
+    );
+    expect(html).toContain("svg");
+    noNaN(html);
+  });
+
+  it("McDistChart renders the all-depleted edge case without NaN (maxVal collapses to 1)", () => {
+    const hist = buildHistogram([0, 0, 0, 0], 12);
+    const html = renderToString(<McDistChart histogram={hist} p10={0} p50={0} p90={0} />);
+    noNaN(html);
+  });
+
   it("InputsSidebar shows the active-optimizer summary label correctly (no NaN%)", () => {
-    // Strategy section is collapsed by default, but its summary chip renders the bracket label —
-    // single-filer ceiling 50400 = top of the 12% band → summary reads 'Roth fill 12%'.
+    // Strategy lives in the collapsed Fine-tuning group; reveal it via the prop so the
+    // summary chip's bracket label renders. Single-filer ceiling 50400 = top of the 12%
+    // band → summary reads 'Roth fill 12%'.
     const inputs = { ...DEFAULTS, conversionCeiling: 50400, conversionEndAge: 72, filingStatus: "single" };
     const plan = makePlan(inputs);
-    const html = renderToString(<InputsSidebar inputs={inputs} set={() => () => {}} plan={plan} />);
+    const html = renderToString(<InputsSidebar inputs={inputs} set={() => () => {}} plan={plan} defaultFineTuningOpen />);
     expect(html).toContain("fill 12%");
     noNaN(html);
+  });
+
+  it("RetireAtControl renders the command band: step-1 slider, steppers, Earliest + milestone ticks", () => {
+    const html = renderToString(
+      <RetireAtControl value={55} min={40} max={80} earliest={52} onScrub={() => {}} onCommit={() => {}} />,
+    );
+    expect(html).toContain("Plan to retire at");
+    expect(html).toContain('type="range"');
+    expect(html).toContain('step="1"');
+    expect(html).toContain('min="40"');
+    expect(html).toContain("Earliest age"); // accent earliest tick (label/title)
+    expect(html).toContain("Medicare"); // milestone teaching ticks (title)
+    noNaN(html);
+  });
+
+  it("App renders the full-width Retire-at command band", () => {
+    const html = renderToString(<App />);
+    expect(html).toContain("Plan to retire at");
+    noNaN(html);
+  });
+
+  it("InputsSidebar renders the two-tier groups and a help tooltip dot", () => {
+    const plan = makePlan(DEFAULTS);
+    const html = renderToString(<InputsSidebar inputs={DEFAULTS} set={() => () => {}} plan={plan} />);
+    expect(html).toContain("Essentials");
+    expect(html).toContain("Money");
+    expect(html).toContain("Fine-tuning");
+    expect(html).toContain("not financial advice");
+    expect(html).toContain('aria-label="More info"'); // InfoDot present on fields
+    noNaN(html);
+  });
+
+  it("InputsSidebar Money section renders contribution fields, Max chips and savings total", () => {
+    const inputs = { ...DEFAULTS, brokerageMonthlyContrib: 500, cashMonthlyContrib: 100 };
+    const plan = makePlan(inputs);
+    const html = renderToString(
+      <InputsSidebar inputs={inputs} set={() => () => {}} plan={plan} defaultOpenSection="money" />,
+    );
+    expect(html).toContain("Contribute/mo");
+    expect(html).toContain("Max"); // capped-account chip
+    expect(html).toContain("You save");
+    noNaN(html);
+  });
+
+  it("InfoDot renders its trigger without throwing", () => {
+    const html = renderToString(<InfoDot context="Some context" typical="Typical range" />);
+    expect(html).toContain('aria-label="More info"');
+    noNaN(html);
+  });
+
+  it("QuickStart renders the onboarding form", () => {
+    const html = renderToString(<QuickStart onApply={() => {}} onSkip={() => {}} />);
+    expect(html).toContain("Start here");
+    expect(html).toContain("See my plan");
+    noNaN(html);
+  });
+
+  it("AdvicePanel renders the CFP networks, fee illustration and export controls", () => {
+    const plan = makePlan(DEFAULTS);
+    const result = runMain(plan);
+    const html = renderToString(
+      <AdvicePanel
+        inputs={DEFAULTS}
+        plan={plan}
+        result={result}
+        earliest={55}
+        sustainable={5000}
+        mcResult={null}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+      />,
+    );
+    expect(html).toContain("NAPFA");
+    expect(html).toContain("Export plan summary");
+    expect(html).toContain("not financial advice");
+    noNaN(html);
+  });
+
+  it("already-retired persona (retireAge == currentAge) gets a correct on-track verdict", () => {
+    // The $7M / 62 / retired case from QuickStart. retireAge == currentAge is a path
+    // the rest of the suite never exercises; earliestRetireAge must floor at currentAge
+    // so it can report "retire now" instead of falsely needing another year.
+    const inputs = {
+      ...DEFAULTS, currentAge: 62, retireAge: 62, monthlyExpense: 12000, lifeExpect: 95,
+      existingBrokerage: 7_000_000, existingBrokerageBasis: 7_000_000,
+      k401Today: 0, rothTotal: 0, existingRothEarnings: 0, cashDeposit: 0, muniBonds: 0, hsaBalance: 0,
+    };
+    const plan = makePlan(inputs);
+    const result = runMain(plan);
+    const earliest = earliestRetireAge(plan);
+    expect(result.depleted).toBeNull();        // survives
+    expect(earliest).toBeLessThanOrEqual(62);  // can retire now, not "need 1 more year"
+
+    const html = renderToString(
+      <EarlyPanel
+        plan={plan}
+        result={result}
+        earliest={earliest}
+        mcResult={null}
+        stressResult={null}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+        sustainable={41000}
+      />,
+    );
+    expect(html).not.toContain("more year"); // no false "Need N more years" warning
+    expect(html).toContain("lasts to"); // plain-language positive summary
+    noNaN(html);
+  });
+
+  it("EarlyPanel renders the 'Retire by age' card keyed to plan.retireAge", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 30, retireAge: 50, monthlyExpense: 6000 });
+    const result = runMain(plan);
+    const retireBy = retireByAge(plan, plan.retireAge); // single source of truth
+    const html = renderToString(
+      <EarlyPanel
+        plan={plan}
+        result={result}
+        earliest={earliestRetireAge(plan)}
+        mcResult={null}
+        stressResult={null}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+        sustainable={5000}
+        retireBy={retireBy}
+      />,
+    );
+    expect(html).toContain("Retire by age 50"); // header reflects the sidebar Retire at age
+    expect(html).toContain("Change"); // hint pointing to the sidebar
+    noNaN(html);
+  });
+
+  it("EarlyPanel target card handles the no-runway path (retireAge <= current age)", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 62, retireAge: 62 });
+    const result = runMain(plan);
+    const retireBy = retireByAge(plan, plan.retireAge); // runway false
+    const html = renderToString(
+      <EarlyPanel
+        plan={plan}
+        result={result}
+        earliest={earliestRetireAge(plan)}
+        mcResult={null}
+        stressResult={null}
+        totalAtRetirement={result.snaps[0]?.total ?? 0}
+        sustainable={5000}
+        retireBy={retireBy}
+      />,
+    );
+    expect(html).toContain("above your current age");
+    noNaN(html);
+  });
+
+  it("buildPlanSummary returns a markdown summary with the key fields", () => {
+    const plan = makePlan(DEFAULTS);
+    const result = runMain(plan);
+    const md = buildPlanSummary(DEFAULTS, plan, result, {
+      earliest: 55,
+      sustainable: 5000,
+      totalAtRetirement: result.snaps[0]?.total ?? 0,
+    });
+    expect(md).toContain("Retirement Plan Summary");
+    expect(md).toContain("Earliest viable retirement age: 55");
+    expect(md).toContain("Sustainable monthly spend");
+    expect(md).toContain("Questions for a planner");
+    expect(md).not.toMatch(/NaN/);
   });
 });

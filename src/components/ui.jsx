@@ -1,6 +1,6 @@
 // Reusable input/output primitives. All real top-level components
 // (never defined inside a render body) so React preserves input focus.
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export const Section = ({ title, children, accent }) => (
   <div style={{ marginBottom: 22 }}>
@@ -112,12 +112,17 @@ export const Toggle = ({ value, onChange, options }) => (
   </div>
 );
 
-export const Collapsible = ({ title, hint, children, defaultOpen = false }) => {
-  const [open, setOpen] = useState(defaultOpen);
+// Optionally controlled: pass `open` + `onToggle` to drive it from the parent
+// (so it can be auto-opened by external triggers); omit them for self-managed state.
+export const Collapsible = ({ title, hint, children, defaultOpen = false, open: openProp, onToggle }) => {
+  const [openState, setOpenState] = useState(defaultOpen);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const toggle = () => (controlled ? onToggle?.(!open) : setOpenState((v) => !v));
   return (
     <div style={{ marginBottom: 14, border: "1px solid #e2e8e6", borderRadius: 10, overflow: "hidden" }}>
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         style={{
           width: "100%",
           background: open ? "#f0f5f4" : "#fafcfc",
@@ -147,6 +152,91 @@ export const Collapsible = ({ title, hint, children, defaultOpen = false }) => {
       </button>
       {open && <div style={{ padding: "12px 14px", borderTop: "1px solid #e2e8e6" }}>{children}</div>}
     </div>
+  );
+};
+
+// Small ⓘ that reveals a context popover on hover or keyboard focus.
+// Content comes from constants/fieldHelp.js so docs and tooltips never diverge.
+// The popover is viewport-fixed and edge-clamped so it never clips inside the
+// sidebar's scroll container (right-column fields would otherwise be cut off).
+const TIP_W = 240;
+export const InfoDot = ({ context, typical }) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState(null);
+  const btnRef = useRef(null);
+  if (!context) return null;
+
+  const show = () => {
+    const el = btnRef.current;
+    if (el && typeof window !== "undefined") {
+      const r = el.getBoundingClientRect();
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - TIP_W - 12));
+      setPos({ left, top: r.bottom + 6 });
+    }
+    setOpen(true);
+  };
+  const hide = () => setOpen(false);
+
+  return (
+    <span style={{ display: "inline-flex", marginLeft: 5, verticalAlign: "middle" }}>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="More info"
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        onFocus={show}
+        onBlur={hide}
+        onClick={() => (open ? hide() : show())}
+        style={{
+          width: 14,
+          height: 14,
+          padding: 0,
+          borderRadius: "50%",
+          border: "1px solid #b9d2ca",
+          background: open ? "#1a2e28" : "#eef5f2",
+          color: open ? "#7ecfbb" : "#5aada0",
+          fontSize: 9,
+          fontWeight: 700,
+          lineHeight: 1,
+          cursor: "help",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Georgia, serif",
+        }}
+      >
+        i
+      </button>
+      {open && pos && (
+        <span
+          role="tooltip"
+          style={{
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            zIndex: 1000,
+            width: TIP_W,
+            background: "#1a2e28",
+            color: "#dceee8",
+            borderRadius: 8,
+            padding: "9px 11px",
+            fontSize: 11,
+            fontWeight: 400,
+            lineHeight: 1.5,
+            letterSpacing: 0,
+            textTransform: "none",
+            boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
+            pointerEvents: "none",
+          }}
+        >
+          {context}
+          {typical && (
+            <span style={{ display: "block", marginTop: 5, color: "#7ecfbb" }}>{typical}</span>
+          )}
+        </span>
+      )}
+    </span>
   );
 };
 

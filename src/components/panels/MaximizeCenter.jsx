@@ -1,8 +1,11 @@
 // Center column for Maximize Portfolio mode.
 // Hero: portfolio at retirement (big number) → KPI chips → optimal
 // Roth conversion card → portfolio chart.
-import { StackedChart } from "../charts/StackedChart.jsx";
+import { useState, useEffect } from "react";
+import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
+import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { Collapsible } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
 
 function KpiChip({ label, value, accent }) {
@@ -46,12 +49,25 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, stressResult }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, stressResult, mcResult = null, onRunMc }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
+
+  // "Show details" pops open when something appears inside it (stress test, legacy
+  // target, or switching the chart to Outcome range). Still hand-collapsible.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  useEffect(() => {
+    if (plan.scenarioMode === "stress" || plan.legacyTarget > 0) setDetailsOpen(true);
+  }, [plan.scenarioMode, plan.legacyTarget, plan.stressDropPct, plan.stressYears]);
+
   const opt = dynamicOpt ?? { type: "none", gain: 0, schedule: [] };
   const convBetter = opt.type === "fill" && opt.gain > 0;
   const bracketLabel = `${Math.round(opt.rate * 100)}%`;
+
+  // Plain-language one-liner from figures already on screen.
+  const plainSummary =
+    `You could safely spend about ${fmtK(Math.round(sustainable))}/mo at ${plan.retireAge} and still leave ${fmt(endVal)} at ${plan.lifeExpect}.` +
+    (convBetter ? ` Filling the ${bracketLabel} bracket with Roth conversions adds about ${fmtK(opt.gain)}.` : "");
 
   return (
     <div
@@ -107,6 +123,19 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
           }}
         >
           Monthly need at {plan.retireAge}: {fmt(Math.round(plan.monthlyAtRetirement))}/mo
+        </div>
+
+        <div
+          style={{
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: "#1a2e28",
+            marginBottom: 22,
+            paddingLeft: 12,
+            borderLeft: "3px solid #7ecfbb",
+          }}
+        >
+          {plainSummary}
         </div>
 
         {/* KPI chips */}
@@ -235,35 +264,30 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         )}
       </div>
 
-      {/* ── Stress test / transparency / legacy ──────── */}
-      <StressCard stressResult={stressResult} plan={plan} />
-      <TaxTransparency plan={plan} result={result} />
-      <LegacyGap plan={plan} endVal={endVal} />
+      {/* ── Chart (Projection ↔ Monte Carlo fan; MC on-demand) ─── */}
+      <PortfolioChartCard
+        snaps={snaps}
+        ssAge={plan.ssAge}
+        plan={plan}
+        stressSnaps={stressResult?.snaps}
+        mcResult={mcResult}
+        onRunMc={onRunMc}
+        runs={500}
+        onViewChange={(v) => v === "range" && setDetailsOpen(true)}
+      />
 
-      {/* ── Chart ────────────────────────────────────── */}
-      <div
-        style={{
-          margin: "12px 14px",
-          background: "#fff",
-          borderRadius: 14,
-          padding: "16px 20px",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-          flex: 1,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.1em",
-            color: "#9db4ae",
-            marginBottom: 12,
-          }}
+      {/* ── Secondary detail (below the chart; auto-opens) ── */}
+      <div style={{ margin: "12px 14px 0" }}>
+        <Collapsible
+          title="Show details — Monte Carlo, tax, stress & legacy"
+          open={detailsOpen}
+          onToggle={setDetailsOpen}
         >
-          Portfolio over time
-        </div>
-        <StackedChart snaps={snaps} ssAge={plan.ssAge} stressSnaps={stressResult?.snaps} />
+          <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
+          <StressCard stressResult={stressResult} plan={plan} />
+          <TaxTransparency plan={plan} result={result} />
+          <LegacyGap plan={plan} endVal={endVal} />
+        </Collapsible>
       </div>
 
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>

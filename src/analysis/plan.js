@@ -48,11 +48,14 @@ export const DEFAULTS = {
 
   // Other savings
   cashDeposit: 75000,
+  cashMonthlyContrib: 0,      // ongoing $/mo into CD/cash savings
   muniBonds: 0,
   muniReturn: 4.5,
   muniDoubleTaxFree: true,
+  muniMonthlyContrib: 0,      // ongoing $/mo into municipal bonds
   existingBrokerage: 0,
   existingBrokerageBasis: 0,
+  brokerageMonthlyContrib: 0, // ongoing $/mo into taxable brokerage
 
   // Tax
   employmentBracket: 22,
@@ -152,18 +155,32 @@ export function projectTo(plan, yrs, overrides = {}) {
   const k401Extra = overrides.k401Annual ?? 0;
   const rothExtra = overrides.rothAnnual ?? 0;
   const muniExtra = overrides.muniAdd ?? 0;
+  const brokerageExtra = overrides.brokerageAnnual ?? 0;
+  // Ongoing user contributions (entered as $/mo, annualized here).
+  const brokContribAnnual = (plan.brokerageMonthlyContrib ?? 0) * 12;
+  const cashContribAnnual = (plan.cashMonthlyContrib ?? 0) * 12;
+  const muniContribAnnual = (plan.muniMonthlyContrib ?? 0) * 12;
   return {
     rothContributions:
       plan.rothContribNow * Math.pow(1 + r, yrs) +
       fvAnnuity(plan.rothAnnualContrib + rothExtra, yrs, plan.stockReturn),
     rothEarnings: (plan.rothEarningsNow + plan.existingRothEarnings) * Math.pow(1 + r, yrs),
-    brokerage: plan.existingBrokerage * Math.pow(1 + r, yrs),
-    brokerageBasis: plan.existingBrokerageBasis,
+    // Brokerage contributions (user input + goal-seek override) are after-tax
+    // dollars, so the contributed principal adds to both the value and the cost
+    // basis (no phantom gain).
+    brokerage:
+      plan.existingBrokerage * Math.pow(1 + r, yrs) +
+      fvAnnuity(brokContribAnnual + brokerageExtra, yrs, plan.stockReturn),
+    brokerageBasis: plan.existingBrokerageBasis + (brokContribAnnual + brokerageExtra) * yrs,
     k401:
       plan.k401Today * Math.pow(1 + r, yrs) +
       fvAnnuity(plan.total401kAnnual + k401Extra, yrs, plan.stockReturn),
-    cashDeposit: plan.cashDeposit * Math.pow(1 + rC, yrs),
-    muniBonds: (plan.muniBonds + muniExtra) * Math.pow(1 + rM, yrs),
+    cashDeposit:
+      plan.cashDeposit * Math.pow(1 + rC, yrs) +
+      fvAnnuity(cashContribAnnual, yrs, plan.depositAfterTaxRate),
+    muniBonds:
+      (plan.muniBonds + muniExtra) * Math.pow(1 + rM, yrs) +
+      fvAnnuity(muniContribAnnual, yrs, plan.muniReturn),
     hsaBalance:
       (plan.hsaBalance ?? 0) * Math.pow(1 + r, yrs) +
       fvAnnuity(plan.hsaAnnualContrib ?? 0, yrs, plan.stockReturn),
@@ -227,10 +244,16 @@ export function runAt(plan, age, overrides = {}) {
   return simulate(simParamsAt(plan, age, overrides));
 }
 
-/** Convenience: does the plan survive to life expectancy at `age`? */
+/**
+ * Can the plan actually retire at `age`? Requires surviving to life
+ * expectancy AND no pre-59½ bridge shortfall — money stranded in a locked
+ * 401k does not count as "retired." This keeps earliestRetireAge honest for
+ * early (pre-bridge-access) targets, where depleted alone stays null because
+ * the locked 401k is never touched.
+ */
 export function survivesAt(plan, age, overrides = {}) {
   const res = runAt(plan, age, overrides);
-  return res !== null && res.depleted === null;
+  return res !== null && res.depleted === null && res.bridgeShortfall === 0;
 }
 
 /** The main run at the configured retirement age. */

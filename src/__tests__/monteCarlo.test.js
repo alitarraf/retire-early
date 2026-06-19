@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { simulate } from "../engine/simulate.js";
-import { monteCarlo } from "../engine/monteCarlo.js";
+import { monteCarlo, percentile, buildHistogram, pctDepletedBefore, percentileBands } from "../engine/monteCarlo.js";
 
 // Shared base for deterministic returnSeries tests.
 const base = {
@@ -95,6 +95,118 @@ describe("monteCarlo(): success rate responds to plan quality", () => {
   it("destitute plan fails nearly every run", () => {
     const { successRate } = monteCarlo(destitute, { n: 100, seed: 1 });
     expect(successRate).toBeLessThan(0.10);
+  });
+});
+
+// ── Percentile / distribution helpers ────────────────────────
+describe("percentile()", () => {
+  const sorted = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]; // length 10, ascending
+
+  it("p5 picks the worst tail, p95 the best", () => {
+    expect(percentile(sorted, 0.05)).toBe(0);
+    expect(percentile(sorted, 0.95)).toBe(90);
+  });
+
+  it("p50 is the middle of the array", () => {
+    expect(percentile(sorted, 0.5)).toBe(50);
+  });
+
+  it("returns 0 for an empty array", () => {
+    expect(percentile([], 0.5)).toBe(0);
+  });
+});
+
+describe("buildHistogram()", () => {
+  it("buckets all values and the counts sum to the input length", () => {
+    const vals = [0, 5, 50, 95, 100, 100, 100];
+    const h = buildHistogram(vals, 10);
+    expect(h).toHaveLength(10);
+    expect(h.reduce((s, b) => s + b.count, 0)).toBe(vals.length);
+  });
+
+  it("piles zero / depleted outcomes into the first bin", () => {
+    const h = buildHistogram([0, 0, 0, 1000], 4);
+    expect(h[0].count).toBe(3);
+  });
+
+  it("returns an empty array for no values", () => {
+    expect(buildHistogram([], 12)).toEqual([]);
+  });
+});
+
+describe("pctDepletedBefore()", () => {
+  it("counts only runs that deplete strictly before the age", () => {
+    const ages = [70, 80, null, 90, null]; // 5 runs, 3 deplete
+    expect(pctDepletedBefore(ages, 85)).toBeCloseTo(2 / 5); // 70 and 80 qualify
+    expect(pctDepletedBefore(ages, 100)).toBeCloseTo(3 / 5); // all depletions qualify
+  });
+
+  it("never counts survivors (null)", () => {
+    expect(pctDepletedBefore([null, null], 90)).toBe(0);
+  });
+});
+
+// ── Enriched monteCarlo() outputs ────────────────────────────
+describe("monteCarlo(): percentile + distribution outputs", () => {
+  const result = monteCarlo({ ...base }, { n: 200, seed: 7 });
+
+  it("orders the wealth percentiles p10 ≤ median ≤ p90", () => {
+    expect(result.p10EndTotal).toBeLessThanOrEqual(result.medianEndTotal);
+    expect(result.medianEndTotal).toBeLessThanOrEqual(result.p90EndTotal);
+  });
+
+  it("p50EndTotal equals the median estate (same value)", () => {
+    expect(result.p50EndTotal).toBe(result.medianEndTotal);
+  });
+
+  it("depletionRate is the complement of successRate", () => {
+    expect(result.depletionRate).toBeCloseTo(1 - result.successRate);
+  });
+
+  it("returns a histogram whose counts total n", () => {
+    expect(result.histogram.length).toBeGreaterThan(0);
+    expect(result.histogram.reduce((s, b) => s + b.count, 0)).toBe(200);
+  });
+
+  it("keeps backward-compatible fields", () => {
+    expect(result).toHaveProperty("successRate");
+    expect(result).toHaveProperty("medianEndTotal");
+    expect(result.depletionAges).toHaveLength(200);
+  });
+
+  it("returns per-year bands spanning the retirement horizon, ordered p10 ≤ p50 ≤ p90", () => {
+    const span = base.lifeExpect - base.retireAge;
+    expect(result.bands.length).toBe(span);
+    // Snapshots are end-of-year, so the first band lands at retireAge+1 and the last at lifeExpect.
+    expect(result.bands[0].age).toBe(base.retireAge + 1);
+    expect(result.bands.at(-1).age).toBe(base.lifeExpect);
+    for (const b of result.bands) {
+      expect(b.p10).toBeLessThanOrEqual(b.p50);
+      expect(b.p50).toBeLessThanOrEqual(b.p90);
+    }
+  });
+});
+
+describe("percentileBands()", () => {
+  it("computes per-index percentiles across trajectories", () => {
+    // 5 runs × 2 years. Year 0 all 100; year 1 spread 0..400.
+    const trajectories = [
+      [100, 0],
+      [100, 100],
+      [100, 200],
+      [100, 300],
+      [100, 400],
+    ];
+    const bands = percentileBands(trajectories, [60, 61]);
+    expect(bands).toHaveLength(2);
+    expect(bands[0]).toMatchObject({ age: 60, p10: 100, p50: 100, p90: 100 });
+    expect(bands[1].p10).toBeLessThanOrEqual(bands[1].p50);
+    expect(bands[1].p50).toBeLessThanOrEqual(bands[1].p90);
+  });
+
+  it("returns [] for empty input", () => {
+    expect(percentileBands([], [])).toEqual([]);
+    expect(percentileBands([[1, 2]], [])).toEqual([]);
   });
 });
 

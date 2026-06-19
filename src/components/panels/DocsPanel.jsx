@@ -1,4 +1,6 @@
 // Documentation tab — how to use the planner, what to enter, how to read outputs.
+import { FIELD_HELP, FIELD_HELP_GROUPS } from "../../constants/fieldHelp.js";
+
 const H2 = ({ children }) => (
   <div style={{ fontSize: 15, fontWeight: 700, color: "#1a2e28", marginTop: 36, marginBottom: 10, paddingBottom: 8, borderBottom: "2px solid #dce8e4" }}>
     {children}
@@ -97,59 +99,24 @@ export function DocsPanel() {
 
       {/* ── Inputs ── */}
       <H2>Inputs reference</H2>
-
-      <H3>Who you are / Timeline</H3>
-      <Field name="Filing status">Affects federal tax brackets throughout retirement. MFJ brackets are roughly double single brackets.</Field>
-      <Field name="Current age">Your age today. All balances compound from now to retire age.</Field>
-      <Field name="Household size">Used for the ACA Federal Poverty Level calculation. Affects whether you owe the full ACA premium or qualify for subsidies.</Field>
-      <Field name="Retire at">The age you plan to stop working. The engine finds your earliest viable age separately — set this to your target.</Field>
-      <Field name="Your Social Security at">The age you claim SS (62–70). Earlier = permanently lower benefit; later = permanently higher. Use PIA mode to see the exact trade-off.</Field>
-      <Field name="Life expectancy">The simulation runs to this age. Money lasting to here = success. Use 90–95 to stress-test longevity.</Field>
-
-      <H3>Spending & Social Security</H3>
-      <Field name="Monthly expenses (today's $)">Your current monthly spend. The engine inflates this at your inflation rate to the retire date and beyond. Do not include health insurance if you're using the ACA premium field.</Field>
-      <Field name="SS benefit (direct)">Monthly amount from your SSA statement at your chosen claiming age, in today's dollars. The engine inflates it in retirement.</Field>
-      <Field name="PIA mode">Enter your Primary Insurance Amount (the benefit at your Full Retirement Age from your SSA statement) and your FRA. The planner computes your actual benefit based on how early or late you claim. Claiming at 62 with FRA 67 = ~70% of PIA; at 70 = ~124%.</Field>
-
-      <H3>Accounts</H3>
-      <Field name="401k balance + contribution">Current balance + annual you + employer match (salary × match %). Both compound to retire age at the stock return. Withdrawals in retirement are taxed as ordinary income.</Field>
-      <Field name="Roth IRA">Split your existing balance into contributions (always withdrawable tax-free) and earnings (free after 59½). Future contributions compound tax-free.</Field>
-      <Field name="CD / cash deposit">After-tax savings in high-yield accounts. Grows at the CD rate (after tax during accumulation). First bucket drawn in early retirement after Roth contributions.</Field>
-      <Field name="Municipal bonds">Tax-free (or state-only-taxable) bond income. Grows at the muni yield. Drawn before brokerage but after Roth contributions in the draw order.</Field>
-      <Field name="Taxable brokerage">Only the gain above your cost basis is taxed at your long-term capital gains rate when sold. Enter basis separately for accurate tax modeling.</Field>
-      <Field name="HSA">Grows at the stock return, tax-free. Draws are tax-free for medical expenses (the model assumes all retirement HSA draws are qualified). Sits between munis and brokerage in the draw order — more efficient than either.</Field>
-
-      <H3>Healthcare & Medicare</H3>
-      <Callout tone="warn">Only enter the ACA premium if your monthly expenses do NOT already include health insurance — otherwise you'll double-count it.</Callout>
-      <Field name="ACA full premium">Unsubsidized monthly marketplace premium (ages 55–64). Added to expenses only when your income exceeds ~$66k/yr (400% FPL for 2 people). Below that, subsidies are assumed to cover it. At 65, Medicare replaces ACA and this cost stops.</Field>
-      <Field name="IRMAA surcharge">Medicare Part B+D surcharge at 65+ for higher-income retirees. Based on income from 2 years prior. Standard Part B (~$185/mo) is assumed baked into your monthly expenses; enter only the surcharge above that.</Field>
-      <Field name="State SS exemption">Many states (e.g. Oregon partially, Illinois fully) don't tax Social Security income. None / 50% / Full reduces the state tax applied to your SS benefit.</Field>
-
-      <H3>Assumptions</H3>
-      <Field name="Stock market return">Nominal annual return — before subtracting inflation. Everything (401k, Roth, brokerage, HSA) grows at this rate. Your real (inflation-adjusted) return is this minus the inflation rate below. Default: 10% nominal − 3% inflation = 7% real, which matches the S&P 500's long-run historical average.</Field>
-      <Field name="Inflation rate">Applied to expenses each month in retirement. Also inflates Social Security (SS is CPI-adjusted). 4.2% = recent 5-year average; 3% = long-run historical average.</Field>
-      <Field name="CD / deposit rate">Rate on cash savings during accumulation only (pre-retire). Taxed at your employment bracket. In retirement, CD is treated as regular cash.</Field>
-
-      <H3>Tax & Strategy</H3>
-      <Field name="Employment bracket">Your marginal federal bracket while working. Used only for taxing CD interest during accumulation — not for retirement withdrawals.</Field>
-      <Field name="Long-term cap gains">Your LTCG rate on brokerage gains (0%, 15%, or 20%). State tax is added on top.</Field>
-      <Field name="State income tax">State rate applied to 401k withdrawals and brokerage gains in retirement. Toggle off if you'll move to a no-income-tax state.</Field>
-      <Field name="Roth conversion ladder">Convert this much per year from 401k → Roth during the bridge (retire age → 59½) while your income is low. Taxed now; unlocks tax-free after 5 years. The optimal amount is computed automatically in the Maximize tab.</Field>
-      <Field name="Rule of 55">If you left your employer at 55 or older, you can take 401k withdrawals before 59½ without the 10% penalty. This eliminates the need for a Roth ladder if the 401k is large enough.</Field>
-      <Field name="72(t) SEPP">Substantially Equal Periodic Payments — commit to a fixed annual 401k draw for 5 years or until 59½ (whichever is longer). Useful when Rule of 55 doesn't apply and you don't have enough Roth contributions to bridge the gap.</Field>
-      <Field name="Spending guardrails">Guyton-Klinger dynamic spending. Upper guardrail: if your portfolio withdrawal rate exceeds the threshold, spending is cut 10% for the next year. Lower guardrail: if WR drops below the threshold (portfolio growing fast), spending is raised 10%. WR is calculated as net portfolio draw (spend minus SS) ÷ total portfolio. Typical: upper 5–6%, lower 3%.</Field>
-
-      <H3>Estate &amp; Legacy</H3>
-      <Field name="Step-up in basis">When on (the default), your heirs inherit taxable brokerage holdings at the date-of-death market value — all unrealized capital gains are erased and never taxed. When off, the embedded gain is taxed at your long-term capital gains rate and subtracted from the reported estate. This only affects the estate figure, not your spending during life.</Field>
-      <Field name="Legacy target">The estate you want to leave behind, in today's dollars. The results inflate it to your life-expectancy year and show whether your plan clears it (surplus) or falls short (shortfall). This is a display-only comparison — it does not change the spending the engine assumes.</Field>
-
-      <H3>Advanced inputs</H3>
-      <Field name="Birth year override">Leave at 0 to derive your birth year from your current age. Set it explicitly for precision: it determines your exact Required Minimum Distribution start age (73 for born ≤1959, 75 for born ≥1960 under SECURE 2.0) and your Social Security Full Retirement Age (shown as a hint). RMD age is authoritative from birth year; FRA stays a manual field you can still override.</Field>
-      <Field name="One-time expenses">Lump costs you expect at a specific age — a wedding, roof replacement, a new car, a big trip. Enter each as an age and a today's-dollar amount; the engine inflates it to that year and funds it through the normal draw order. Entries before your retirement age are ignored (the model only spends in retirement). Add as many as you like.</Field>
-      <Field name="Phase spending (go-go / slow-go / no-go)">Retirement spending is rarely flat. The "go-go" years (active, early) often cost more; the "no-go" years (less travel, later) often cost less. Set a multiplier for each phase (1.0 = no change) and the ages where slow-go and no-go begin. A common glide path is go-go 1.1, slow-go 1.0, no-go 0.8.</Field>
-
-      <H3>Scenario testing</H3>
-      <Field name="Deterministic vs Stress Test">Deterministic mode uses your mean return every year. Stress Test replays a sharp crash — your chosen drop (e.g. −30%) for the first few retirement years, then a reversion to the mean. Retiring straight into a downturn is the worst case for sequence-of-returns risk; the stress card shows whether the plan still survives and what estate remains. It is illustrative and shown alongside — never replacing — your headline verdict. The Retire Early tab also runs a 500-path Monte Carlo for a probabilistic view.</Field>
+      <P>Every field below is also a hover tooltip — the ⓘ next to its label in the sidebar shows the same note.</P>
+      {FIELD_HELP_GROUPS.map((g) => (
+        <div key={g.title}>
+          <H3>{g.title}</H3>
+          {g.title === "Healthcare & Medicare" && (
+            <Callout tone="warn">Only enter the ACA premium if your monthly expenses do NOT already include health insurance — otherwise you'll double-count it.</Callout>
+          )}
+          {g.ids.map((id) => {
+            const f = FIELD_HELP[id];
+            if (!f) return null;
+            return (
+              <Field key={id} name={f.label}>
+                {f.context}{f.typical ? ` ${f.typical}` : ""}
+              </Field>
+            );
+          })}
+        </div>
+      ))}
 
       {/* ── Outputs ── */}
       <H2>Reading the results — Retire Early tab</H2>
@@ -167,8 +134,10 @@ export function DocsPanel() {
       <H3>Monte Carlo — 500 scenarios</H3>
       <P>Runs 500 simulations, each with the same mean return but randomized year-by-year sequence. A crash at 57 has a very different impact than one at 75, even if the lifetime average return is identical. This is sequence-of-returns risk.</P>
       <P><strong>Success rate</strong> = fraction of 500 runs where money lasts to life expectancy. 90%+ is green; 75–89% is orange; below 75% is red.</P>
-      <P><strong>Median estate</strong> = the middle outcome across all 500 runs. Half of scenarios leave more than this, half leave less.</P>
-      <P>The gap between the deterministic verdict (above) and the MC success rate is your sequence-of-returns risk. A plan that "works" in the flat-return model might only succeed 80% of the time once timing uncertainty is introduced.</P>
+      <P><strong>Outcome range.</strong> Beyond the median we show the <strong>10th percentile</strong> (downside — only 1 in 10 runs ends worse) and the <strong>90th percentile</strong> (upside). The <strong>median estate</strong> is the 50th percentile — the middle outcome, with half of runs above and half below. We rank by final estate rather than depletion age because every run has a final balance ($0 if it ran out), whereas a depletion age only exists for runs that fail. <strong>Show outcome distribution</strong> expands a histogram of all 500 final-estate outcomes — depleted runs pile into the red leftmost bin, and the 10th / median / 90th markers show where you land in the spread.</P>
+      <P><strong>Percentile fan on the chart.</strong> The Portfolio-over-time chart overlays a shaded <strong>10th–90th-percentile band</strong> with a <strong>median line</strong> (blue) computed across all 500 runs year by year. The stacked bars are still your single deterministic projection; the fan shows how wide the cone of outcomes gets as sequence risk compounds over time — a band that drops toward $0 in early years is the visual signature of sequence-of-returns risk.</P>
+      <P>Returns are heavily right-skewed: a handful of lucky sequences can compound to many multiples of your plan, so the 90th percentile is often far above everything else. To keep the bars readable, the y-axis is anchored to the central outcome (deterministic + median) and capped at 2.5× that; when the 90th percentile runs higher the band clips at the top and the legend notes <em>“90th ↑ off-chart.”</em> The <strong>Show outcome distribution</strong> histogram shows the full upper tail without clipping.</P>
+      <P>The gap between the deterministic verdict (above) and the MC success rate is your sequence-of-returns risk. A plan that "works" in the flat-return model might only succeed 80% of the time once timing uncertainty is introduced. In the <strong>Maximize</strong> tab the Monte Carlo runs on demand (a <em>Run Monte Carlo</em> button) so optimizing stays fast; click it to stress-test the recommended strategy.</P>
       <Callout>Higher return assumption → higher success rate. This is correct: a higher mean return shifts the entire distribution of outcomes upward. Monte Carlo models uncertainty around your assumption, not a different assumption.</Callout>
 
       <H3>Phase breakdown</H3>

@@ -91,7 +91,7 @@ export function StressCard({ stressResult, plan }) {
       <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 8 }}>
         <Stat
           label="Outcome"
-          value={survives ? "Survives" : `Depletes ${depleted}`}
+          value={survives ? "Survives" : `Depletes by ${Math.ceil(depleted)}`}
           color={survives ? "#3d8c78" : "#c0392b"}
         />
         <Stat label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} color={survives ? "#1a2e28" : "#c0392b"} />

@@ -6,7 +6,10 @@
 import { survivesAt } from "./plan.js";
 
 export function earliestRetireAge(plan, { min, max = 75, overrides = {} } = {}) {
-  const start = min ?? plan.currentAge + 1;
+  // Floor at currentAge so an already-retired user (retireAge == currentAge)
+  // can be found to "retire now" — otherwise the search would skip their
+  // actual retire age and falsely report they need another year.
+  const start = min ?? plan.currentAge;
   for (let age = start; age <= max; age++) {
     if (survivesAt(plan, age, overrides)) return age;
   }

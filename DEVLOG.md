@@ -36,6 +36,59 @@ components/ + App.jsx    React UI
 
 ---
 
+## Session: 2026-06-19 — Retire-at into sidebar, mobile-responsive layout
+
+Feature work on the `historical-sequence` branch. Test count **192 → 194**, green +
+build clean throughout. Each non-trivial item was planned (EnterPlanMode) and
+advisor-reviewed. Commits: `f766315` (Retire-at move + padding), `ad4f224` (mobile).
+
+### 1. Retire-at control back into the left sidebar (`f766315`)
+- Moved `RetireAtControl` from the top of the center results column to the top of
+  the **left sidebar** (under the navbar, above Essentials) and shrank it to fit the
+  440px column (headline 25→16px, age 24→22px, steppers 34→28px, ticks/labels
+  smaller, full-width slider, dropped the top accent border). Same no-lag
+  scrub/commit wiring.
+- `App.jsx`: sidebar column is now a flex wrapper with the accordion in a
+  `flex:1 / minHeight:0` box so its pinned bottom caption isn't pushed off-screen
+  (advisor catch). Empty-state microcopy updated to point at the sidebar slider.
+- Added 40px bottom padding to both result panels so the trailing detail cards
+  clear the bottom of the viewport.
+
+### 2. Mobile-responsive layout (`ad4f224`) — **new `src/components/mobile/MobileShell.jsx`**
+- Below **767px** the app renders a dedicated single-column shell instead of the
+  3-column desktop grid; **desktop is untouched**, gated by new `src/useIsMobile.js`
+  (`matchMedia`, returns `false` in SSR/tests so the desktop tree + existing
+  assertions hold).
+- **Mobile IA** (designed with the user, frontend-design skill consulted): top bar
+  with a ☰ burger for the 4 page tabs; the Retire-at slider pinned as a hero; a
+  scrolling results middle (right-rail content folds in); a **bottom nav** of input
+  sections (You/Money/Spending/Assumptions/Fine-tune) that open an editor in place
+  (tap-again / Done returns to results; Fine-tune opens a sub-tab strip over the 6
+  optional sections). Get advice / How it works are content-only (no hero/bottom
+  nav). Shell is a **`100dvh`** flex column (top bar / hero / middle = the only
+  scroller / bottom nav as a flex sibling) so the bottom nav clears the iOS Safari
+  toolbar.
+- **`InputsSidebar` refactor**: each section's fields extracted into body components
+  (`YouFields`, `MoneyFields`, …) keyed in an exported **`INPUT_SECTIONS`** map +
+  `sectionSummary()`; the desktop accordion and the mobile single-section view both
+  render from it — one source of truth, no redundant nav. Desktop output unchanged.
+  The 401k withdrawal-preview state is owned by the sidebar (not `TaxesFields`) so it
+  survives section switches (advisor catch — would have reset on desktop).
+- **`embedded` prop** on `EarlyPanel` / `MaximizeCenter` / `RightRail` /
+  `MaximizeRail`: drops the nested `height:100%`/`overflowY:auto` so they stack in one
+  page scroll, and KPI grids go 2-up. Identity default → desktop byte-identical
+  (gated, not a non-gated `auto-fit`, which would have reflowed narrow desktop —
+  advisor catch).
+- `ui.jsx`: `maxWidth:100%` on `NumInput` so fixed widths don't overflow narrow
+  screens. Added 2 `MobileShell` render tests (early renders hero+nav+folded
+  results; content tabs hide hero+nav).
+- **Not yet verified in a real browser** (tests gate the mobile branch off, so 194
+  green only proves desktop unchanged + the shell renders): real-device `100dvh`
+  bottom-nav clearance, burger z-index over hero, sticky editor header, 360px
+  overflow. Minor accepted: mobile Fine-tune sub-tab switch resets the 401k preview.
+
+---
+
 ## Session: 2026-06-18 (cont.) — Interactive chart, design-system pass, Historical Sequence Testing
 
 Continuation, all feedback-driven. Test count **185 → 192**, green + build clean throughout.

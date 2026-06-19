@@ -3,10 +3,15 @@
 // stacked-composition Projection and a clean Monte Carlo Outcome-range fan;
 // the fan view adds an explanation card. In Maximize, Monte Carlo is on-demand,
 // so selecting the fan before it's run shows a Run button (via onRunMc).
+//
+// All interaction state (zoom window, hidden series, hover) lives here, not in
+// StackedChart: toggling Projection↔Range conditionally remounts the chart, so
+// keeping state in the card preserves it across that toggle (and across both
+// panels, since they share this card).
 import { useState } from "react";
-import { StackedChart } from "../charts/StackedChart.jsx";
-import { Toggle } from "../ui.jsx";
-import { pct } from "../../format.js";
+import { StackedChart, GEO, colCenterX, STACK_COLORS } from "../charts/StackedChart.jsx";
+import { Toggle, RangeSlider } from "../ui.jsx";
+import { pct, fmt } from "../../format.js";
 
 const cardStyle = {
   margin: "12px 14px",
@@ -24,6 +29,9 @@ const labelStyle = {
   letterSpacing: "0.1em",
   color: "#9db4ae",
 };
+
+const SERIES_LABEL = { roth: "Roth", muni: "Munis", hsa: "HSA", brokerage: "Brokerage", k401: "401k", cd: "CD" };
+const TOOLTIP_ROWS = ["roth", "muni", "hsa", "brokerage", "k401", "cd"];
 
 function FanExplainCard({ mcResult, plan, runs }) {
   const successPct = Math.round(mcResult.successRate * 100);
@@ -49,17 +57,154 @@ function FanExplainCard({ mcResult, plan, runs }) {
   );
 }
 
+// Tooltip card, absolutely positioned over the SVG. Tracks the hovered column
+// horizontally (same column math as the chart) and flips left of the cursor
+// near the right edge so it never overflows the card.
+function HoverTip({ snap, band, isFan, hidden, n, index }) {
+  const leftPct = (colCenterX(index, n) / GEO.W) * 100;
+  const flip = leftPct > 55;
+  const rows = isFan
+    ? [
+        ["90th pct", band?.p90, "#5b7db1"],
+        ["Median", band?.p50, "#3a5a99"],
+        ["10th pct", band?.p10, "#5b7db1"],
+      ]
+    : TOOLTIP_ROWS.filter((k) => !hidden.has(k)).map((k) => [SERIES_LABEL[k], snap[k] ?? 0, STACK_COLORS[k]]);
+  const total = isFan ? band?.p50 : rows.reduce((s, [, v]) => s + v, 0);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 6,
+        left: `${leftPct}%`,
+        transform: flip ? "translateX(calc(-100% - 8px))" : "translateX(8px)",
+        background: "#1a2e28",
+        color: "#dceee8",
+        borderRadius: 8,
+        padding: "8px 10px",
+        fontSize: 11,
+        lineHeight: 1.5,
+        boxShadow: "0 4px 14px rgba(0,0,0,0.22)",
+        pointerEvents: "none",
+        zIndex: 5,
+        minWidth: 120,
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 4, color: "#7ecfbb" }}>Age {snap.age}</div>
+      {rows.map(([label, val, color]) => (
+        <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flex: "0 0 auto" }} />
+          <span style={{ flex: 1 }}>{label}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(val)}</span>
+        </div>
+      ))}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          marginTop: 5,
+          paddingTop: 4,
+          borderTop: "1px solid #34514a",
+          fontWeight: 700,
+        }}
+      >
+        <span>{isFan ? "Median" : "Total"}</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmt(total ?? 0)}</span>
+      </div>
+    </div>
+  );
+}
+
 export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcResult = null, onRunMc = null, runs = 500, initialView = "projection", onViewChange = null }) {
   const [chartView, setChartView] = useState(initialView);
+  const [hidden, setHidden] = useState(() => new Set());
+  const [hover, setHover] = useState(null);
+  const [win, setWin] = useState(null); // { lo, hi } age window, or null = all
+
   const canRange = !!(mcResult || onRunMc);
   const showFan = chartView === "range" && canRange;
   const selectView = (v) => {
     setChartView(v);
+    setHover(null);
     onViewChange?.(v);
   };
+  const toggleHidden = (key) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const options = [{ value: "projection", label: "Projection" }];
   if (canRange) options.push({ value: "range", label: "Outcome range" });
+
+  // Zoom: slice the bars and every age-keyed overlay to the same window so they
+  // stay aligned. Snaps are yearly and sorted, so a simple age filter suffices.
+  const minAge = snaps.length ? snaps[0].age : 0;
+  const maxAge = snaps.length ? snaps[snaps.length - 1].age : 0;
+  const lo = win ? win.lo : minAge;
+  const hi = win ? win.hi : maxAge;
+  const inWin = (s) => s.age >= lo && s.age <= hi;
+  const vSnaps = win ? snaps.filter(inWin) : snaps;
+  const vStress = stressSnaps && win ? stressSnaps.filter(inWin) : stressSnaps;
+  const vBands = mcResult?.bands && win ? mcResult.bands.filter(inWin) : mcResult?.bands;
+
+  // Phase chips → preset windows (clamped to the available age range).
+  const clampWin = (a, b) => {
+    const l = Math.max(minAge, Math.min(a, maxAge - 1));
+    const h = Math.min(maxAge, Math.max(b, l + 1));
+    return { lo: l, hi: h };
+  };
+  const presets = {
+    all: null,
+    bridge: clampWin(minAge, 59),
+    early: clampWin(60, ssAge - 1),
+    "ss+": clampWin(ssAge, maxAge),
+  };
+  const eq = (w) => (w == null ? win == null : win && win.lo === w.lo && win.hi === w.hi);
+  const activePreset = Object.keys(presets).find((k) => eq(presets[k])) ?? "";
+  const setPreset = (k) => {
+    setWin(presets[k]);
+    setHover(null);
+  };
+
+  const renderControls = (interactive) => (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: "#7C9A92", fontFamily: "'JetBrains Mono', monospace", flex: "0 0 auto" }}>
+          {lo}–{hi}
+        </span>
+        <RangeSlider
+          min={minAge}
+          max={maxAge}
+          lo={lo}
+          hi={hi}
+          onChange={(l, h) => {
+            setWin(l === minAge && h === maxAge ? null : { lo: l, hi: h });
+            setHover(null);
+          }}
+        />
+      </div>
+      {interactive && (
+        <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+          <Toggle
+            value={activePreset}
+            onChange={setPreset}
+            options={[
+              { value: "all", label: "All" },
+              { value: "bridge", label: "Bridge" },
+              { value: "early", label: "Early" },
+              { value: "ss+", label: "SS+" },
+            ]}
+          />
+        </div>
+      )}
+    </div>
+  );
+
+  const tipIndex = hover != null && vSnaps[hover] ? hover : null;
 
   return (
     <div style={cardStyle}>
@@ -72,7 +217,20 @@ export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcR
 
       {showFan && mcResult ? (
         <>
-          <StackedChart snaps={snaps} ssAge={ssAge} mcBands={mcResult.bands} view="fan" />
+          <div style={{ position: "relative" }}>
+            <StackedChart
+              snaps={vSnaps}
+              ssAge={ssAge}
+              mcBands={vBands}
+              view="fan"
+              hover={hover}
+              onHover={setHover}
+            />
+            {tipIndex != null && (
+              <HoverTip snap={vSnaps[tipIndex]} band={vBands?.[tipIndex]} isFan hidden={hidden} n={vSnaps.length} index={tipIndex} />
+            )}
+          </div>
+          {renderControls(true)}
           <FanExplainCard mcResult={mcResult} plan={plan} runs={runs} />
         </>
       ) : showFan && onRunMc ? (
@@ -88,7 +246,24 @@ export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcR
           </button>
         </div>
       ) : (
-        <StackedChart snaps={snaps} ssAge={ssAge} stressSnaps={stressSnaps} mcBands={null} />
+        <>
+          <div style={{ position: "relative" }}>
+            <StackedChart
+              snaps={vSnaps}
+              ssAge={ssAge}
+              stressSnaps={vStress}
+              mcBands={null}
+              hidden={hidden}
+              onToggleHidden={toggleHidden}
+              hover={hover}
+              onHover={setHover}
+            />
+            {tipIndex != null && (
+              <HoverTip snap={vSnaps[tipIndex]} isFan={false} hidden={hidden} n={vSnaps.length} index={tipIndex} />
+            )}
+          </div>
+          {renderControls(true)}
+        </>
       )}
     </div>
   );

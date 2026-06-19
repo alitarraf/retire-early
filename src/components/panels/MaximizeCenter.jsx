@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
-import { Collapsible } from "../ui.jsx";
+import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
 
 function KpiChip({ label, value, accent }) {
@@ -277,18 +277,23 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
+      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
+          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
-        <Collapsible
-          title="Show details — Monte Carlo, tax, stress & legacy"
+        <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-        >
+          caption="Monte Carlo, tax, stress & legacy"
+        />
+      </div>
+      {detailsOpen && (
+        <>
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <StressCard stressResult={stressResult} plan={plan} />
           <TaxTransparency plan={plan} result={result} />
           <LegacyGap plan={plan} endVal={endVal} />
-        </Collapsible>
-      </div>
+        </>
+      )}
 
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.7, padding: "0 14px 14px" }}>
         Sustainable spend = max monthly draw where money lasts to age {plan.lifeExpect} (binary

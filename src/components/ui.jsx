@@ -155,6 +155,47 @@ export const Collapsible = ({ title, hint, children, defaultOpen = false, open: 
   );
 };
 
+// Flat inline disclosure (Option A): a borderless hairline-rule row, not a
+// button-box. Used to reveal secondary cards that already carry their own
+// elevation, so the revealed content flows as more of the same column rather
+// than nesting inside a bordered shell.
+export const DetailsToggle = ({ open, onToggle, caption }) => (
+  <button
+    type="button"
+    aria-expanded={open}
+    onClick={() => onToggle(!open)}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      width: "100%",
+      background: "transparent",
+      border: "none",
+      cursor: "pointer",
+      padding: "4px 0",
+    }}
+  >
+    <span style={{ fontSize: 12, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>
+      {open ? "Hide details" : "Show details"}
+    </span>
+    <span style={{ flex: 1, height: 1, background: "#dde7e3" }} />
+    {caption && (
+      <span style={{ fontSize: 11, color: "#9db4ae", whiteSpace: "nowrap" }}>{caption}</span>
+    )}
+    <span
+      style={{
+        fontSize: 12,
+        color: "#7C9A92",
+        display: "inline-block",
+        transform: open ? "rotate(180deg)" : "none",
+        transition: "transform 0.2s",
+      }}
+    >
+      ▾
+    </span>
+  </button>
+);
+
 // Small ⓘ that reveals a context popover on hover or keyboard focus.
 // Content comes from constants/fieldHelp.js so docs and tooltips never diverge.
 // The popover is viewport-fixed and edge-clamped so it never clips inside the
@@ -247,7 +288,6 @@ export const Card = ({ children, accent, warn, style = {} }) => (
       borderRadius: 14,
       padding: 18,
       boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-      border: warn ? "1.5px solid #f5c0b0" : "none",
       ...style,
     }}
   >

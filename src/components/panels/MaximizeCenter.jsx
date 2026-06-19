@@ -78,6 +78,7 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
+        paddingBottom: 40,
       }}
     >
       {/* ── Hero ─────────────────────────────────────── */}

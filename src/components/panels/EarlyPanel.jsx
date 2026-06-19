@@ -202,6 +202,7 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
+        paddingBottom: 40,
       }}
     >
       {/* ── Hero ─────────────────────────────────────── */}

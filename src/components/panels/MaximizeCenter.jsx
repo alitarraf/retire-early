@@ -3,7 +3,7 @@
 // Roth conversion card → portfolio chart.
 import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
-import { TaxTransparency, LegacyGap, StressCard } from "./ResultsExtras.jsx";
+import { TaxTransparency, LegacyGap, ScenarioCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
@@ -50,7 +50,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, stressResult, mcResult = null, onRunMc }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -58,8 +58,8 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
   // target, or switching the chart to Outcome range). Still hand-collapsible.
   const [detailsOpen, setDetailsOpen] = useState(false);
   useEffect(() => {
-    if (plan.scenarioMode === "stress" || plan.legacyTarget > 0) setDetailsOpen(true);
-  }, [plan.scenarioMode, plan.legacyTarget, plan.stressDropPct, plan.stressYears]);
+    if (plan.scenarioMode !== "deterministic" || plan.legacyTarget > 0) setDetailsOpen(true);
+  }, [plan.scenarioMode, plan.legacyTarget, plan.stressDropPct, plan.stressYears, plan.historicalScenario, plan.historicalLens]);
 
   const opt = dynamicOpt ?? { type: "none", gain: 0, schedule: [] };
   const convBetter = opt.type === "fill" && opt.gain > 0;
@@ -261,7 +261,9 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         snaps={snaps}
         ssAge={plan.ssAge}
         plan={plan}
-        stressSnaps={stressResult?.snaps}
+        scenarioSnaps={scenario?.result?.snaps}
+        scenarioColor={scenario?.color}
+        scenarioLabel={scenario?.label}
         mcResult={mcResult}
         onRunMc={onRunMc}
         runs={500}
@@ -275,13 +277,13 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Monte Carlo, tax, stress & legacy"
+          caption="Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
-          <StressCard stressResult={stressResult} plan={plan} />
+          <ScenarioCard scenario={scenario} plan={plan} />
           <TaxTransparency plan={plan} result={result} />
           <LegacyGap plan={plan} endVal={endVal} />
         </>

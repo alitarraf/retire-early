@@ -21,7 +21,8 @@ components/ + App.jsx    React UI
 ```
 
 **Key facts that save time**
-- **Live sidebar is `InputsSidebar.jsx`** (accordion). `InputsPanel.jsx` and `MaximizePanel.jsx` are **DEAD CODE** — not imported by App. Don't edit them.
+- **Live sidebar is `InputsSidebar.jsx`** (accordion). `MaximizePanel.jsx` is **DEAD CODE** — not imported by App. Don't edit it. (`InputsPanel.jsx` + the `Row` primitive were deleted 2026-06-18.)
+- **Design tokens live in `src/theme.js`** (`neutral`/`status`/`phase`/`slider` + `eyebrowStyle`/`cardTitleStyle`); `src/index.css` themes the native range slider. Status hues (green/amber/red) are reserved for **verdicts**; phases use a separate cool **slate** ramp. Use tokens, don't reintroduce raw grays.
 - `App.jsx` holds all state via `useState(DEFAULTS)`, derives `plan = makePlan(inputs)`, passes results down. **Four tabs:** Retire Early (`EarlyPanel`+`RightRail`), Maximize (`MaximizeCenter`+`MaximizeRail`), **Get advice** (`AdvicePanel`), How it works (`DocsPanel`).
 - **"Retire at" is a full-width command band** (`RetireAtControl.jsx`) at the top of the center results column, not a sidebar field. **No-lag scrubbing:** a slider drag updates `dragAge` ONLY (never `setInputs`), so `inputs`/`plan` stay referentially stable and every expensive memo is frozen for free; a cheap `livePlan`/`liveResult` (1 sim) tracks the drag; commit on release/discrete action triggers the full recompute. Don't "fix" this with `useTransition`.
 - **Per-field help is single-sourced** in `constants/fieldHelp.js` (`FIELD_HELP` + `FIELD_HELP_GROUPS`) — feeds both the sidebar `InfoDot` tooltips and the DocsPanel inputs reference. Add a field's help once, there.
@@ -32,6 +33,67 @@ components/ + App.jsx    React UI
 - Tax year is 2026, MFJ default. Annual update = single-file edit in `constants/brackets.js`.
 
 **Test suite: 185 passing, 14 files** (was 94 at start of 2026-06-17, 156 at end of that day).
+
+---
+
+## Session: 2026-06-18 (cont.) — Interactive chart, design-system pass, Historical Sequence Testing
+
+Continuation, all feedback-driven. Test count **185 → 192**, green + build clean throughout.
+Each item was planned (EnterPlanMode) and advisor-reviewed where the advisor was available.
+Merged via PRs #1 (interactive chart) and #2 (design-issues); `historical-sequence` branch open.
+
+### 1. Interactive portfolio chart (`StackedChart.jsx`, `PortfolioChartCard.jsx`)
+- **Hover** any year → composition tooltip (per-account $ + total) via full-height SVG hit-rects
+  (no pointer→SVG coordinate mapping). **Legend click** show/hides an account type (axis rescales).
+  **Zoom** via a dual-handle age `RangeSlider` (new in `ui.jsx`) + phase chips; the MC fan and the
+  scenario line get the same age-window filter so overlays stay aligned.
+- All interaction state lives in `PortfolioChartCard` (survives the Projection↔Range remount; both
+  panels share it). Presentation-only — engine untouched.
+
+### 2. Elevation language + flat "Show details" (`docs/on-elevation-show-details.md`)
+- One elevation rule: floating = shadow only, grouping = flat tint, accent = a single left bar for
+  status. Dropped warn borders (Card/KpiChip/BridgeWarning). `Collapsible` "Show details" → flat
+  hairline disclosure (`DetailsToggle`); detail cards now flow in the same column. Draw-order
+  footnote moved into the Phase-breakdown rail.
+
+### 3. Design-issues pass (`docs/design-issues.md`, all 7) — **new `src/theme.js` + `src/index.css`**
+- Solid age numbers (dropped gradient text; kept agePop + ✨); slider headline 48→24px so the 88px
+  hero is the single answer. Phase vs status color split (slate phases). Native + custom sliders
+  unified on shared slider tokens. Card titles → sentence-case; caps eyebrows reserved for section
+  starts. ~10 grays collapsed to a 4–5 step neutral scale.
+- **Clickable sensitivity levers** (`RightRail.jsx`): each lever has an explicit **Apply** button;
+  `sensitivity.js` carries an input-namespace `apply` patch (distinct from the engine-override
+  `ov` — caught a Max-Roth bug where apply could *lower* an above-7.5k contribution, guarded with
+  `max(current, 7500)`). One-time apply (no silent stacking), an **Applied (N)** summary, and
+  **Undo all** to the pre-lever baseline (state in `App.jsx`). Test: apply==preview earliest age.
+
+### 4. Feature 5 — Historical Sequence Testing (`historical-sequence` branch)
+- Third Scenario-testing mode: replay real bad markets (retire into 2000 / 2007 / 2022 / 1973).
+  **No engine change** — reuses `simulate()`'s `returnSeries` hook (same as `stressTest`/`monteCarlo`).
+- New `constants/historicalReturns.js` (`HISTORICAL_RETURNS` 1973–2024 with **two lenses** per year:
+  all-equity S&P 500 and a 60/40 blend; `HISTORICAL_SCENARIOS`). New `analysis/historicalSequence.js`
+  builds the series and **reverts to the user's mean** once recorded history ends.
+- **Generalized the Stress overlay into one "scenario" path:** App builds a `{ result, color, label,
+  blurb }` descriptor (stress = red, historical = violet); `stressSnaps`→`scenarioSnaps` (+color/label)
+  through `PortfolioChartCard`→`StackedChart`; `StressCard`→`ScenarioCard`. Both result panels.
+- ⚠️ **Historical return figures are representative (from memory) — flagged in the file header for
+  verification against an authoritative source (NYU Stern / Bloomberg Agg) before relying on them.**
+- Tests: `historicalSequence.test.js` (series build + revert-to-mean, early-years crash bite,
+  S&P-harsher-than-blend, scenario coverage) + render tests for the overlay line + `ScenarioCard`.
+
+### Decisions / notes
+- Sequence-of-returns truth that bit a test: with a low withdrawal rate, a *bad start* can still end
+  with **more** final wealth (the post-crash boom compounds), so the honest invariant is the
+  **early-years** portfolio value, not final wealth. Tests assert the early dip, not the ending.
+- Historical returns are **nominal** applied to the whole portfolio (engine has no per-bucket return
+  in drawdown); the 60/40 lens makes that far less wrong than all-equity. 1973's high inflation is
+  **not** separately modeled — only the market sequence (noted in the card copy).
+
+### Tomorrow's Starting Point
+- Push `historical-sequence` and open its PR (user confirmed it renders fine in-browser).
+- **Verify the historical return data** against a real source before trusting projections.
+- Possible follow-ups: blended-return realism (per-bucket returns in drawdown), or historizing
+  inflation for the stagflation scenario.
 
 ---
 

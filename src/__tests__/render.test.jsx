@@ -19,6 +19,8 @@ import { dynamicOptimizer } from "../analysis/dynamicOptimizer.js";
 import { monteCarlo, buildHistogram } from "../engine/monteCarlo.js";
 import { McDistChart } from "../components/charts/McDistChart.jsx";
 import { StackedChart } from "../components/charts/StackedChart.jsx";
+import { ScenarioCard } from "../components/panels/ResultsExtras.jsx";
+import { historicalSequence } from "../analysis/historicalSequence.js";
 import { PortfolioChartCard } from "../components/panels/PortfolioChartCard.jsx";
 import { MonteCarloCard } from "../components/panels/MonteCarloCard.jsx";
 import { RetireAtControl } from "../components/panels/RetireAtControl.jsx";
@@ -48,7 +50,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={opt}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
       />,
     );
     expect(html).toContain("Dynamic Roth conversion optimizer");
@@ -74,7 +76,7 @@ describe("render smoke tests", () => {
         sustainable={3000}
         dynamicOpt={opt}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
       />,
     );
     expect(html).toContain("Dynamic Roth conversion optimizer");
@@ -97,7 +99,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={dynamicOptimizer(plan)}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
         mcResult={mcResult}
         onRunMc={() => {}}
       />,
@@ -105,7 +107,7 @@ describe("render smoke tests", () => {
     expect(html).toContain("Portfolio over time");
     expect(html).toContain("Outcome range"); // chart toggle option
     expect(html).toContain("Show details"); // flat disclosure trigger (cards revealed on open)
-    expect(html).toContain("Monte Carlo, tax, stress &amp; legacy"); // disclosure caption
+    expect(html).toContain("Monte Carlo, tax, scenario &amp; legacy"); // disclosure caption
     noNaN(html);
   });
 
@@ -120,7 +122,7 @@ describe("render smoke tests", () => {
         sustainable={5000}
         dynamicOpt={dynamicOptimizer(plan)}
         onApplyOptimized={() => {}}
-        stressResult={null}
+        scenario={null}
         mcResult={null}
         onRunMc={() => {}}
       />,
@@ -137,6 +139,41 @@ describe("render smoke tests", () => {
       <StackedChart snaps={result.snaps} ssAge={plan.ssAge} mcBands={mc.bands} />,
     );
     expect(html).toContain("MC 10–90%");
+    noNaN(html);
+  });
+
+  it("StackedChart renders a historical scenario overlay line + label without NaN", () => {
+    const plan = makePlan({
+      ...DEFAULTS, currentAge: 50, retireAge: 55,
+      scenarioMode: "historical", historicalScenario: "gfc2007", historicalLens: "sp",
+    });
+    const result = runMain(plan);
+    const scen = historicalSequence(simParamsAt(plan, plan.retireAge), { startYear: 2007, lens: "sp" });
+    const html = renderToString(
+      <StackedChart
+        snaps={result.snaps}
+        ssAge={plan.ssAge}
+        scenarioSnaps={scen.snaps}
+        scenarioColor="#7048a8"
+        scenarioLabel="Global financial crisis (2007) · S&P 500"
+      />,
+    );
+    expect(html).toContain("Global financial crisis (2007)"); // legend label
+    expect(html).toContain("#7048a8"); // scenario line color applied
+    noNaN(html);
+  });
+
+  it("ScenarioCard summarizes a historical scenario (outcome + estate + blurb)", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const scen = historicalSequence(simParamsAt(plan, plan.retireAge), { startYear: 2000, lens: "balanced" });
+    const html = renderToString(
+      <ScenarioCard
+        plan={plan}
+        scenario={{ result: scen, color: "#7048a8", label: "Dot-com bust (2000) · 60/40 blend", blurb: "Replays actual returns." }}
+      />,
+    );
+    expect(html).toContain("Dot-com bust (2000)");
+    expect(html).toMatch(/Survives|Depletes by/);
     noNaN(html);
   });
 
@@ -322,7 +359,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliest}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={41000}
       />,
@@ -342,7 +379,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliestRetireAge(plan)}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={5000}
         retireBy={retireBy}
@@ -363,7 +400,7 @@ describe("render smoke tests", () => {
         result={result}
         earliest={earliestRetireAge(plan)}
         mcResult={null}
-        stressResult={null}
+        scenario={null}
         totalAtRetirement={result.snaps[0]?.total ?? 0}
         sustainable={5000}
         retireBy={retireBy}

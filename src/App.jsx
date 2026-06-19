@@ -8,6 +8,8 @@ import { dynamicOptimizer } from "./analysis/dynamicOptimizer.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
 import { monteCarlo } from "./engine/monteCarlo.js";
 import { stressTest } from "./analysis/stressTest.js";
+import { historicalSequence } from "./analysis/historicalSequence.js";
+import { HISTORICAL_SCENARIOS } from "./constants/historicalReturns.js";
 import { InputsSidebar } from "./components/panels/InputsSidebar.jsx";
 import { RetireAtControl } from "./components/panels/RetireAtControl.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
@@ -96,7 +98,10 @@ export default function App() {
     setMaxMcOn(false);
   }, [mainSimParams]);
 
-  // Deterministic stress test — only when the Scenario Testing section is in stress mode.
+  // Scenario overlay — a single downside run (synthetic stress OR a real historical
+  // sequence) shown alongside the base plan. Null in deterministic mode. The
+  // descriptor carries everything the chart line + results card need (snaps via
+  // `result`, plus line color, legend label, and explanatory blurb).
   const stressResult = useMemo(
     () =>
       plan.scenarioMode === "stress"
@@ -104,6 +109,37 @@ export default function App() {
         : null,
     [mainSimParams, plan.scenarioMode, plan.stressDropPct, plan.stressYears],
   );
+  const historicalResult = useMemo(
+    () =>
+      plan.scenarioMode === "historical"
+        ? historicalSequence(mainSimParams, {
+            startYear: HISTORICAL_SCENARIOS.find((s) => s.key === plan.historicalScenario)?.startYear,
+            lens: plan.historicalLens,
+          })
+        : null,
+    [mainSimParams, plan.scenarioMode, plan.historicalScenario, plan.historicalLens],
+  );
+  const scenario = useMemo(() => {
+    if (plan.scenarioMode === "stress" && stressResult) {
+      return {
+        result: stressResult,
+        color: "#c0392b",
+        label: "Stress test",
+        blurb: `Illustrative downside: the market drops ${plan.stressDropPct}% per year for the first ${plan.stressYears} retirement year${plan.stressYears > 1 ? "s" : ""}, then reverts to your mean return. Retiring into a crash is the worst case for sequence-of-returns risk.`,
+      };
+    }
+    if (plan.scenarioMode === "historical" && historicalResult) {
+      const sc = HISTORICAL_SCENARIOS.find((s) => s.key === plan.historicalScenario);
+      const lensLabel = plan.historicalLens === "sp" ? "S&P 500" : "60/40 blend";
+      return {
+        result: historicalResult,
+        color: "#7048a8",
+        label: `${sc?.label ?? "Historical"} · ${lensLabel}`,
+        blurb: `${sc?.blurb ?? ""} Applies the ${lensLabel} return each year to your whole portfolio; once recorded history ends it reverts to your mean return. Nominal returns — spending still inflates at your own rate.`,
+      };
+    }
+    return null;
+  }, [plan.scenarioMode, plan.stressDropPct, plan.stressYears, plan.historicalScenario, plan.historicalLens, stressResult, historicalResult]);
 
   // Maximize-mode analysis
   const atRetirement = useMemo(() => projectAtRetirement(plan), [plan]);
@@ -299,7 +335,7 @@ export default function App() {
                     result={result}
                     earliest={earliest}
                     mcResult={mcResult}
-                    stressResult={stressResult}
+                    scenario={scenario}
                     totalAtRetirement={totalAtRetirement}
                     sustainable={sustainable}
                     retireBy={retireBy}
@@ -312,7 +348,7 @@ export default function App() {
                     sustainable={sustainable}
                     dynamicOpt={dynamicOpt}
                     onApplyOptimized={applyOptimized}
-                    stressResult={stressResult}
+                    scenario={scenario}
                     mcResult={mcResult}
                     onRunMc={() => setMaxMcOn(true)}
                   />

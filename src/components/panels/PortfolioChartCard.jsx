@@ -112,7 +112,7 @@ function HoverTip({ snap, band, isFan, hidden, n, index }) {
   );
 }
 
-export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcResult = null, onRunMc = null, runs = 500, initialView = "projection", onViewChange = null }) {
+export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, scenarioColor = null, scenarioLabel = null, mcResult = null, onRunMc = null, runs = 500, initialView = "projection", onViewChange = null }) {
   const [chartView, setChartView] = useState(initialView);
   const [hidden, setHidden] = useState(() => new Set());
   const [hover, setHover] = useState(null);
@@ -143,7 +143,7 @@ export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcR
   const hi = win ? win.hi : maxAge;
   const inWin = (s) => s.age >= lo && s.age <= hi;
   const vSnaps = win ? snaps.filter(inWin) : snaps;
-  const vStress = stressSnaps && win ? stressSnaps.filter(inWin) : stressSnaps;
+  const vScenario = scenarioSnaps && win ? scenarioSnaps.filter(inWin) : scenarioSnaps;
   const vBands = mcResult?.bands && win ? mcResult.bands.filter(inWin) : mcResult?.bands;
 
   // Phase chips → preset windows (clamped to the available age range).
@@ -246,7 +246,9 @@ export function PortfolioChartCard({ snaps, ssAge, plan, stressSnaps = null, mcR
             <StackedChart
               snaps={vSnaps}
               ssAge={ssAge}
-              stressSnaps={vStress}
+              scenarioSnaps={vScenario}
+              scenarioColor={scenarioColor}
+              scenarioLabel={scenarioLabel}
               mcBands={null}
               hidden={hidden}
               onToggleHidden={toggleHidden}

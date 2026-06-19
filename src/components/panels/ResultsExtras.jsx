@@ -1,7 +1,7 @@
 // Shared results widgets used by both EarlyPanel and MaximizeCenter:
 //  • TaxTransparency — surfaces the new SS provisional-income / marginal-rate modeling.
 //  • LegacyGap       — projected estate vs the user's legacy target.
-//  • StressCard      — illustrative early-crash downside (sequence-of-returns risk).
+//  • ScenarioCard    — downside scenario summary (synthetic stress or historical sequence).
 import { fmt } from "../../format.js";
 import { TAX_YEAR } from "../../constants/brackets.js";
 import { cardTitleStyle } from "../../theme.js";
@@ -72,16 +72,17 @@ export function LegacyGap({ plan, endVal }) {
   );
 }
 
-export function StressCard({ stressResult, plan }) {
-  if (!stressResult) return null;
-  const { snaps, depleted, estateGainTax = 0 } = stressResult;
+// Downside scenario summary — drives off the `scenario` descriptor from App
+// ({ result, color, label, blurb }), so it renders identically for the synthetic
+// Stress Test and a real Historical Sequence.
+export function ScenarioCard({ scenario, plan }) {
+  if (!scenario?.result) return null;
+  const { snaps, depleted, estateGainTax = 0 } = scenario.result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
   const survives = depleted === null;
   return (
-    <div style={{ ...cardStyle, borderLeft: `3px solid ${survives ? "#c97c1a" : "#c0392b"}` }}>
-      <div style={labelStyle}>
-        Stress test — {plan.stressDropPct}% crash × {plan.stressYears} early year{plan.stressYears > 1 ? "s" : ""}
-      </div>
+    <div style={{ ...cardStyle, borderLeft: `3px solid ${scenario.color}` }}>
+      <div style={labelStyle}>{scenario.label}</div>
       <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 8 }}>
         <Stat
           label="Outcome"
@@ -90,11 +91,7 @@ export function StressCard({ stressResult, plan }) {
         />
         <Stat label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} color={survives ? "#1a2e28" : "#c0392b"} />
       </div>
-      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6 }}>
-        Illustrative downside: the market drops {plan.stressDropPct}% per year for the first{" "}
-        {plan.stressYears} retirement year{plan.stressYears > 1 ? "s" : ""}, then reverts to your{" "}
-        mean return. Retiring into a crash is the worst case for sequence-of-returns risk.
-      </div>
+      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6 }}>{scenario.blurb}</div>
     </div>
   );
 }

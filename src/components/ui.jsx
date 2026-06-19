@@ -283,6 +283,113 @@ export const BigNum = ({ children, accent, warn, small }) => (
   </div>
 );
 
+// Dual-handle range slider, fully inline-styled (no CSS file in this project, so
+// native <input type=range> thumbs can't be themed). Pointer-drag + arrow-key
+// support; thumbs are real buttons so keyboard focus is visible. Values are
+// clamped so the two handles never cross (lo stays <= hi - 1).
+export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
+  const trackRef = useRef(null);
+  const dragRef = useRef(null);
+  const span = Math.max(1, max - min);
+  const pctOf = (v) => ((v - min) / span) * 100;
+
+  const valAt = (clientX) => {
+    const el = trackRef.current;
+    if (!el) return min;
+    const r = el.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    return Math.round((min + frac * span) / step) * step;
+  };
+  const apply = (which, v) => {
+    if (which === "lo") onChange(Math.max(min, Math.min(v, hi - step)), hi);
+    else onChange(lo, Math.min(max, Math.max(v, lo + step)));
+  };
+  const onDown = (which) => (e) => {
+    e.preventDefault();
+    dragRef.current = which;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onMove = (e) => {
+    if (!dragRef.current) return;
+    apply(dragRef.current, valAt(e.clientX));
+  };
+  const onUp = () => {
+    dragRef.current = null;
+  };
+  const onKey = (which, cur) => (e) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+      e.preventDefault();
+      apply(which, cur - step);
+    } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+      e.preventDefault();
+      apply(which, cur + step);
+    }
+  };
+
+  const thumb = (which, val) => (
+    <button
+      type="button"
+      role="slider"
+      aria-label={which === "lo" ? "Start age" : "End age"}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={val}
+      onPointerDown={onDown(which)}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onKeyDown={onKey(which, val)}
+      style={{
+        position: "absolute",
+        left: `${pctOf(val)}%`,
+        top: "50%",
+        width: 14,
+        height: 14,
+        marginLeft: -7,
+        marginTop: -7,
+        borderRadius: "50%",
+        border: "2px solid #3d8c78",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        cursor: "grab",
+        padding: 0,
+        touchAction: "none",
+      }}
+    />
+  );
+
+  return (
+    <div style={{ position: "relative", height: 22, flex: 1, minWidth: 120 }}>
+      <div
+        ref={trackRef}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: 0,
+          right: 0,
+          height: 4,
+          marginTop: -2,
+          borderRadius: 2,
+          background: "#e2e8e6",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            bottom: 0,
+            left: `${pctOf(lo)}%`,
+            right: `${100 - pctOf(hi)}%`,
+            background: "#7ecfbb",
+            borderRadius: 2,
+          }}
+        />
+      </div>
+      {thumb("lo", lo)}
+      {thumb("hi", hi)}
+    </div>
+  );
+};
+
 export const Note = ({ children, tone = "info" }) => {
   const bg = tone === "warn" ? "#fffbf0" : "#f0f5f4";
   return (

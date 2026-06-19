@@ -4,7 +4,7 @@
 import { fmt, pct } from "../../format.js";
 import { phase as phaseColor } from "../../theme.js";
 
-export function RightRail({ plan, result, sensitivityRows, onApplyLever, leverUndo, onUndoLever }) {
+export function RightRail({ plan, result, sensitivityRows, onApplyLever, appliedLevers = [], onUndoLevers }) {
   const { snaps } = result;
   const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
   const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
@@ -120,61 +120,63 @@ export function RightRail({ plan, result, sensitivityRows, onApplyLever, leverUn
           Try a lever
         </div>
         <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
-          Click one to apply it to your inputs and re-run. Each changes one thing, all else equal.
+          Apply one to write it into your inputs and re-run. Each changes one thing, all else equal.
         </div>
 
-        {leverUndo && (
+        {appliedLevers.length > 0 && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
               background: "#f0f5f4",
               borderRadius: 8,
               padding: "8px 10px",
-              marginBottom: 12,
+              marginBottom: 14,
             }}
           >
-            <span style={{ fontSize: 11, color: "#4a5e58" }}>
-              Applied <strong>{leverUndo.label}</strong>
-            </span>
-            <button
-              type="button"
-              onClick={onUndoLever}
+            <div
               style={{
-                border: "none",
-                background: "transparent",
-                color: "#3d8c78",
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: "pointer",
-                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                marginBottom: 4,
               }}
             >
-              Undo
-            </button>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#4a5e58" }}>
+                Applied ({appliedLevers.length})
+              </span>
+              <button
+                type="button"
+                onClick={onUndoLevers}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#3d8c78",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                Undo all
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#4a5e58", lineHeight: 1.5 }}>
+              {appliedLevers.join(" · ")}
+            </div>
           </div>
         )}
 
         {sensitivityRows.map(({ label, newEarliest, delta, apply }) => {
           const noChange = delta === null || delta === 0;
+          const applied = appliedLevers.includes(label);
           return (
-            <button
-              type="button"
+            <div
               key={label}
-              onClick={() => onApplyLever?.(apply, label)}
-              title={`Apply "${label}" to your inputs`}
               style={{
-                display: "block",
-                width: "100%",
-                textAlign: "left",
-                background: "transparent",
-                border: "none",
                 borderBottom: "1px solid #e2e8e6",
-                cursor: "pointer",
                 padding: "0 0 10px",
                 marginBottom: 10,
+                opacity: applied ? 0.6 : 1,
               }}
             >
               <div
@@ -182,61 +184,69 @@ export function RightRail({ plan, result, sensitivityRows, onApplyLever, leverUn
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 4,
+                  gap: 8,
+                  marginBottom: 6,
                 }}
               >
-                <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {newEarliest != null && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: "#9db4ae",
-                        fontFamily: "'JetBrains Mono', monospace",
-                      }}
-                    >
-                      → {newEarliest}
-                    </span>
-                  )}
-                  <span
+                <span style={{ fontSize: 11, color: "#4a5e58", flex: 1, minWidth: 0 }}>{label}</span>
+                {applied ? (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>
+                    ✓ Applied
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onApplyLever?.(apply, label)}
+                    title={`Apply "${label}" to your inputs`}
                     style={{
-                      fontSize: 11,
+                      flexShrink: 0,
+                      border: "1px solid #3d8c78",
+                      background: "transparent",
+                      color: "#3d8c78",
+                      fontSize: 10,
                       fontWeight: 700,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      minWidth: 44,
-                      textAlign: "right",
-                      color: delta > 0 ? "#3d8c78" : noChange ? "#9db4ae" : "#c0392b",
+                      borderRadius: 6,
+                      padding: "3px 9px",
+                      cursor: "pointer",
                     }}
                   >
-                    {delta > 0
-                      ? `−${delta}yr`
-                      : noChange
-                      ? "—"
-                      : `+${Math.abs(delta ?? 0)}yr`}
-                  </span>
-                </div>
+                    Apply
+                  </button>
+                )}
               </div>
-              {delta > 0 && (
-                <div
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1, background: "#e2e8e6", borderRadius: 99, height: 3, overflow: "hidden" }}>
+                  {delta > 0 && (
+                    <div
+                      style={{
+                        width: `${Math.min(100, (delta / 10) * 100)}%`,
+                        height: "100%",
+                        background: "#3d8c78",
+                        borderRadius: 99,
+                        minWidth: 4,
+                      }}
+                    />
+                  )}
+                </div>
+                {newEarliest != null && (
+                  <span style={{ fontSize: 10, color: "#9db4ae", fontFamily: "'JetBrains Mono', monospace" }}>
+                    → {newEarliest}
+                  </span>
+                )}
+                <span
                   style={{
-                    background: "#e2e8e6",
-                    borderRadius: 99,
-                    height: 3,
-                    overflow: "hidden",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    minWidth: 44,
+                    textAlign: "right",
+                    color: delta > 0 ? "#3d8c78" : noChange ? "#9db4ae" : "#c0392b",
                   }}
                 >
-                  <div
-                    style={{
-                      width: `${Math.min(100, (delta / 10) * 100)}%`,
-                      height: "100%",
-                      background: "#3d8c78",
-                      borderRadius: 99,
-                      minWidth: 4,
-                    }}
-                  />
-                </div>
-              )}
-            </button>
+                  {delta > 0 ? `−${delta}yr` : noChange ? "—" : `+${Math.abs(delta ?? 0)}yr`}
+                </span>
+              </div>
+            </div>
           );
         })}
 

@@ -119,16 +119,22 @@ export default function App() {
       annualRothConversion: 0,
     }));
 
-  // Clickable sensitivity levers: apply the input patch and remember the prior
-  // inputs for a one-step Undo (no toast system, so the banner lives in the rail).
-  const [leverUndo, setLeverUndo] = useState(null);
+  // Clickable sensitivity levers. We snapshot `inputs` before the FIRST lever is
+  // applied (the baseline) and track which levers are applied. A lever can only
+  // be applied once (so it can't silently stack, e.g. +$50k munis twice = +$100k),
+  // and "Undo all" reverts to the baseline in one step.
+  const [leverBaseline, setLeverBaseline] = useState(null);
+  const [appliedLevers, setAppliedLevers] = useState([]);
   const applyLever = (apply, label) => {
-    setLeverUndo({ prevInputs: inputs, label });
+    if (appliedLevers.includes(label)) return;
+    setLeverBaseline((b) => (b == null ? inputs : b));
+    setAppliedLevers((list) => [...list, label]);
     setInputs((prev) => ({ ...prev, ...apply }));
   };
-  const undoLever = () => {
-    if (leverUndo) setInputs(leverUndo.prevInputs);
-    setLeverUndo(null);
+  const undoLevers = () => {
+    if (leverBaseline) setInputs(leverBaseline);
+    setLeverBaseline(null);
+    setAppliedLevers([]);
   };
 
   // Un-gated: used in Early mode KPI chip and Maximize mode hero
@@ -322,8 +328,8 @@ export default function App() {
                   result={result}
                   sensitivityRows={sensitivityRows}
                   onApplyLever={applyLever}
-                  leverUndo={leverUndo}
-                  onUndoLever={undoLever}
+                  appliedLevers={appliedLevers}
+                  onUndoLevers={undoLevers}
                 />
               ) : (
                 <MaximizeRail plan={livePlan} atRetirement={atRetirement} marginalRows={marginalRows} />

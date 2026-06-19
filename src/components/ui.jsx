@@ -409,7 +409,7 @@ export const RangeSlider = ({ min, max, lo, hi, onChange, step = 1 }) => {
             bottom: 0,
             left: `${pctOf(lo)}%`,
             right: `${100 - pctOf(hi)}%`,
-            background: "#7ecfbb",
+            background: slider.active,
             borderRadius: 2,
           }}
         />

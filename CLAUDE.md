@@ -68,6 +68,44 @@ server: {
 
 `usePolling` makes Vite detect file changes on the Windows filesystem. `host: true` + `hmr.host: "localhost"` lets the Windows browser reach the WSL server via localhost.
 
+## Ask agent & Ask Pro (`api/`, `src/agent/`)
+
+The "Ask" chat is a client-side agent on Claude Haiku 4.5 (PRD
+`docs/PRD_Agentic_Chat_June2026.md`). The agent loop runs in the browser and
+executes the `analysis/*` routines as tools; `api/chat.js` is a stateless proxy
+that injects `ANTHROPIC_API_KEY`. The whole feature is behind `isAskEnabled()`
+(env/localStorage). It's the permanent right column on desktop and a sheet on
+mobile.
+
+**Ask Pro monetization (§10)** meters the agent: anonymous 3/day → signed-in-free
+5/day (Supabase magic-link) → Ask Pro unlimited ($7/mo, Stripe). All entitlement
+is **server-authoritative**:
+
+- `api/_lib/` holds the shared, framework-free logic the functions reuse:
+  `entitlement.js` (pure rules — DB-free unit tests), `gate.js` (identity +
+  allow/deny + webhook write + peek), `stripe.js`, `supabase.js`, `auth.js`,
+  `http.js`. A "prompt" = one **user turn**; the proxy derives the turn boundary
+  from the message shape (a `tool_result` continuation is not metered), never a
+  client flag.
+- Functions: `api/chat.js` (gated), `api/stripe-{checkout,webhook,portal}.js`,
+  `api/entitlement-status.js`. Tables in `supabase/migrations/` — run the SQL in
+  the Supabase SQL Editor; **RLS is enabled with no policies**, so only the
+  secret key (server) can touch `usage`/`subscriptions`.
+- Client: `src/agent/{supabaseClient,entitlement}.js` + `panels/Paywall.jsx`.
+  `supabase-js` is a lazy dynamic import (separate chunk; only loaded where
+  `VITE_SUPABASE_*` is set).
+
+**Env:** see `.env.example`. Server vars (`STRIPE_*`, `SUPABASE_URL`,
+`SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`) never reach the bundle; only
+`VITE_`-prefixed vars do.
+
+**Dev metering:** `npm run dev` uses the Vite middleware proxy for `/api/chat`
+only and has **no gate — it's unmetered**, and the Stripe/Supabase endpoints
+don't exist there. Test the full §10 funnel under **`netlify dev`** (`npm i -g
+netlify-cli`), which runs the real `api/` functions; pair with `stripe listen
+--forward-to localhost:8888/api/stripe-webhook` for webhooks. When Supabase is
+unconfigured the gate is a no-op and the chat behaves exactly as before.
+
 ## Test suite
 
 `src/__tests__/` contains regression invariants A–E that lock in the engine's correctness. These are the M0 gate; all must pass before any engine change is merged. Tests use vitest with `environment: "node"` (no DOM).

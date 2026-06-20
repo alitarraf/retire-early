@@ -1,9 +1,10 @@
 // Center column for Retire Early mode: hero verdict → KPI chips →
-// Monte Carlo card → portfolio chart. Phase breakdown and sensitivity
-// levers live in RightRail.jsx to the right.
+// Monte Carlo card → portfolio chart. The Phase breakdown is a card in
+// "Show details"; the sensitivity levers moved to the sidebar's Fine-tuning
+// group. The right column is now the permanent Ask chat.
 import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
-import { TaxTransparency, LegacyGap, ScenarioCard } from "./ResultsExtras.jsx";
+import { TaxTransparency, LegacyGap, ScenarioCard, PhaseBreakdownCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
 import { DetailsToggle, InfoDot } from "../ui.jsx";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
@@ -301,11 +302,12 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Monte Carlo, tax, scenario & legacy"
+          caption="Phases, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <PhaseBreakdownCard plan={plan} result={result} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />
           <TaxTransparency plan={plan} result={result} />

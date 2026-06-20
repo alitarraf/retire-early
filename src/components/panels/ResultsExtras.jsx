@@ -1,10 +1,14 @@
 // Shared results widgets used by both EarlyPanel and MaximizeCenter:
-//  • TaxTransparency — surfaces the new SS provisional-income / marginal-rate modeling.
-//  • LegacyGap       — projected estate vs the user's legacy target.
-//  • ScenarioCard    — downside scenario summary (synthetic stress or historical sequence).
-import { fmt } from "../../format.js";
+//  • TaxTransparency    — surfaces the SS provisional-income / marginal-rate modeling.
+//  • LegacyGap          — projected estate vs the user's legacy target.
+//  • ScenarioCard       — downside scenario summary (synthetic stress or historical sequence).
+//  • PhaseBreakdownCard — Bridge → Early Retirement → Full SS (Retire Early details).
+//  • ProjectedBalancesCard / MarginalValueCard — per-account balances + next-$1k value
+//    (Maximize details). All three moved out of the rails when the chat became
+//    the permanent right column.
+import { fmt, pct } from "../../format.js";
 import { TAX_YEAR } from "../../constants/brackets.js";
-import { cardTitleStyle } from "../../theme.js";
+import { cardTitleStyle, phase as phaseColor } from "../../theme.js";
 
 const cardStyle = {
   margin: "12px 14px 0",
@@ -92,6 +96,152 @@ export function ScenarioCard({ scenario, plan }) {
         <Stat label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} color={survives ? "#1a2e28" : "#c0392b"} />
       </div>
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6 }}>{scenario.blurb}</div>
+    </div>
+  );
+}
+
+// Phase breakdown — the three drawdown chapters (Bridge → Early Retirement →
+// Full SS). Moved here from the old right rail; shown in Retire Early "details".
+export function PhaseBreakdownCard({ plan, result }) {
+  const { snaps } = result;
+  const snap59 = snaps.find((s) => s.age === 59) || snaps[0];
+  const snapSS = snaps.find((s) => s.age === plan.ssAge) || snaps[0];
+
+  const phases = [
+    {
+      color: phaseColor.bridge,
+      title: "Bridge",
+      ages: `${plan.retireAge}→59½`,
+      desc:
+        `Roth contribs free → Munis → Brokerage (${pct(plan.brokerageLtcgRate)} LTCG). 401k locked.` +
+        (plan.annualRothConversion > 0 ? ` Converting ${fmt(plan.annualRothConversion)}/yr → Roth.` : ""),
+      balance: snap59?.total ?? null,
+    },
+    {
+      color: phaseColor.early,
+      title: "Early Retirement",
+      ages: `59½→${plan.ssAge}`,
+      desc: `Roth earnings free. 401k at retirement bracket — not ${plan.employmentBracket}%. No SS.`,
+      balance: snapSS?.total ?? null,
+    },
+    {
+      color: phaseColor.full,
+      title: "Full SS",
+      ages: `${plan.ssAge}+`,
+      desc:
+        `SS ${fmt(plan.ssBenefit)}/mo` +
+        (plan.ss2Benefit > 0 ? ` + spouse ${fmt(plan.ss2Benefit)}/mo` : "") +
+        ` offsets spend. 401k covers the gap.`,
+      balance: null,
+    },
+  ];
+
+  return (
+    <div style={cardStyle}>
+      <div style={labelStyle}>Phase breakdown</div>
+      {phases.map((ph) => (
+        <div key={ph.title} style={{ borderLeft: `3px solid ${ph.color}`, paddingLeft: 11, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ph.color }}>
+              {ph.title}{" "}
+              <span style={{ fontWeight: 400, color: "#9db4ae", fontSize: 11 }}>Age {ph.ages}</span>
+            </div>
+            {ph.balance != null && (
+              <span style={{ fontSize: 11, fontFamily: "'JetBrains Mono', monospace", color: "#1a2e28", fontWeight: 600, whiteSpace: "nowrap" }}>
+                {fmt(ph.balance)}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: "#4a5e58", lineHeight: 1.5, marginTop: 3 }}>{ph.desc}</div>
+        </div>
+      ))}
+      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.6, marginTop: 4, paddingTop: 10, borderTop: "1px solid #e2e8e6" }}>
+        Draw order: Roth contributions → Roth earnings (59½+) → Converted Roth (59½+, 5-yr lock) →
+        Munis → HSA → Brokerage → 401k (59½+) → CD. 401k uses {TAX_YEAR}{" "}
+        {plan.filingStatus.toUpperCase()} brackets on the actual draw. Planning model only.
+      </div>
+    </div>
+  );
+}
+
+// Per-account balances projected to the retirement date. Moved here from the old
+// Maximize rail; shown in Maximize "details".
+const PROJ_ROWS = [
+  { key: "rothContributions", label: "Roth contributions", color: "#3d8c78", note: "Always tax-free" },
+  { key: "rothEarnings",      label: "Roth earnings",      color: "#7ecfbb", note: "Tax-free after 59½" },
+  { key: "k401",              label: "401k",                color: "#1a2e28", note: "Taxed at retirement bracket" },
+  { key: "hsaBalance",        label: "HSA",                 color: "#5aada0", note: "Tax-free for medical" },
+  { key: "muniBonds",         label: "Munis",               color: "#a8d5c8", note: null },
+  { key: "brokerage",         label: "Brokerage",           color: "#4a8c7a", note: null },
+  { key: "cashDeposit",       label: "CD / cash",           color: "#9db4ae", note: null },
+];
+
+export function ProjectedBalancesCard({ plan, atRetirement }) {
+  if (!atRetirement) return null;
+  const total = PROJ_ROWS.reduce((sum, { key }) => sum + (atRetirement[key] ?? 0), 0);
+
+  return (
+    <div style={cardStyle}>
+      <div style={labelStyle}>Projected at retirement — age {plan.retireAge}</div>
+      {PROJ_ROWS.map(({ key, label, color, note }) => {
+        const val = atRetirement[key] ?? 0;
+        const dynamicNote =
+          key === "muniBonds" ? `${pct(plan.muniReturn)} yield`
+          : key === "brokerage" ? `LTCG ${pct(plan.brokerageLtcgRate)}`
+          : key === "cashDeposit" ? `After-tax ${pct(plan.depositAfterTaxRate)}`
+          : note;
+        return (
+          <div key={key} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid #e2e8e6" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 7, height: 7, borderRadius: 99, background: color, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
+              </div>
+              {dynamicNote && (
+                <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 1, paddingLeft: 12 }}>{dynamicNote}</div>
+              )}
+            </div>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, color: "#1a2e28", fontSize: 11 }}>
+              {fmt(val)}
+            </span>
+          </div>
+        );
+      })}
+      <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0", fontSize: 12, fontWeight: 700 }}>
+        <span>Total</span>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "#3d8c78" }}>{fmt(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+// Marginal value — extra estate at death from adding $1k/yr to each account.
+// Moved here from the old Maximize rail; shown in Maximize "details".
+export function MarginalValueCard({ plan, marginalRows }) {
+  if (!marginalRows?.length) return null;
+  const maxGain = Math.max(...marginalRows.map((m) => m.gain), 1);
+  return (
+    <div style={cardStyle}>
+      <div style={labelStyle}>Where should your next $1,000/yr go?</div>
+      <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
+        Extra estate value at death from adding $1k/yr to each account — after taxes, growth, and drawdown.
+      </div>
+      {marginalRows.map(({ label, gain }) => (
+        <div key={label} style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#3d8c78" }}>
+              +{fmt(Math.round(gain))}
+            </span>
+          </div>
+          <div style={{ background: "#e2e8e6", borderRadius: 99, height: 4, overflow: "hidden" }}>
+            <div style={{ width: `${(gain / maxGain) * 100}%`, height: "100%", background: "#3d8c78", borderRadius: 99, minWidth: gain > 0 ? 4 : 0 }} />
+          </div>
+        </div>
+      ))}
+      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
+        Gain = additional estate at age {plan.lifeExpect}. Full simulation per account.
+      </div>
     </div>
   );
 }

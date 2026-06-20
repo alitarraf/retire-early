@@ -13,9 +13,7 @@ import { HISTORICAL_SCENARIOS } from "./constants/historicalReturns.js";
 import { InputsSidebar } from "./components/panels/InputsSidebar.jsx";
 import { RetireAtControl } from "./components/panels/RetireAtControl.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
-import { RightRail } from "./components/panels/RightRail.jsx";
 import { MaximizeCenter } from "./components/panels/MaximizeCenter.jsx";
-import { MaximizeRail } from "./components/panels/MaximizeRail.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { QuickStart } from "./components/panels/QuickStart.jsx";
@@ -225,10 +223,24 @@ export default function App() {
     [onCommitAge],
   );
 
+  // The chat is a permanent right column on desktop (variant "rail") and a
+  // mobile sheet. isAskEnabled() is the deploy-level kill switch (PRD §9): when
+  // off, the grid drops back to two columns and the relocated detail cards /
+  // sidebar levers carry the content on their own.
+  const askOn = isAskEnabled();
   const askDrawer = (variant) =>
-    isAskEnabled() ? (
+    askOn ? (
       <ChatDrawer variant={variant} inputs={inputs} plan={plan} results={askResults} actions={askActions} />
     ) : null;
+
+  // Sensitivity levers now live in the sidebar's Fine-tuning group (moved out of
+  // the old right rail, which the chat replaced).
+  const leverProps = {
+    sensitivityRows,
+    appliedLevers,
+    onApplyLever: applyLever,
+    onUndoLevers: undoLevers,
+  };
 
   // ── Mobile (≤767px): a dedicated single-column shell fed the same props.
   // All hooks above run unconditionally, so this early return is hook-safe.
@@ -351,12 +363,15 @@ export default function App() {
         </div>
       </div>
 
-      {/* ── Workspace: sidebar │ (Retire-at band + center) │ rail ── */}
+      {/* ── Workspace: sidebar │ center │ permanent chat rail ──────
+          Col 3 is the always-on chat (all tabs, one mount so the transcript
+          survives tab switches). When the Ask flag is off it collapses to two
+          columns and the relocated cards/levers stand on their own. */}
       <div
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "440px 1fr 320px",
+          gridTemplateColumns: askOn ? "400px 1fr 340px" : "400px 1fr",
           gap: "1px",
           background: "#e2e8e6",
           overflow: "hidden",
@@ -377,16 +392,16 @@ export default function App() {
           {/* flex:1 + minHeight:0 gives InputsSidebar's height:100% a definite
               height so its pinned bottom caption isn't pushed off-screen. */}
           <div style={{ flex: 1, minHeight: 0 }}>
-            <InputsSidebar inputs={inputs} set={set} plan={livePlan} />
+            <InputsSidebar inputs={inputs} set={set} plan={livePlan} levers={leverProps} />
           </div>
         </div>
 
         {mode === "docs" ? (
-          <div style={{ gridColumn: "2 / 4", background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
+          <div style={{ gridColumn: 2, background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
             <DocsPanel />
           </div>
         ) : mode === "advice" ? (
-          <div style={{ gridColumn: "2 / 4", background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
+          <div style={{ gridColumn: 2, background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
             <AdvicePanel
               inputs={inputs}
               plan={plan}
@@ -398,70 +413,61 @@ export default function App() {
             />
           </div>
         ) : (
-          <>
-            {/* Center column: the results panel (the Retire-at control now lives
-                pinned at the top of the left sidebar). */}
-            <div style={{ gridColumn: 2, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
-              <div style={{ flex: 1, minHeight: 0 }}>
-                {!result ? (
-                  <div style={{ height: "100%", background: "#f0f5f4", display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 36px" }}>
-                    <div style={{ maxWidth: 360, textAlign: "center", background: "#fff", borderRadius: 14, padding: "24px 28px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#c97c1a", marginBottom: 8 }}>
-                        Check the retirement age
-                      </div>
-                      <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
-                        Your retire age ({livePlan.retireAge}) must be at least your current age ({inputs.currentAge}).
-                        Nudge the slider in the sidebar, or lower Your age there.
-                      </div>
+          /* Center column: the results panel (the Retire-at control now lives
+             pinned at the top of the left sidebar). */
+          <div style={{ gridColumn: 2, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {!result ? (
+                <div style={{ height: "100%", background: "#f0f5f4", display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 36px" }}>
+                  <div style={{ maxWidth: 360, textAlign: "center", background: "#fff", borderRadius: 14, padding: "24px 28px", boxShadow: "0 1px 6px rgba(0,0,0,0.07)" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#c97c1a", marginBottom: 8 }}>
+                      Check the retirement age
+                    </div>
+                    <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
+                      Your retire age ({livePlan.retireAge}) must be at least your current age ({inputs.currentAge}).
+                      Nudge the slider in the sidebar, or lower Your age there.
                     </div>
                   </div>
-                ) : mode === "early" ? (
-                  <EarlyPanel
-                    plan={livePlan}
-                    result={result}
-                    earliest={earliest}
-                    mcResult={mcResult}
-                    scenario={scenario}
-                    totalAtRetirement={totalAtRetirement}
-                    sustainable={sustainable}
-                    retireBy={retireBy}
-                  />
-                ) : (
-                  <MaximizeCenter
-                    plan={livePlan}
-                    result={result}
-                    totalAtRetirement={totalAtRetirement}
-                    sustainable={sustainable}
-                    dynamicOpt={dynamicOpt}
-                    onApplyOptimized={applyOptimized}
-                    scenario={scenario}
-                    mcResult={mcResult}
-                    onRunMc={() => setMaxMcOn(true)}
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* Right rail (col 3) */}
-            {result &&
-              (mode === "early" ? (
-                <RightRail
+                </div>
+              ) : mode === "early" ? (
+                <EarlyPanel
                   plan={livePlan}
                   result={result}
-                  sensitivityRows={sensitivityRows}
-                  onApplyLever={applyLever}
-                  appliedLevers={appliedLevers}
-                  onUndoLevers={undoLevers}
+                  earliest={earliest}
+                  mcResult={mcResult}
+                  scenario={scenario}
+                  totalAtRetirement={totalAtRetirement}
+                  sustainable={sustainable}
+                  retireBy={retireBy}
                 />
               ) : (
-                <MaximizeRail plan={livePlan} atRetirement={atRetirement} marginalRows={marginalRows} />
-              ))}
-          </>
+                <MaximizeCenter
+                  plan={livePlan}
+                  result={result}
+                  totalAtRetirement={totalAtRetirement}
+                  sustainable={sustainable}
+                  dynamicOpt={dynamicOpt}
+                  onApplyOptimized={applyOptimized}
+                  scenario={scenario}
+                  mcResult={mcResult}
+                  onRunMc={() => setMaxMcOn(true)}
+                  atRetirement={atRetirement}
+                  marginalRows={marginalRows}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Col 3: permanent chat rail (all tabs). */}
+        {askOn && (
+          <div style={{ gridColumn: 3, minHeight: 0, overflow: "hidden" }}>
+            {askDrawer("rail")}
+          </div>
         )}
       </div>
 
       {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
-      {askDrawer("dock")}
     </div>
   );
 }

@@ -113,28 +113,33 @@ function AuditTrail({ changeLog, onRevert, onUndoAll, appliedCount }) {
 }
 
 export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" }) {
-  const [open, setOpen] = useState(false);
+  // "rail" is the permanent right-column dock — always open, no launcher/close.
+  const isRail = variant === "rail";
+  const [open, setOpen] = useState(isRail);
   const ask = useAsk({ inputs, plan, results, actions });
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const [draft, setDraft] = useState("");
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
+    // Focus the input when the dock/sheet opens — but NOT for the permanent rail,
+    // which would steal focus from the page on every load. ("New chat" still
+    // focuses explicitly via startFresh.)
+    if (open && !isRail) inputRef.current?.focus();
+  }, [open, isRail]);
 
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [ask.display, ask.streaming, ask.pending, open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || isRail) return; // the permanent rail can't be closed
     const onKey = (e) => {
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [open, isRail]);
 
   const submit = () => {
     const t = draft.trim();
@@ -151,8 +156,8 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
 
   const prompts = suggestedPrompts(results, inputs);
 
-  // ── collapsed launcher ──────────────────────────────────────
-  if (!open) {
+  // ── collapsed launcher (never for the permanent rail) ───────
+  if (!open && !isRail) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -169,12 +174,14 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
   }
 
   const panelStyle =
-    variant === "sheet"
+    isRail
+      ? { height: "100%", width: "100%", minHeight: 0, background: "#fff", borderLeft: `1px solid ${neutral.border}`, display: "flex", flexDirection: "column" }
+      : variant === "sheet"
       ? { position: "fixed", inset: 0, zIndex: 50, background: "#fff", display: "flex", flexDirection: "column" }
       : { position: "fixed", right: 0, top: 0, bottom: 0, width: 400, maxWidth: "100vw", zIndex: 50, background: "#fff", boxShadow: "-4px 0 24px rgba(0,0,0,0.18)", display: "flex", flexDirection: "column" };
 
   return (
-    <div role="dialog" aria-label="Ask assistant" aria-modal={variant === "sheet"} style={panelStyle}>
+    <div role={isRail ? "complementary" : "dialog"} aria-label="Ask assistant" aria-modal={variant === "sheet"} style={panelStyle}>
       {/* Header */}
       <div style={{ background: neutral.ink, color: "#fff", padding: "10px 14px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -190,9 +197,11 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
                 New chat
               </button>
             )}
-            <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "#9db4ae", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
-              ×
-            </button>
+            {!isRail && (
+              <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: "none", border: "none", color: "#9db4ae", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
+                ×
+              </button>
+            )}
           </div>
         </div>
         <div style={{ fontSize: 10, color: "#7ecfbb", marginTop: 2 }}>Educational — not financial advice</div>

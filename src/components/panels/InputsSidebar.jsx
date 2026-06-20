@@ -172,7 +172,7 @@ function FineTuningHeader({ isOpen, onToggle }) {
         Fine-tuning <span style={{ color: "#9db4ae" }}>(optional)</span>
       </span>
       <span style={{ flex: 1, fontSize: 11, color: "#9db4ae", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {isOpen ? "" : "Taxes · Strategy · Healthcare · Estate · Advanced · Scenario"}
+        {isOpen ? "" : "Taxes · Strategy · Healthcare · Estate · Levers · Advanced · Scenario"}
       </span>
       <span style={{ fontSize: 13, color: "#5aada0", flexShrink: 0, lineHeight: 1 }}>{isOpen ? "−" : "+"}</span>
     </button>
@@ -674,6 +674,85 @@ function AdvancedFields({ inputs, set, plan }) {
   );
 }
 
+// Sensitivity levers — "what moves your earliest retirement age?" Each row
+// applies one change to the inputs, all else equal. Lives here (moved out of the
+// old right rail) so tuning happens next to the inputs it edits. The lever data
+// is Retire-Early-specific; in other tabs it shows a contextual note.
+function LeversFields({ sensitivityRows = [], appliedLevers = [], onApplyLever, onUndoLevers }) {
+  if (!sensitivityRows.length) {
+    return (
+      <div style={{ fontSize: 11, color: "#7C9A92", lineHeight: 1.55 }}>
+        Switch to the <strong style={{ color: "#1a2e28" }}>Retire Early</strong> tab to see what moves
+        your earliest retirement age — each lever applies one change to your inputs, all else equal.
+      </div>
+    );
+  }
+  return (
+    <>
+      <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
+        Apply one to write it into your inputs and re-run. Each changes one thing, all else equal.
+      </div>
+
+      {appliedLevers.length > 0 && (
+        <div style={{ background: "#f0f5f4", borderRadius: 8, padding: "8px 10px", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: "#4a5e58" }}>Applied ({appliedLevers.length})</span>
+            <button
+              type="button"
+              onClick={onUndoLevers}
+              style={{ border: "none", background: "transparent", color: "#3d8c78", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}
+            >
+              Undo all
+            </button>
+          </div>
+          <div style={{ fontSize: 11, color: "#4a5e58", lineHeight: 1.5 }}>{appliedLevers.join(" · ")}</div>
+        </div>
+      )}
+
+      {sensitivityRows.map(({ label, newEarliest, delta, apply }) => {
+        const noChange = delta === null || delta === 0;
+        const applied = appliedLevers.includes(label);
+        return (
+          <div key={label} style={{ borderBottom: "1px solid #e2e8e6", padding: "0 0 10px", marginBottom: 10, opacity: applied ? 0.6 : 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: "#4a5e58", flex: 1, minWidth: 0 }}>{label}</span>
+              {applied ? (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>✓ Applied</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onApplyLever?.(apply, label)}
+                  title={`Apply "${label}" to your inputs`}
+                  style={{ flexShrink: 0, border: "1px solid #3d8c78", background: "transparent", color: "#3d8c78", fontSize: 10, fontWeight: 700, borderRadius: 6, padding: "3px 9px", cursor: "pointer" }}
+                >
+                  Apply
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, background: "#e2e8e6", borderRadius: 99, height: 3, overflow: "hidden" }}>
+                {delta > 0 && (
+                  <div style={{ width: `${Math.min(100, (delta / 10) * 100)}%`, height: "100%", background: "#3d8c78", borderRadius: 99, minWidth: 4 }} />
+                )}
+              </div>
+              {newEarliest != null && (
+                <span style={{ fontSize: 10, color: "#9db4ae", fontFamily: "'JetBrains Mono', monospace" }}>→ {newEarliest}</span>
+              )}
+              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", minWidth: 44, textAlign: "right", color: delta > 0 ? "#3d8c78" : noChange ? "#9db4ae" : "#c0392b" }}>
+                {delta > 0 ? `−${delta}yr` : noChange ? "—" : `+${Math.abs(delta ?? 0)}yr`}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
+        Bar = years gained (max 10). Full simulation per row — taxes, SS, inflation, draw order.
+      </div>
+    </>
+  );
+}
+
 function ScenarioFields({ inputs, set }) {
   return (
     <>
@@ -743,12 +822,13 @@ const CAPTIONS = {
   strategy: "Roth conversions during the bridge fill low brackets cheaply. Rule of 55 unlocks your 401k penalty-free if you left that employer at 55+. Guardrails auto-adjust spending based on withdrawal rate.",
   healthcare: "Enter ACA only if your monthly expenses above do not already include health insurance — otherwise you'll double-count it. At 65 Medicare replaces ACA. IRMAA applies at higher incomes.",
   estate: "Step-up in basis erases unrealized brokerage gains for your heirs — leave it on unless you plan to liquidate before death. The legacy target is the estate you want to leave; results show the gap.",
+  levers: "Each lever applies one change to your inputs — more savings, lower spending, a later SS claim — and reports how many years it shaves off your earliest retirement age, all else equal. Apply writes it in; Undo all reverts.",
   advanced: "Birth year sets your exact RMD start age (73 vs 75) and Full Retirement Age. One-time expenses are lump costs in today's dollars. Phase multipliers model the go-go / slow-go / no-go spending curve.",
   scenario: "Stress Test replays a sharp early-retirement crash (sequence-of-returns risk) as an illustrative downside, separate from the headline verdict. Monte Carlo (Retire Early tab) averages 500 random paths.",
 };
 
 const ESSENTIAL_KEYS = ["you", "money", "spending", "assumptions"];
-const FINE_TUNING_KEYS = ["tax", "strategy", "healthcare", "estate", "advanced", "scenario"];
+const FINE_TUNING_KEYS = ["tax", "strategy", "healthcare", "estate", "levers", "advanced", "scenario"];
 const FILING_SHORT = { single: "Single", mfj: "MFJ", hoh: "HOH" };
 
 // Section registry — { title, Body, caption }. The desktop accordion and the
@@ -762,6 +842,7 @@ const INPUT_SECTIONS = {
   strategy: { title: "Strategy", Body: StrategyFields },
   healthcare: { title: "Healthcare", Body: HealthcareFields },
   estate: { title: "Estate", Body: EstateFields },
+  levers: { title: "Levers", Body: LeversFields },
   advanced: { title: "Advanced", Body: AdvancedFields },
   scenario: { title: "Scenario", Body: ScenarioFields },
 };
@@ -798,6 +879,8 @@ export function sectionSummary(key, inputs, plan) {
       return `ACA ${fmtK(inputs.monthlyAcaFullPremium)}/mo · IRMAA ${fmtK(inputs.monthlyIrmaaSurcharge)}/mo`;
     case "estate":
       return `Step-up ${inputs.assumeStepUpBasis ? "on" : "off"} · target ${inputs.legacyTarget > 0 ? fmtK(inputs.legacyTarget) : "none"}`;
+    case "levers":
+      return "what moves your date";
     case "advanced":
       return `b.${plan.birthYear} · ${inputs.oneTimeExpenses?.length ?? 0} lump · phase ${inputs.goGoMult}/${inputs.slowGoMult}/${inputs.noGoMult}`;
     case "scenario":
@@ -813,7 +896,7 @@ export function sectionSummary(key, inputs, plan) {
 
 // ─── Main export (desktop accordion) ─────────────────────────
 
-export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false, defaultOpenSection = "you" }) {
+export function InputsSidebar({ inputs, set, plan, levers = {}, defaultFineTuningOpen = false, defaultOpenSection = "you" }) {
   const [open, setOpen] = useState(defaultOpenSection);
   const [ftOpen, setFtOpen] = useState(defaultFineTuningOpen);
   // Owned here (not inside TaxesFields) so the 401k-withdrawal preview persists
@@ -824,13 +907,18 @@ export function InputsSidebar({ inputs, set, plan, defaultFineTuningOpen = false
   const captionVisible = open && (ftOpen || ESSENTIAL_KEYS.includes(open));
   const caption = captionVisible ? CAPTIONS[open] : "Select a section to edit inputs. Closed sections show current values at a glance.";
 
+  const appliedCount = levers.appliedLevers?.length ?? 0;
+
   const renderSection = (key) => {
     const { title, Body } = INPUT_SECTIONS[key];
-    const extra = key === "tax" ? { previewWithdrawal, setPreviewWithdrawal } : {};
+    const extra =
+      key === "tax" ? { previewWithdrawal, setPreviewWithdrawal } : key === "levers" ? levers : {};
+    const summary =
+      key === "levers" && appliedCount > 0 ? `${appliedCount} applied` : sectionSummary(key, inputs, plan);
     return (
       <AccSection
         title={title}
-        summary={sectionSummary(key, inputs, plan)}
+        summary={summary}
         isOpen={open === key}
         onToggle={() => toggle(key)}
       >

@@ -3,7 +3,7 @@
 // Roth conversion card → portfolio chart.
 import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
-import { TaxTransparency, LegacyGap, ScenarioCard } from "./ResultsExtras.jsx";
+import { TaxTransparency, LegacyGap, ScenarioCard, ProjectedBalancesCard, MarginalValueCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
@@ -50,7 +50,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, embedded = false }) {
+export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -278,11 +278,13 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Monte Carlo, tax, scenario & legacy"
+          caption="Balances, next $1k, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <ProjectedBalancesCard plan={plan} atRetirement={atRetirement} />
+          <MarginalValueCard plan={plan} marginalRows={marginalRows} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />
           <TaxTransparency plan={plan} result={result} />

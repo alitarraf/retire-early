@@ -17,6 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { getServiceClient, isSupabaseConfigured } from "./supabase.js";
 import { decide, isActiveSubscription, isNewUserTurn } from "./entitlement.js";
+import { getUserFromRequest } from "./auth.js";
 
 export const DEVICE_COOKIE = "ask_did";
 
@@ -32,19 +33,6 @@ function parseCookies(header) {
 function deviceCookie(id) {
   const yearish = 60 * 60 * 24 * 400;
   return `${DEVICE_COOKIE}=${id}; Path=/; Max-Age=${yearish}; HttpOnly; SameSite=Lax; Secure`;
-}
-
-async function getUser(sb, req) {
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (!token) return null;
-  try {
-    const { data, error } = await sb.auth.getUser(token);
-    if (error || !data?.user) return null;
-    return data.user;
-  } catch {
-    return null;
-  }
 }
 
 async function meterKey(sb, key, tier) {
@@ -83,7 +71,7 @@ export async function checkEntitlement(req, messages, sb = isSupabaseConfigured(
   // Only meter NEW user turns; tool-result continuations pass through (§10.1).
   if (!isNewUserTurn(messages)) return { allow: true };
 
-  const user = await getUser(sb, req);
+  const user = await getUserFromRequest(sb, req);
 
   if (user) {
     const { data: sub } = await sb.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle();
@@ -102,4 +90,46 @@ export async function checkEntitlement(req, messages, sb = isSupabaseConfigured(
   const res = await meterKey(sb, did, "anon");
   if (setCookie) res.setCookie = setCookie;
   return res;
+}
+
+/**
+ * Apply a Stripe webhook update (from mapEventToUpdate) to the subscriptions
+ * table. Idempotent + order-robust: subscription.* events carry the full status
+ * and are upserted by user_id (carried in subscription metadata); checkout
+ * completion writes the user↔customer mapping. The webhook is the single source
+ * of truth for entitlement (§10.4).
+ */
+export async function applyEntitlementUpdate(sb, upd) {
+  if (!sb || !upd) return;
+  const now = new Date().toISOString();
+
+  if (upd.kind === "checkout") {
+    if (!upd.userId) return;
+    await sb.from("subscriptions").upsert(
+      {
+        user_id: upd.userId,
+        stripe_customer_id: upd.customerId ?? undefined,
+        email: upd.email ?? undefined,
+        status: "active", // optimistic; subscription.* refines status + period
+        updated_at: now,
+      },
+      { onConflict: "user_id" },
+    );
+    return;
+  }
+
+  if (upd.kind === "subscription") {
+    const patch = {
+      stripe_customer_id: upd.customerId ?? undefined,
+      status: upd.status,
+      current_period_end: upd.current_period_end,
+      updated_at: now,
+    };
+    if (upd.userId) {
+      await sb.from("subscriptions").upsert({ user_id: upd.userId, ...patch }, { onConflict: "user_id" });
+    } else if (upd.customerId) {
+      // No metadata user_id — best-effort update of an existing mapping.
+      await sb.from("subscriptions").update(patch).eq("stripe_customer_id", upd.customerId);
+    }
+  }
 }

@@ -34,3 +34,11 @@ create index if not exists subscriptions_stripe_customer_id_idx
 -- access. This is what keeps entitlement server-authoritative (§10.3).
 alter table public.subscriptions enable row level security;
 alter table public.usage         enable row level security;
+
+-- Grant the server role (the sb_secret_ key → service_role, which has BYPASSRLS)
+-- explicit table privileges. Supabase usually auto-grants these, but a table
+-- created in the SQL editor can miss them, surfacing as "permission denied for
+-- table" (42501) — distinct from an RLS filter, which returns 0 rows. anon /
+-- authenticated get nothing, so the publishable (client) key stays locked out.
+grant all privileges on table public.subscriptions to service_role;
+grant all privileges on table public.usage         to service_role;

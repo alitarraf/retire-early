@@ -145,7 +145,6 @@ export default function App() {
   }, [plan.scenarioMode, plan.stressDropPct, plan.stressYears, plan.historicalScenario, plan.historicalLens, stressResult, historicalResult]);
 
   // Maximize-mode analysis
-  const atRetirement = useMemo(() => projectAtRetirement(plan), [plan]);
   const marginalRows = useMemo(() => (mode === "maximize" ? marginalValues(plan) : []), [plan, mode]);
   const dynamicOpt = useMemo(() => (mode === "maximize" ? dynamicOptimizer(plan) : null), [plan, mode]);
 
@@ -179,9 +178,10 @@ export default function App() {
   // Un-gated: used in Early mode KPI chip and Maximize mode hero
   const sustainable = useMemo(() => sustainableSpend(plan), [plan]);
 
-  // Live projection for the headline "portfolio at retirement" so it tracks the
-  // slider drag (cheap — no simulation); the committed `atRetirement` still feeds
-  // the Maximize rail / marginal-value analysis.
+  // Live projection for the headline "portfolio at retirement" AND the Maximize
+  // per-account balances card, so both track the slider drag in lockstep (cheap —
+  // no simulation). The expensive marginal-value analysis stays on the committed
+  // `plan` and is frozen during a drag.
   const liveAtRetirement = useMemo(() => projectAtRetirement(livePlan), [livePlan]);
   const totalAtRetirement =
     liveAtRetirement.rothContributions +
@@ -267,7 +267,7 @@ export default function App() {
           applyLever={applyLever}
           appliedLevers={appliedLevers}
           undoLevers={undoLevers}
-          atRetirement={atRetirement}
+          atRetirement={liveAtRetirement}
           marginalRows={marginalRows}
           dynamicOpt={dynamicOpt}
           applyOptimized={applyOptimized}
@@ -451,7 +451,7 @@ export default function App() {
                   scenario={scenario}
                   mcResult={mcResult}
                   onRunMc={() => setMaxMcOn(true)}
-                  atRetirement={atRetirement}
+                  atRetirement={liveAtRetirement}
                   marginalRows={marginalRows}
                 />
               )}

@@ -14,10 +14,16 @@
 //  streaming by returning the upstream body. Exposed at /api/chat via
 //  the redirect in netlify.toml.
 //
-//  NOTE: §10 monetization (entitlement gate, Stripe, accounts) is NOT
-//  wired here yet — this proxy currently enforces only the §9 abuse
-//  controls. The entitlement check slots in before the upstream fetch.
+//  §10 entitlement: checkEntitlement meters NEW user turns (anon 3/day →
+//  signed-in-free 5/day → Pro unlimited), issues the anon device cookie,
+//  and returns 401/402 at the walls. It's a no-op when Supabase isn't
+//  configured, and fails OPEN on a gate error (availability over DRM —
+//  this is a soft conversion nudge, not airtight metering). The dev proxy
+//  in vite.config.js has no gate, so `npm run dev` is unmetered; the gate
+//  runs under `netlify dev` and in production.
 // ─────────────────────────────────────────────────────────────
+
+import { checkEntitlement } from "./_lib/gate.js";
 
 const MAX_TOKENS_CAP = 1024; // server-enforced per turn (§9)
 const RATE_LIMIT = { windowMs: 60_000, max: 30 }; // per IP, best-effort
@@ -40,7 +46,8 @@ function corsHeaders(origin) {
   if (origin) {
     h["access-control-allow-origin"] = origin;
     h["access-control-allow-methods"] = "POST, OPTIONS";
-    h["access-control-allow-headers"] = "content-type";
+    h["access-control-allow-headers"] = "content-type, authorization";
+    h["access-control-allow-credentials"] = "true";
     h.vary = "Origin";
   }
   return h;
@@ -93,6 +100,21 @@ export default async function handler(req) {
   }
   const cappedMaxTokens = Math.min(Number(max_tokens) || MAX_TOKENS_CAP, MAX_TOKENS_CAP);
 
+  // §10 entitlement gate. Meters only NEW user turns; no-op without Supabase;
+  // fails OPEN so a DB blip never blocks chat (soft nudge, not DRM).
+  let gate = { allow: true };
+  try {
+    gate = await checkEntitlement(req, messages);
+  } catch (e) {
+    console.error(JSON.stringify({ evt: "ask_gate_error", detail: String(e?.message || e) }));
+    gate = { allow: true };
+  }
+  if (!gate.allow) {
+    const headers = { "content-type": "application/json", ...corsHeaders(origin) };
+    if (gate.setCookie) headers["set-cookie"] = gate.setCookie;
+    return new Response(JSON.stringify(gate.body), { status: gate.status, headers });
+  }
+
   // Logging WITHOUT message content (§9).
   console.log(
     JSON.stringify({ evt: "ask_chat", model: model || HAIKU, messages: messages.length, ts: Date.now() }),
@@ -130,13 +152,22 @@ export default async function handler(req) {
     return json(upstream.status || 502, { error: "upstream_error", detail }, origin);
   }
 
-  return new Response(upstream.body, {
-    status: 200,
-    headers: {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-      ...corsHeaders(origin),
-    },
-  });
+  // Turn started successfully → burn one prompt (only now, so a credits/network
+  // failure above doesn't consume quota, §10.1). Best-effort; never block the stream.
+  if (gate.commit) {
+    try {
+      await gate.commit();
+    } catch (e) {
+      console.error(JSON.stringify({ evt: "ask_commit_error", detail: String(e?.message || e) }));
+    }
+  }
+
+  const headers = {
+    "content-type": "text/event-stream",
+    "cache-control": "no-cache",
+    connection: "keep-alive",
+    ...corsHeaders(origin),
+  };
+  if (gate.setCookie) headers["set-cookie"] = gate.setCookie;
+  return new Response(upstream.body, { status: 200, headers });
 }

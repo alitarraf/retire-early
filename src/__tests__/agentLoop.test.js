@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { makePlan, DEFAULTS } from "../analysis/plan.js";
 import { runAgentTurn } from "../agent/agentLoop.js";
+import { ChatError } from "../agent/chatClient.js";
 import { _resetChangeIds } from "../agent/changeLog.js";
 
 const plan = makePlan(DEFAULTS);
@@ -124,5 +125,16 @@ describe("agentLoop — manual tool-use loop", () => {
     expect(applied).toEqual([]);
     expect(staged).toHaveLength(1);
     expect(out.changeLog[0].status).toBe("awaiting_confirmation");
+  });
+
+  // Locks the entitlement seam (§10): an HTTP error from the transport must
+  // propagate with .status intact so useAsk routes 401/402 to the paywall
+  // instead of the generic "something went wrong" branch.
+  it("propagates a status-bearing transport error (so the paywall can fire)", async () => {
+    const plan = makePlan(DEFAULTS);
+    const transport = () => {
+      throw new ChatError("Assistant request failed (402).", { retryable: false, status: 402 });
+    };
+    await expect(runAgentTurn({ userText: "blocked turn", plan, transport })).rejects.toMatchObject({ status: 402 });
   });
 });

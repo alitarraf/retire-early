@@ -23,7 +23,7 @@ components/ + App.jsx    React UI
 **Key facts that save time**
 - **Live sidebar is `InputsSidebar.jsx`** (accordion). `MaximizePanel.jsx` is **DEAD CODE** — not imported by App. Don't edit it. (`InputsPanel.jsx` + the `Row` primitive were deleted 2026-06-18.)
 - **Design tokens live in `src/theme.js`** (`neutral`/`status`/`phase`/`slider` + `eyebrowStyle`/`cardTitleStyle`); `src/index.css` themes the native range slider. Status hues (green/amber/red) are reserved for **verdicts**; phases use a separate cool **slate** ramp. Use tokens, don't reintroduce raw grays.
-- `App.jsx` holds all state via `useState(DEFAULTS)`, derives `plan = makePlan(inputs)`, passes results down. **Four tabs:** Retire Early (`EarlyPanel`+`RightRail`), Maximize (`MaximizeCenter`+`MaximizeRail`), **Get advice** (`AdvicePanel`), How it works (`DocsPanel`).
+- `App.jsx` holds all state via `useState(DEFAULTS)`, derives `plan = makePlan(inputs)`, passes results down. **Four tabs:** Retire Early (`EarlyPanel`), Maximize (`MaximizeCenter`), **Get advice** (`AdvicePanel`), How it works (`DocsPanel`). **Col 3 is the permanent Ask chat on all tabs** (`ChatDrawer variant="rail"`, behind `isAskEnabled()`). The old `RightRail`/`MaximizeRail` are **deleted** (2026-06-19): Phase breakdown / Projected balances / next-$1k are now "Show details" cards in `ResultsExtras.jsx`; the "Try a lever" panel is the **Levers** section in the sidebar Fine-tuning group.
 - **"Retire at" is a full-width command band** (`RetireAtControl.jsx`) at the top of the center results column, not a sidebar field. **No-lag scrubbing:** a slider drag updates `dragAge` ONLY (never `setInputs`), so `inputs`/`plan` stay referentially stable and every expensive memo is frozen for free; a cheap `livePlan`/`liveResult` (1 sim) tracks the drag; commit on release/discrete action triggers the full recompute. Don't "fix" this with `useTransition`.
 - **Per-field help is single-sourced** in `constants/fieldHelp.js` (`FIELD_HELP` + `FIELD_HELP_GROUPS`) — feeds both the sidebar `InfoDot` tooltips and the DocsPanel inputs reference. Add a field's help once, there.
 - **`survivesAt` (plan.js) is bridge-aware**: `depleted === null && bridgeShortfall === 0`. So `earliestRetireAge`/`sensitivity`/`retireByAge` all refuse ages where money is stranded in a locked 401k. Invariant D holds by construction (the verdict *is* `survivesAt`).
@@ -32,7 +32,203 @@ components/ + App.jsx    React UI
 - **Tests are the gate.** Invariants A–E in `simulate.test.js` + others. When adding engine params, use **identity defaults** (off = byte-identical output) and re-run the full suite after every engine edit.
 - Tax year is 2026, MFJ default. Annual update = single-file edit in `constants/brackets.js`.
 
-**Test suite: 194 passing, 15 files** (was 94 at start of 2026-06-17, 156 at end of that day).
+**Test suite: 319 passing, 32 files** (194 before the Ask chat; +51 for Ask Pro §10; +8 for plan sync). Ask agent + Ask Pro architecture is in `CLAUDE.md` (api/_lib shared logic, RLS-enabled tables, lazy supabase chunk, metered-dev note). Test §10 + plan sync on **`netlify dev` :8888**, not Vite :5173.
+
+---
+
+## Session: 2026-06-19 (cont. 2) — Reti persona + sign-in visibility + account-scoped plan sync
+
+Branch `historical-sequence`. Gave the Ask agent a consistent persona, made sign-in
+**visible and reachable**, and tied the user's plan to their account so it follows them
+across devices (on a localStorage baseline). Test count **311 → 319**, build clean.
+Advisor-reviewed — caught a real autosave race before it shipped. **Not yet
+runtime-verified** end-to-end (needs Supabase + `netlify dev`).
+
+### 1. "Reti" agent persona
+- Rewrote `src/agent/systemPrompt.js` around the `docs/reti.md` persona: curious,
+  friendly, lightly witty; educational-not-advisor framing ("the model projects…");
+  numbers-from-tools-only hardened; transparency + confirm-before-larger-changes; a
+  closing follow-up. Tool mechanics (3-change limit, `awaiting_confirmation`) preserved.
+- UI (`ChatDrawer.jsx`): chat header **Ask → "Ask RETI"** with tagline "Your curious
+  retirement assistant."; the "Educational — not financial advice" line moved from the
+  header to a persistent footer at the bottom of the chat window.
+
+### 2. Sign-in is visible + reachable (top-right nav)
+- **Removed** the header "sanity strip" (age / portfolio / $/mo) in `App.jsx`; replaced
+  with `panels/NavAuth.jsx`: signed-in **email + Sign out**, or a proactive **Sign in**
+  popover — no longer trapped behind the 3-prompt paywall.
+- Extracted reusable **`SignInForm`** from `Paywall.jsx` (the 401 branch reuses it).
+- **Lifted `useEntitlement` to `App.jsx`** (was inside `ChatDrawer`), passed `ent` down —
+  one Supabase session/listener now shared by the nav and plan sync.
+
+### 3. Plan persistence + account sync
+- **localStorage baseline:** `App.jsx` persists `inputs` on every change
+  (`retire-early.inputs`), so a reload — incl. the magic-link redirect — keeps data.
+- **Account sync (signed in):** new `plans` table (`supabase/migrations/0002_plan_sync.sql`,
+  same RLS-on/no-policies/secret-key doctrine) + `api/plan-{get,save}.js`. New
+  `src/agent/planSync.js` (`usePlanSync`) loads on sign-in, debounced-autosaves on change.
+  `plansDiffer`/`reconcile` are pure + unit-tested (`__tests__/planSync.test.js`, 8 tests).
+  Conflicts raise `panels/PlanSyncBanner.jsx` (Load saved / Keep this one) — never a silent
+  overwrite. `api/_lib/http.js` CORS now allows GET.
+- **Race fixed (advisor):** autosave was gated on the synchronous `loadedRef`, so a slow
+  cold-start GET could fire the 1.5s debounce mid-load and overwrite a fresh device's saved
+  plan with DEFAULTS. Now gated on a `synced` flag set only *after* reconcile resolves; the
+  GET-failure path leaves it false so autosave never runs over an unread remote.
+
+### Open / next
+- **Runtime-verify** under `netlify dev` + Supabase: run the `0002` SQL, magic-link
+  round-trip, two-device load, conflict banner.
+- Mobile nav has no auth indicator (desktop-only, by request) — add if wanted.
+
+---
+
+## Session: 2026-06-19 (cont.) — Ask chat permanent + Ask Pro (§10) monetization
+
+Big session on `historical-sequence`. Committed the agentic chat, made it a
+permanent column, relocated the rails, and built + **verified live** the entire
+§10 paywall funnel. Test count **256 → 311**, green + build clean throughout.
+Every non-trivial step advisor-reviewed; committed in stages. Commits: `ecb5fa6`,
+`d4e6797`, `74f13b5`, `e2618d6`, `ef42d49`, `5940fa0`, `2568cf4`, `7177502`,
+`690611e`, `4cc44bd`.
+
+### 1. Ask chat committed + "Start fresh" (`ecb5fa6`)
+- Committed the previously-uncommitted agentic "Ask" chat (PRD §1–9, §11): client
+  agent on Haiku 4.5, `src/agent/*`, `api/chat.js` proxy, behind `isAskEnabled()`.
+- Fixed the §9 token-budget dead-end: `useAsk.reset()` clears transcript + token
+  counter **in place** (no reload), keeps applied plan changes + audit trail, and
+  rejects orphaned `awaiting_confirmation` log entries (would otherwise leak into
+  the next conversation via `get_change_log`). Surfaced as a "New chat" button +
+  actionable warning/hard-stop notices.
+
+### 2. Chat is the permanent right column; rails dismantled (`d4e6797`)
+- Desktop grid `400px 1fr 340px` — **col 3 is the always-on chat on every tab**
+  (one mount; transcript survives tab switches). `ChatDrawer variant="rail"`:
+  always open, no launcher/close/Esc. Collapses to 2 cols when `isAskEnabled()` is
+  off (the §9 kill switch — not a user-facing collapse). Mobile stays a sheet.
+- **`RightRail.jsx` + `MaximizeRail.jsx` deleted.** Their content relocated into
+  "Show details" cards in `ResultsExtras.jsx`: Phase breakdown (Early), Projected
+  balances + next-$1k (Maximize). The **"Try a lever"** sensitivity panel moved to
+  a new **Levers** section in the sidebar Fine-tuning group (between Estate and
+  Advanced; contextual note outside Retire Early). 5 sidebar touch-points + mobile
+  sub-tab plumbing wired.
+- Added direct SSR render tests for the three relocated cards (they sit behind a
+  collapsed-by-default toggle, so nothing else mounted them).
+
+### 3. Maximize live balances reconciliation (`74f13b5`)
+- `ProjectedBalancesCard` read committed `atRetirement` while the hero used live
+  `liveAtRetirement` → mismatch mid-drag, now that they share a column. Fed the
+  card `liveAtRetirement` (the cheap, no-sim tier) so rows + Total track the slider
+  in lockstep; dropped the dead committed memo. `marginalValues` stays frozen.
+
+### 4. Ask Pro monetization — §10, built in 5 stages (`e2618d6`→`7177502`)
+Server-authoritative metering funnel: anon 3/day → signed-in-free 5/day
+(Supabase magic-link) → Ask Pro unlimited ($7/mo, Stripe). Decisions: Supabase
+(Postgres + built-in auth), no trial, monthly-only.
+- **`api/_lib/`** shared framework-free logic: `entitlement.js` (pure rules,
+  DB-free unit tests), `gate.js` (identity + allow/deny + webhook write + peek),
+  `stripe.js`, `supabase.js`, `auth.js`, `http.js`.
+- **Functions:** `chat.js` gated, `stripe-{checkout,webhook,portal}.js`,
+  `entitlement-status.js`. Migration `supabase/migrations/0001_entitlement.sql`
+  (RLS enabled, no policies — server secret key only).
+- **Client:** `supabaseClient.js` (lazy dynamic import → supabase-js is a split
+  213KB chunk, main bundle ~346KB), `entitlement.js` hook, `Paywall.jsx`; wired
+  into `useAsk`/`ChatDrawer` (Bearer token, 401/402 → paywall, counter, Pro badge,
+  pending-question stash across redirect).
+- **Key correctness:** a "prompt" = one **user turn**; the proxy derives the turn
+  boundary from message shape (a `tool_result` continuation is not metered), never
+  a client flag a paying user could forge. Quota commits only **after** a
+  successful upstream start (errored turns don't burn). Gate **fails open**.
+  Webhook is the single source of truth, idempotent by `user_id` from subscription
+  metadata.
+- **Tests added:** entitlement(17), gate(13), stripe(12), proxyGate(6), Paywall
+  render(2), agentLoop seam(1). §10.7 secret check: no server secret in `dist/`.
+
+### 5. Live verification under `netlify dev` + Stripe sandbox (`4cc44bd`)
+- Full funnel passed on **http://localhost:8888**: anon 3/3 → signup wall →
+  signed-in-free 5/5 → paywall → Checkout (test card) → webhook → **Ask Pro badge
+  + Manage**. DB confirmed: `subscriptions` status=active (customer+user mapped);
+  `usage` anon=3, free=5.
+- **Two live-only fixes:** (a) supabase-js eagerly builds its Realtime client →
+  throws on Node<22 (no native WebSocket); we only use REST+auth, so hand it the
+  `ws` transport in `getServiceClient`. (b) SQL-editor table creation missed the
+  `service_role` grant → "permission denied for table" (42501, not an RLS filter);
+  migration now `grant ... to service_role`. Verified the publishable (client) key
+  is still RLS-blocked from both tables.
+
+### Decisions
+- Chat is "permanent" = no user-facing collapse; `isAskEnabled()` remains the
+  deploy kill switch (grid drops to 2 cols when off).
+- Levers in non-Early tabs show a contextual note rather than computing sensitivity
+  (no extra cost); kept gated to Early mode.
+- Metering fails **open** (availability over DRM — it's a conversion nudge, §10.3).
+- Pending question restored to the input on redirect return (not auto-sent) so a
+  turn is never spent without an explicit press.
+- **Gotcha pinned:** test §10 on **8888** (netlify dev, gated functions), NOT
+  Vite's 5173/5174 (unmetered middleware, no `/api` functions).
+
+### Tomorrow's starting point
+- Branch `historical-sequence` is **not pushed / no PR** (9+ commits). Decide:
+  push + PR.
+- **Go-live (production):** deploy to Netlify; set all env vars in the Netlify
+  dashboard (switch `STRIPE_*` to LIVE + live Price id); create a PRODUCTION
+  Stripe webhook → `https://DOMAIN/api/stripe-webhook` (events:
+  checkout.session.completed, customer.subscription.created/updated/deleted) and
+  put its `whsec_` in Netlify; add the prod domain to Supabase Auth redirect URLs;
+  set `APP_URL` to the prod domain. Optionally `ASK_ALLOWED_ORIGINS` + Stripe Tax.
+- Optional: A/B the free counts (`LIMITS` in `api/_lib/entitlement.js`, now 3/5).
+
+---
+
+## Session: 2026-06-19 — Retire-at into sidebar, mobile-responsive layout
+
+Feature work on the `historical-sequence` branch. Test count **192 → 194**, green +
+build clean throughout. Each non-trivial item was planned (EnterPlanMode) and
+advisor-reviewed. Commits: `f766315` (Retire-at move + padding), `ad4f224` (mobile).
+
+### 1. Retire-at control back into the left sidebar (`f766315`)
+- Moved `RetireAtControl` from the top of the center results column to the top of
+  the **left sidebar** (under the navbar, above Essentials) and shrank it to fit the
+  440px column (headline 25→16px, age 24→22px, steppers 34→28px, ticks/labels
+  smaller, full-width slider, dropped the top accent border). Same no-lag
+  scrub/commit wiring.
+- `App.jsx`: sidebar column is now a flex wrapper with the accordion in a
+  `flex:1 / minHeight:0` box so its pinned bottom caption isn't pushed off-screen
+  (advisor catch). Empty-state microcopy updated to point at the sidebar slider.
+- Added 40px bottom padding to both result panels so the trailing detail cards
+  clear the bottom of the viewport.
+
+### 2. Mobile-responsive layout (`ad4f224`) — **new `src/components/mobile/MobileShell.jsx`**
+- Below **767px** the app renders a dedicated single-column shell instead of the
+  3-column desktop grid; **desktop is untouched**, gated by new `src/useIsMobile.js`
+  (`matchMedia`, returns `false` in SSR/tests so the desktop tree + existing
+  assertions hold).
+- **Mobile IA** (designed with the user, frontend-design skill consulted): top bar
+  with a ☰ burger for the 4 page tabs; the Retire-at slider pinned as a hero; a
+  scrolling results middle (right-rail content folds in); a **bottom nav** of input
+  sections (You/Money/Spending/Assumptions/Fine-tune) that open an editor in place
+  (tap-again / Done returns to results; Fine-tune opens a sub-tab strip over the 6
+  optional sections). Get advice / How it works are content-only (no hero/bottom
+  nav). Shell is a **`100dvh`** flex column (top bar / hero / middle = the only
+  scroller / bottom nav as a flex sibling) so the bottom nav clears the iOS Safari
+  toolbar.
+- **`InputsSidebar` refactor**: each section's fields extracted into body components
+  (`YouFields`, `MoneyFields`, …) keyed in an exported **`INPUT_SECTIONS`** map +
+  `sectionSummary()`; the desktop accordion and the mobile single-section view both
+  render from it — one source of truth, no redundant nav. Desktop output unchanged.
+  The 401k withdrawal-preview state is owned by the sidebar (not `TaxesFields`) so it
+  survives section switches (advisor catch — would have reset on desktop).
+- **`embedded` prop** on `EarlyPanel` / `MaximizeCenter` / `RightRail` /
+  `MaximizeRail`: drops the nested `height:100%`/`overflowY:auto` so they stack in one
+  page scroll, and KPI grids go 2-up. Identity default → desktop byte-identical
+  (gated, not a non-gated `auto-fit`, which would have reflowed narrow desktop —
+  advisor catch).
+- `ui.jsx`: `maxWidth:100%` on `NumInput` so fixed widths don't overflow narrow
+  screens. Added 2 `MobileShell` render tests (early renders hero+nav+folded
+  results; content tabs hide hero+nav).
+- **Not yet verified in a real browser** (tests gate the mobile branch off, so 194
+  green only proves desktop unchanged + the shell renders): real-device `100dvh`
+  bottom-nav clearance, burger z-index over hero, sticky editor header, 360px
+  overflow. Minor accepted: mobile Fine-tune sub-tab switch resets the 401k preview.
 
 ---
 

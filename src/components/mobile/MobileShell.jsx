@@ -14,9 +14,7 @@
 import { useState } from "react";
 import { RetireAtControl } from "../panels/RetireAtControl.jsx";
 import { EarlyPanel } from "../panels/EarlyPanel.jsx";
-import { RightRail } from "../panels/RightRail.jsx";
 import { MaximizeCenter } from "../panels/MaximizeCenter.jsx";
-import { MaximizeRail } from "../panels/MaximizeRail.jsx";
 import { AdvicePanel } from "../panels/AdvicePanel.jsx";
 import { DocsPanel } from "../panels/DocsPanel.jsx";
 import { INPUT_SECTIONS, FINE_TUNING_KEYS } from "../panels/InputsSidebar.jsx";
@@ -170,6 +168,12 @@ export function MobileShell(props) {
             inputs={inputs}
             set={set}
             plan={plan}
+            levers={{
+              sensitivityRows: props.sensitivityRows,
+              appliedLevers: props.appliedLevers,
+              onApplyLever: props.applyLever,
+              onUndoLevers: props.undoLevers,
+            }}
           />
         ) : (
           <Results {...props} />
@@ -270,56 +274,45 @@ function Results(props) {
 
   if (mode === "maximize") {
     return (
-      <>
-        <MaximizeCenter
-          embedded
-          plan={plan}
-          result={result}
-          totalAtRetirement={totalAtRetirement}
-          sustainable={sustainable}
-          dynamicOpt={dynamicOpt}
-          onApplyOptimized={applyOptimized}
-          scenario={scenario}
-          mcResult={mcResult}
-          onRunMc={onRunMc}
-        />
-        <MaximizeRail embedded plan={plan} atRetirement={atRetirement} marginalRows={marginalRows} />
-      </>
+      <MaximizeCenter
+        embedded
+        plan={plan}
+        result={result}
+        totalAtRetirement={totalAtRetirement}
+        sustainable={sustainable}
+        dynamicOpt={dynamicOpt}
+        onApplyOptimized={applyOptimized}
+        scenario={scenario}
+        mcResult={mcResult}
+        onRunMc={onRunMc}
+        atRetirement={atRetirement}
+        marginalRows={marginalRows}
+      />
     );
   }
 
   // early
   return (
-    <>
-      <EarlyPanel
-        embedded
-        plan={plan}
-        result={result}
-        earliest={earliest}
-        mcResult={mcResult}
-        scenario={scenario}
-        totalAtRetirement={totalAtRetirement}
-        sustainable={sustainable}
-        retireBy={retireBy}
-      />
-      <RightRail
-        embedded
-        plan={plan}
-        result={result}
-        sensitivityRows={sensitivityRows}
-        onApplyLever={applyLever}
-        appliedLevers={appliedLevers}
-        onUndoLevers={undoLevers}
-      />
-    </>
+    <EarlyPanel
+      embedded
+      plan={plan}
+      result={result}
+      earliest={earliest}
+      mcResult={mcResult}
+      scenario={scenario}
+      totalAtRetirement={totalAtRetirement}
+      sustainable={sustainable}
+      retireBy={retireBy}
+    />
   );
 }
 
 // ── Single input section editor ──────────────────────────────
-function SectionEditor({ section, ftSub, setFtSub, onDone, inputs, set, plan }) {
-  // "Fine-tune" opens a sub-tab strip over the six optional sections.
+function SectionEditor({ section, ftSub, setFtSub, onDone, inputs, set, plan, levers = {} }) {
+  // "Fine-tune" opens a sub-tab strip over the optional sections.
   if (section === "finetuning") {
     const Sub = INPUT_SECTIONS[ftSub].Body;
+    const subExtra = ftSub === "levers" ? levers : {};
     return (
       <div style={{ background: "#fff", minHeight: "100%" }}>
         <EditorHeader title="Fine-tuning" onDone={onDone} />
@@ -349,7 +342,7 @@ function SectionEditor({ section, ftSub, setFtSub, onDone, inputs, set, plan }) 
           })}
         </div>
         <div style={{ padding: "16px 16px 32px" }}>
-          <Sub inputs={inputs} set={set} plan={plan} />
+          <Sub inputs={inputs} set={set} plan={plan} {...subExtra} />
         </div>
       </div>
     );

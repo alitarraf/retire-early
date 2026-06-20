@@ -54,15 +54,17 @@ export function PromptCounter({ ent }) {
   );
 }
 
-/** Sign-up (401) or paywall (402) card. Calls onCleared after a flow starts. */
-export function PaywallCard({ ent }) {
-  const isPaywall = ent?.paywall?.status === 402;
+/**
+ * Reusable magic-link sign-in form: email → "Send link" → "check your email".
+ * Owns its own busy/sent/error state so it can be dropped anywhere (the 401
+ * paywall card AND the proactive nav-bar entry). `footer` renders below the
+ * input only before a link is sent (e.g. a "Maybe later" dismiss).
+ */
+export function SignInForm({ ent, heading, subtext, footer }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState(null);
-
-  if (!ent?.paywall) return null;
 
   const sendLink = async () => {
     if (!email.trim() || busy) return;
@@ -73,6 +75,46 @@ export function PaywallCard({ ent }) {
     if (res.ok) setSent(true);
     else setErr(res.error || "Couldn't send the link.");
   };
+
+  return (
+    <>
+      {heading && <div style={title}>{heading}</div>}
+      {subtext && <div style={sub}>{subtext}</div>}
+      {sent ? (
+        <div style={{ fontSize: 12, color: status.ok, fontWeight: 600 }}>
+          Check your email for a sign-in link, then come back here.
+        </div>
+      ) : (
+        <>
+          {err && <div style={{ fontSize: 11, color: status.fail, marginBottom: 8 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && sendLink()}
+              placeholder="you@email.com"
+              aria-label="Email address"
+              style={{ flex: 1, minWidth: 0, border: `1px solid ${neutral.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12 }}
+            />
+            <button style={primaryBtn} onClick={sendLink} disabled={busy}>
+              {busy ? "…" : "Send link"}
+            </button>
+          </div>
+          {footer}
+        </>
+      )}
+    </>
+  );
+}
+
+/** Sign-up (401) or paywall (402) card. Calls onCleared after a flow starts. */
+export function PaywallCard({ ent }) {
+  const isPaywall = ent?.paywall?.status === 402;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  if (!ent?.paywall) return null;
 
   const subscribe = async () => {
     setBusy(true);
@@ -101,35 +143,15 @@ export function PaywallCard({ ent }) {
     );
   }
 
-  // 401 — anonymous wall → sign-up nudge (no card).
+  // 401 — anonymous wall → sign-up nudge (reuses the shared SignInForm).
   return (
     <div style={card} role="dialog" aria-label="Sign in to keep asking">
-      <div style={title}>Sign in free to keep asking</div>
-      <div style={sub}>You've used your 3 free prompts for today. Sign in with email for 5 a day — no card needed.</div>
-      {sent ? (
-        <div style={{ fontSize: 12, color: status.ok, fontWeight: 600 }}>
-          Check your email for a sign-in link, then come back here.
-        </div>
-      ) : (
-        <>
-          {err && <div style={{ fontSize: 11, color: status.fail, marginBottom: 8 }}>{err}</div>}
-          <div style={{ display: "flex", gap: 6 }}>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendLink()}
-              placeholder="you@email.com"
-              aria-label="Email address"
-              style={{ flex: 1, minWidth: 0, border: `1px solid ${neutral.border}`, borderRadius: 8, padding: "7px 10px", fontSize: 12 }}
-            />
-            <button style={primaryBtn} onClick={sendLink} disabled={busy}>
-              {busy ? "…" : "Send link"}
-            </button>
-          </div>
-          <button style={{ ...linkBtn, marginTop: 6 }} onClick={ent.dismissPaywall}>Maybe later</button>
-        </>
-      )}
+      <SignInForm
+        ent={ent}
+        heading="Sign in free to keep asking"
+        subtext="You've used your 3 free prompts for today. Sign in with email for 5 a day — no card needed."
+        footer={<button style={{ ...linkBtn, marginTop: 6 }} onClick={ent.dismissPaywall}>Maybe later</button>}
+      />
     </div>
   );
 }

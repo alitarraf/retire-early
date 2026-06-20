@@ -88,12 +88,31 @@ is **server-authoritative**:
   from the message shape (a `tool_result` continuation is not metered), never a
   client flag.
 - Functions: `api/chat.js` (gated), `api/stripe-{checkout,webhook,portal}.js`,
-  `api/entitlement-status.js`. Tables in `supabase/migrations/` — run the SQL in
+  `api/entitlement-status.js`, `api/plan-{get,save}.js` (account sync). Tables in
+  `supabase/migrations/` — run the SQL in
   the Supabase SQL Editor; **RLS is enabled with no policies**, so only the
   secret key (server) can touch `usage`/`subscriptions`.
 - Client: `src/agent/{supabaseClient,entitlement}.js` + `panels/Paywall.jsx`.
   `supabase-js` is a lazy dynamic import (separate chunk; only loaded where
   `VITE_SUPABASE_*` is set).
+
+**Auth UI & plan sync.** `useEntitlement` is owned by `App.jsx` (not the drawer)
+and passed down, so the nav-bar auth cluster and plan sync share one session. The
+top-right `panels/NavAuth.jsx` shows the signed-in email + Sign out, or a proactive
+"Sign in" popover (reusing `SignInForm`, extracted from `Paywall.jsx`) — sign-in is no
+longer gated behind the 3-prompt wall.
+
+**Plan sync (account-scoped).** Inputs persist to `localStorage` always (the
+`retire-early.inputs` key in `App.jsx`), so a reload — including the magic-link
+redirect — keeps the user's data. When **signed in**, `src/agent/planSync.js`
+(`usePlanSync`) loads the plan on sign-in and autosaves (debounced) via two new
+server-authoritative endpoints, `api/plan-{get,save}.js`, backed by the `plans` table
+(`supabase/migrations/0002_plan_sync.sql`; same RLS-on/no-policies/secret-key-only
+doctrine). Local-vs-remote conflicts surface a `panels/PlanSyncBanner.jsx` prompt
+(Load saved / Keep this one) — never a silent overwrite. The reconcile logic
+(`plansDiffer`/`reconcile`) is pure and unit-tested in `__tests__/planSync.test.js`.
+Like the Stripe endpoints, plan sync is only live under `netlify dev`; plain
+`npm run dev` falls back to localStorage-only.
 
 **Env:** see `.env.example`. Server vars (`STRIPE_*`, `SUPABASE_URL`,
 `SUPABASE_SECRET_KEY`, `ANTHROPIC_API_KEY`) never reach the bundle; only

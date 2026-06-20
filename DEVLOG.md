@@ -32,7 +32,53 @@ components/ + App.jsx    React UI
 - **Tests are the gate.** Invariants A–E in `simulate.test.js` + others. When adding engine params, use **identity defaults** (off = byte-identical output) and re-run the full suite after every engine edit.
 - Tax year is 2026, MFJ default. Annual update = single-file edit in `constants/brackets.js`.
 
-**Test suite: 311 passing, 31 files** (194 before the Ask chat; +51 for Ask Pro §10). Ask agent + Ask Pro architecture is in `CLAUDE.md` (api/_lib shared logic, RLS-enabled tables, lazy supabase chunk, metered-dev note). Test §10 on **`netlify dev` :8888**, not Vite :5173.
+**Test suite: 319 passing, 32 files** (194 before the Ask chat; +51 for Ask Pro §10; +8 for plan sync). Ask agent + Ask Pro architecture is in `CLAUDE.md` (api/_lib shared logic, RLS-enabled tables, lazy supabase chunk, metered-dev note). Test §10 + plan sync on **`netlify dev` :8888**, not Vite :5173.
+
+---
+
+## Session: 2026-06-19 (cont. 2) — Reti persona + sign-in visibility + account-scoped plan sync
+
+Branch `historical-sequence`. Gave the Ask agent a consistent persona, made sign-in
+**visible and reachable**, and tied the user's plan to their account so it follows them
+across devices (on a localStorage baseline). Test count **311 → 319**, build clean.
+Advisor-reviewed — caught a real autosave race before it shipped. **Not yet
+runtime-verified** end-to-end (needs Supabase + `netlify dev`).
+
+### 1. "Reti" agent persona
+- Rewrote `src/agent/systemPrompt.js` around the `docs/reti.md` persona: curious,
+  friendly, lightly witty; educational-not-advisor framing ("the model projects…");
+  numbers-from-tools-only hardened; transparency + confirm-before-larger-changes; a
+  closing follow-up. Tool mechanics (3-change limit, `awaiting_confirmation`) preserved.
+- UI (`ChatDrawer.jsx`): chat header **Ask → "Ask RETI"** with tagline "Your curious
+  retirement assistant."; the "Educational — not financial advice" line moved from the
+  header to a persistent footer at the bottom of the chat window.
+
+### 2. Sign-in is visible + reachable (top-right nav)
+- **Removed** the header "sanity strip" (age / portfolio / $/mo) in `App.jsx`; replaced
+  with `panels/NavAuth.jsx`: signed-in **email + Sign out**, or a proactive **Sign in**
+  popover — no longer trapped behind the 3-prompt paywall.
+- Extracted reusable **`SignInForm`** from `Paywall.jsx` (the 401 branch reuses it).
+- **Lifted `useEntitlement` to `App.jsx`** (was inside `ChatDrawer`), passed `ent` down —
+  one Supabase session/listener now shared by the nav and plan sync.
+
+### 3. Plan persistence + account sync
+- **localStorage baseline:** `App.jsx` persists `inputs` on every change
+  (`retire-early.inputs`), so a reload — incl. the magic-link redirect — keeps data.
+- **Account sync (signed in):** new `plans` table (`supabase/migrations/0002_plan_sync.sql`,
+  same RLS-on/no-policies/secret-key doctrine) + `api/plan-{get,save}.js`. New
+  `src/agent/planSync.js` (`usePlanSync`) loads on sign-in, debounced-autosaves on change.
+  `plansDiffer`/`reconcile` are pure + unit-tested (`__tests__/planSync.test.js`, 8 tests).
+  Conflicts raise `panels/PlanSyncBanner.jsx` (Load saved / Keep this one) — never a silent
+  overwrite. `api/_lib/http.js` CORS now allows GET.
+- **Race fixed (advisor):** autosave was gated on the synchronous `loadedRef`, so a slow
+  cold-start GET could fire the 1.5s debounce mid-load and overwrite a fresh device's saved
+  plan with DEFAULTS. Now gated on a `synced` flag set only *after* reconcile resolves; the
+  GET-failure path leaves it false so autosave never runs over an unread remote.
+
+### Open / next
+- **Runtime-verify** under `netlify dev` + Supabase: run the `0002` SQL, magic-link
+  round-trip, two-device load, conflict banner.
+- Mobile nav has no auth indicator (desktop-only, by request) — add if wanted.
 
 ---
 

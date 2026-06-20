@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { neutral, status } from "../../theme.js";
 import { fmt } from "../../format.js";
 import { useAsk, suggestedPrompts, followUpChips } from "../../agent/useAsk.js";
-import { useEntitlement } from "../../agent/entitlement.js";
 import { ChatMessage } from "./ChatMessage.jsx";
 import { PromptCounter, PaywallCard } from "./Paywall.jsx";
 
@@ -114,11 +113,10 @@ function AuditTrail({ changeLog, onRevert, onUndoAll, appliedCount }) {
   );
 }
 
-export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" }) {
+export function ChatDrawer({ inputs, plan, results, actions, ent, variant = "dock" }) {
   // "rail" is the permanent right-column dock — always open, no launcher/close.
   const isRail = variant === "rail";
   const [open, setOpen] = useState(isRail);
-  const ent = useEntitlement();
   const { getToken, onBlocked: entOnBlocked, onTurnComplete } = ent;
   // Stash the typed question across the auth/checkout redirect so it can be
   // restored when the user returns (the gate-cleared resume, §10.5).
@@ -221,7 +219,7 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
       {/* Header */}
       <div style={{ background: neutral.ink, color: "#fff", padding: "10px 14px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em" }}>Ask</div>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em" }}>Ask RETI</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <PromptCounter ent={ent} />
             {ent.isPro && (
@@ -250,7 +248,7 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
             )}
           </div>
         </div>
-        <div style={{ fontSize: 10, color: "#7ecfbb", marginTop: 2 }}>Educational — not financial advice</div>
+        <div style={{ fontSize: 10, color: "#7ecfbb", marginTop: 2 }}>Your curious retirement assistant.</div>
       </div>
 
       {/* Message list */}
@@ -379,6 +377,11 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
         >
           Send
         </button>
+      </div>
+
+      {/* Persistent disclaimer — anchored to the bottom of the chat window */}
+      <div style={{ flexShrink: 0, padding: "0 14px 8px", fontSize: 10, color: neutral.textFaint, textAlign: "center" }}>
+        Educational — not financial advice
       </div>
     </div>
   );

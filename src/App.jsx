@@ -19,9 +19,12 @@ import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { QuickStart } from "./components/panels/QuickStart.jsx";
 import { MobileShell } from "./components/mobile/MobileShell.jsx";
 import { ChatDrawer } from "./components/panels/ChatDrawer.jsx";
+import { NavAuth } from "./components/panels/NavAuth.jsx";
+import { PlanSyncBanner } from "./components/panels/PlanSyncBanner.jsx";
 import { isAskEnabled } from "./agent/featureFlags.js";
+import { useEntitlement } from "./agent/entitlement.js";
+import { usePlanSync } from "./agent/planSync.js";
 import { useIsMobile } from "./useIsMobile.js";
-import { fmt } from "./format.js";
 
 const TABS = [
   { key: "early", label: "Retire Early" },
@@ -31,12 +34,42 @@ const TABS = [
 ];
 
 const QS_KEY = "retire-early.quickStartDismissed";
+const INPUTS_KEY = "retire-early.inputs";
+
+// Plan inputs persist locally so a reload — including the full-page navigation a
+// magic-link sign-in triggers — keeps the user's data. Stored as { data, updatedAt };
+// updatedAt is also the local half of the account-sync conflict check (planSync.js).
+function loadInputs() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(INPUTS_KEY));
+    return parsed?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+function saveInputs(data) {
+  try {
+    localStorage.setItem(INPUTS_KEY, JSON.stringify({ data, updatedAt: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
 
 export default function App() {
   const [mode, setMode] = useState("early");
   const isMobile = useIsMobile();
-  const [inputs, setInputs] = useState(DEFAULTS);
+  const [inputs, setInputs] = useState(() => loadInputs() ?? DEFAULTS);
   const set = (key) => (val) => setInputs((prev) => ({ ...prev, [key]: val }));
+
+  // Mirror inputs to localStorage on every change (the same-browser baseline).
+  useEffect(() => { saveInputs(inputs); }, [inputs]);
+
+  // Server-authoritative entitlement + Supabase session (Ask Pro funnel and, when
+  // signed in, account-scoped plan sync). Lifted here so the nav-bar auth cluster
+  // and plan sync share one session/listener; passed down to the chat drawer.
+  const ent = useEntitlement();
+  // Account-scoped plan sync (load on sign-in, debounced autosave, conflict banner).
+  const planSync = usePlanSync({ inputs, setInputs, ent });
 
   // First-run onboarding overlay; dismissal is remembered across sessions.
   const [showQuickStart, setShowQuickStart] = useState(() => {
@@ -230,7 +263,7 @@ export default function App() {
   const askOn = isAskEnabled();
   const askDrawer = (variant) =>
     askOn ? (
-      <ChatDrawer variant={variant} inputs={inputs} plan={plan} results={askResults} actions={askActions} />
+      <ChatDrawer variant={variant} inputs={inputs} plan={plan} results={askResults} actions={askActions} ent={ent} />
     ) : null;
 
   // Sensitivity levers now live in the sidebar's Fine-tuning group (moved out of
@@ -247,6 +280,7 @@ export default function App() {
   if (isMobile) {
     return (
       <>
+        <PlanSyncBanner sync={planSync} />
         <MobileShell
           mode={mode}
           setMode={setMode}
@@ -346,22 +380,12 @@ export default function App() {
           ))}
         </div>
 
-        {/* Sanity strip */}
-        <div
-          style={{
-            fontSize: 10,
-            color: "#5aada0",
-            fontFamily: "'JetBrains Mono', monospace",
-            display: "flex",
-            gap: 18,
-            flexShrink: 0,
-          }}
-        >
-          <span>age {inputs.currentAge}</span>
-          <span style={{ color: "#7ecfbb" }}>{fmt(totalAtRetirement)}</span>
-          <span>{fmt(livePlan.monthlyAtRetirement)}/mo</span>
-        </div>
+        {/* Auth cluster — visible sign-in state + proactive sign-in entry */}
+        <NavAuth ent={ent} />
       </div>
+
+      {/* Account-sync reconciliation prompt (only when local ≠ saved) */}
+      <PlanSyncBanner sync={planSync} />
 
       {/* ── Workspace: sidebar │ center │ permanent chat rail ──────
           Col 3 is the always-on chat (all tabs, one mount so the transcript

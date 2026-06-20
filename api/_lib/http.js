@@ -6,7 +6,7 @@ export function corsHeaders(origin) {
   const h = { "cache-control": "no-store" };
   if (origin) {
     h["access-control-allow-origin"] = origin;
-    h["access-control-allow-methods"] = "POST, OPTIONS";
+    h["access-control-allow-methods"] = "GET, POST, OPTIONS";
     h["access-control-allow-headers"] = "content-type, authorization";
     h["access-control-allow-credentials"] = "true";
     h.vary = "Origin";

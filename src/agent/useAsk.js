@@ -16,7 +16,7 @@ import { getConfirmMode, TOKEN_BUDGET } from "./featureFlags.js";
 let _uid = 0;
 const uid = () => `ui_${++_uid}`;
 
-export function useAsk({ inputs, plan, results, actions }) {
+export function useAsk({ inputs, plan, results, actions, auth }) {
   const [display, setDisplay] = useState([]); // [{id, role, text, trajectory, incomplete}]
   const [history, setHistory] = useState([]); // model messages
   const [streaming, setStreaming] = useState(false);
@@ -63,10 +63,11 @@ export function useAsk({ inputs, plan, results, actions }) {
       lastUserText.current = text;
       setError(null);
 
+      const userId = uid();
       const assistantId = uid();
       setDisplay((d) => [
         ...d,
-        { id: uid(), role: "user", text },
+        { id: userId, role: "user", text },
         { id: assistantId, role: "assistant", text: "", trajectory: [], incomplete: false },
       ]);
       setStreaming(true);
@@ -81,6 +82,7 @@ export function useAsk({ inputs, plan, results, actions }) {
           plan,
           changeLog,
           confirmMode,
+          authToken: auth?.getToken?.() ?? undefined,
           actions: writeActions,
           stageConfirmation: (card) => {
             setPending((p) => [...p, { id: uid(), ...card }]);
@@ -104,16 +106,25 @@ export function useAsk({ inputs, plan, results, actions }) {
         if (out.incomplete || out.hitCeiling) {
           setDisplay((d) => d.map((m) => (m.id === assistantId ? { ...m, incomplete: true } : m)));
         }
+        auth?.onTurnComplete?.(); // refresh the prompt counter (§10.5)
       } catch (e) {
-        // Network/proxy error: preserve the typed message, mark retryable (§7).
-        setError({ message: e?.message ?? "Something went wrong.", retryable: e?.retryable ?? true });
-        // Drop the empty assistant bubble so retry reuses the same question.
-        setDisplay((d) => d.filter((m) => m.id !== assistantId));
+        // Entitlement wall (§10): no quota was burned. Surface the sign-up/paywall
+        // card, drop the optimistic bubbles, and keep the text for auto-resend
+        // once the gate clears — not a generic error.
+        if (e?.status === 401 || e?.status === 402) {
+          setDisplay((d) => d.filter((m) => m.id !== assistantId && m.id !== userId));
+          auth?.onBlocked?.({ status: e.status, text });
+        } else {
+          // Network/proxy error: preserve the typed message, mark retryable (§7).
+          setError({ message: e?.message ?? "Something went wrong.", retryable: e?.retryable ?? true });
+          // Drop the empty assistant bubble so retry reuses the same question.
+          setDisplay((d) => d.filter((m) => m.id !== assistantId));
+        }
       } finally {
         setStreaming(false);
       }
     },
-    [streaming, tokenStopped, inputs, plan, results, history, changeLog, confirmMode, writeActions],
+    [streaming, tokenStopped, inputs, plan, results, history, changeLog, confirmMode, writeActions, auth],
   );
 
   const retry = useCallback(() => {

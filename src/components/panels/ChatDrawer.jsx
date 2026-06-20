@@ -8,11 +8,13 @@
 //  token-budget notices, and an accessible input.
 // ─────────────────────────────────────────────────────────────
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { neutral, status } from "../../theme.js";
 import { fmt } from "../../format.js";
 import { useAsk, suggestedPrompts, followUpChips } from "../../agent/useAsk.js";
+import { useEntitlement } from "../../agent/entitlement.js";
 import { ChatMessage } from "./ChatMessage.jsx";
+import { PromptCounter, PaywallCard } from "./Paywall.jsx";
 
 function fmtVal(v) {
   if (v == null) return "—";
@@ -116,10 +118,44 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
   // "rail" is the permanent right-column dock — always open, no launcher/close.
   const isRail = variant === "rail";
   const [open, setOpen] = useState(isRail);
-  const ask = useAsk({ inputs, plan, results, actions });
+  const ent = useEntitlement();
+  const { getToken, onBlocked: entOnBlocked, onTurnComplete } = ent;
+  // Stash the typed question across the auth/checkout redirect so it can be
+  // restored when the user returns (the gate-cleared resume, §10.5).
+  const onBlocked = useCallback(
+    (info) => {
+      try {
+        sessionStorage.setItem("ask_pending", info.text || "");
+      } catch {
+        /* ignore */
+      }
+      entOnBlocked(info);
+    },
+    [entOnBlocked],
+  );
+  const auth = useMemo(
+    () => (ent.configured ? { getToken, onBlocked, onTurnComplete } : undefined),
+    [ent.configured, getToken, onBlocked, onTurnComplete],
+  );
+  const ask = useAsk({ inputs, plan, results, actions, auth });
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    // Restore a question stashed before an auth/checkout redirect so the user
+    // returns to their words in the box (§10.5). Restored to the input, not
+    // auto-sent, so a turn is never spent without an explicit press.
+    try {
+      const p = sessionStorage.getItem("ask_pending");
+      if (p) {
+        setDraft(p);
+        sessionStorage.removeItem("ask_pending");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     // Focus the input when the dock/sheet opens — but NOT for the permanent rail,
@@ -187,6 +223,16 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.04em" }}>Ask</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <PromptCounter ent={ent} />
+            {ent.isPro && (
+              <button
+                onClick={ent.openPortal}
+                title="Manage your Ask Pro subscription"
+                style={{ background: "none", border: "none", color: "#9db4ae", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: 0 }}
+              >
+                Manage
+              </button>
+            )}
             {ask.display.length > 0 && (
               <button
                 onClick={startFresh}
@@ -295,6 +341,9 @@ export function ChatDrawer({ inputs, plan, results, actions, variant = "dock" })
           to keep going. (Your plan changes are kept.)
         </div>
       )}
+
+      {/* Entitlement nudge (§10.5): sign-up at 3/day, paywall at 5/day */}
+      <PaywallCard ent={ent} />
 
       {/* Audit trail */}
       <AuditTrail

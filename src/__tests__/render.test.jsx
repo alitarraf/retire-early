@@ -21,6 +21,7 @@ import { monteCarlo, buildHistogram } from "../engine/monteCarlo.js";
 import { McDistChart } from "../components/charts/McDistChart.jsx";
 import { StackedChart } from "../components/charts/StackedChart.jsx";
 import { ScenarioCard, PhaseBreakdownCard, ProjectedBalancesCard, MarginalValueCard } from "../components/panels/ResultsExtras.jsx";
+import { PromptCounter, PaywallCard } from "../components/panels/Paywall.jsx";
 import { historicalSequence } from "../analysis/historicalSequence.js";
 import { PortfolioChartCard } from "../components/panels/PortfolioChartCard.jsx";
 import { MonteCarloCard } from "../components/panels/MonteCarloCard.jsx";
@@ -499,5 +500,23 @@ describe("render smoke tests", () => {
   it("MarginalValueCard and ProjectedBalancesCard no-op on missing data", () => {
     expect(renderToString(<MarginalValueCard plan={makePlan(DEFAULTS)} marginalRows={[]} />)).toBe("");
     expect(renderToString(<ProjectedBalancesCard plan={makePlan(DEFAULTS)} atRetirement={null} />)).toBe("");
+  });
+
+  // Ask Pro funnel UI (PRD §10.5/§10.7).
+  it("PromptCounter: hidden unconfigured, shows free count, shows Pro badge", () => {
+    const strip = (h) => h.replace(/<!--.*?-->/g, "");
+    expect(renderToString(<PromptCounter ent={{ configured: false }} />)).toBe("");
+    expect(strip(renderToString(<PromptCounter ent={{ configured: true, isPro: false, remaining: 2, limit: 3 }} />))).toContain("2 of 3 free left");
+    expect(renderToString(<PromptCounter ent={{ configured: true, isPro: true }} />)).toContain("Ask Pro");
+  });
+
+  it("PaywallCard: null without a wall, sign-up at 401, paywall at 402", () => {
+    expect(renderToString(<PaywallCard ent={{ paywall: null }} />)).toBe("");
+    const signup = renderToString(<PaywallCard ent={{ paywall: { status: 401, text: "q" }, signIn: () => {}, dismissPaywall: () => {} }} />);
+    expect(signup).toMatch(/Sign in free/);
+    expect(signup).toMatch(/you@email\.com/);
+    const pay = renderToString(<PaywallCard ent={{ paywall: { status: 402 }, subscribe: () => {}, dismissPaywall: () => {} }} />);
+    expect(pay).toMatch(/\$7\/mo/);
+    expect(pay).not.toMatch(/NaN/);
   });
 });

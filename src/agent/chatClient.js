@@ -35,15 +35,19 @@ export async function streamChat({
   signal,
   onText,
   onToolUseStart,
+  authToken,
   fetchImpl = fetch,
 } = {}) {
   let resp;
   try {
+    const headers = { "content-type": "application/json" };
+    if (authToken) headers.authorization = `Bearer ${authToken}`;
     resp = await fetchImpl(CHAT_ENDPOINT, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: JSON.stringify({ model, max_tokens: maxTokens, system, tools, messages }),
       signal,
+      credentials: "same-origin", // send the anon device cookie
     });
   } catch (e) {
     throw new ChatError(`Couldn't reach the assistant — ${e?.message ?? "network error"}.`, { retryable: true });

@@ -1,6 +1,6 @@
 // Entitlement gate (PRD §10.3, §10.7) — allow/deny over a fake Supabase.
 import { describe, it, expect } from "vitest";
-import { checkEntitlement, DEVICE_COOKIE } from "../../api/_lib/gate.js";
+import { checkEntitlement, peekEntitlement, DEVICE_COOKIE } from "../../api/_lib/gate.js";
 
 const iso = (ms) => new Date(ms).toISOString();
 
@@ -132,5 +132,44 @@ describe("checkEntitlement", () => {
     const res = await checkEntitlement(req({ authorization: "Bearer tok" }), NEW_TURN, sb);
     expect(res.allow).toBe(true);
     expect(res.tier).toBe("free");
+  });
+});
+
+describe("peekEntitlement (read-only, never meters)", () => {
+  it("unconfigured → not configured", async () => {
+    expect(await peekEntitlement(req(), null)).toMatchObject({ configured: false, tier: "anon" });
+  });
+
+  it("anonymous with usage → remaining counts down, nothing written", async () => {
+    const sb = fakeSb({ usage: { dev: { tier: "anon", count: 1, window_start: iso(Date.now()) } } });
+    const out = await peekEntitlement(req({ cookie: `${DEVICE_COOKIE}=dev` }), sb);
+    expect(out).toMatchObject({ configured: true, tier: "anon", remaining: 2, limit: 3 });
+    expect(sb._upserts).toHaveLength(0);
+  });
+
+  it("anonymous with no cookie → full allowance", async () => {
+    const sb = fakeSb();
+    expect(await peekEntitlement(req(), sb)).toMatchObject({ tier: "anon", remaining: 3 });
+  });
+
+  it("active subscriber → pro, unlimited", async () => {
+    const sb = fakeSb({
+      users: { tok: { id: "p1", email: "a@b.com" } },
+      subscriptions: { p1: { status: "active", current_period_end: iso(Date.now() + 1e6) } },
+    });
+    expect(await peekEntitlement(req({ authorization: "Bearer tok" }), sb)).toMatchObject({
+      tier: "pro",
+      active: true,
+      remaining: null,
+      email: "a@b.com",
+    });
+  });
+
+  it("signed-in-free → 5/day remaining on user.id", async () => {
+    const sb = fakeSb({
+      users: { tok: { id: "u1" } },
+      usage: { u1: { tier: "free", count: 2, window_start: iso(Date.now()) } },
+    });
+    expect(await peekEntitlement(req({ authorization: "Bearer tok" }), sb)).toMatchObject({ tier: "free", remaining: 3, limit: 5 });
   });
 });

@@ -53,6 +53,7 @@ export async function runAgentTurn({
   stageConfirmation,
   maxTokens = 1024,
   signal,
+  authToken,
   callbacks = {},
   transport = streamChat,
   dispatchImpl = defaultDispatch,
@@ -83,6 +84,7 @@ export async function runAgentTurn({
       messages: requestMessages,
       maxTokens,
       signal,
+      authToken,
       onText: callbacks.onText,
       onToolUseStart: callbacks.onToolUseStart,
     });

@@ -16,7 +16,7 @@
 
 import { randomUUID } from "node:crypto";
 import { getServiceClient, isSupabaseConfigured } from "./supabase.js";
-import { decide, isActiveSubscription, isNewUserTurn } from "./entitlement.js";
+import { decide, isActiveSubscription, isNewUserTurn, rolloverWindow, tierLimit } from "./entitlement.js";
 import { getUserFromRequest } from "./auth.js";
 
 export const DEVICE_COOKIE = "ask_did";
@@ -90,6 +90,37 @@ export async function checkEntitlement(req, messages, sb = isSupabaseConfigured(
   const res = await meterKey(sb, did, "anon");
   if (setCookie) res.setCookie = setCookie;
   return res;
+}
+
+/**
+ * Read-only entitlement snapshot for the UI counter / Pro badge / post-checkout
+ * polling. Never increments, never issues a cookie. remaining is null for an
+ * unlimited (Pro) tier.
+ */
+export async function peekEntitlement(req, sb = isSupabaseConfigured() ? getServiceClient() : null) {
+  if (!sb) return { configured: false, tier: "anon", active: false, remaining: null, limit: null };
+
+  const usedFor = async (key) => {
+    if (!key) return 0;
+    const { data: row } = await sb.from("usage").select("*").eq("key", key).maybeSingle();
+    return rolloverWindow(row).count ?? 0;
+  };
+
+  const user = await getUserFromRequest(sb, req);
+  if (user) {
+    const { data: sub } = await sb.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle();
+    if (isActiveSubscription(sub)) {
+      return { configured: true, tier: "pro", active: true, remaining: null, limit: null, email: user.email };
+    }
+    const limit = tierLimit("free");
+    const used = await usedFor(user.id);
+    return { configured: true, tier: "free", active: false, remaining: Math.max(0, limit - used), limit, email: user.email };
+  }
+
+  const did = parseCookies(req.headers.get("cookie"))[DEVICE_COOKIE];
+  const limit = tierLimit("anon");
+  const used = await usedFor(did);
+  return { configured: true, tier: "anon", active: false, remaining: Math.max(0, limit - used), limit };
 }
 
 /**

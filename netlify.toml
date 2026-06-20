@@ -2,6 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
+# Serverless proxy for the "Ask" agent (holds ANTHROPIC_API_KEY).
+# api/chat.js is a modern function routed at /api/chat via its `config.path`.
+[functions]
+  directory = "api"
+  node_bundler = "esbuild"
+
+# SPA fallback. Function paths (/api/chat) are matched before this catch-all.
 [[redirects]]
   from = "/*"
   to = "/index.html"

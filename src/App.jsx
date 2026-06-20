@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { DEFAULTS, makePlan, runMain, projectAtRetirement, simParamsAt } from "./analysis/plan.js";
 import { earliestRetireAge } from "./analysis/earliestRetireAge.js";
 import { retireByAge } from "./analysis/retireByAge.js";
@@ -20,6 +20,8 @@ import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { QuickStart } from "./components/panels/QuickStart.jsx";
 import { MobileShell } from "./components/mobile/MobileShell.jsx";
+import { ChatDrawer } from "./components/panels/ChatDrawer.jsx";
+import { isAskEnabled } from "./agent/featureFlags.js";
 import { useIsMobile } from "./useIsMobile.js";
 import { fmt } from "./format.js";
 
@@ -192,6 +194,42 @@ export default function App() {
     liveAtRetirement.muniBonds +
     (liveAtRetirement.hsaBalance ?? 0);
 
+  // ── "Ask" agent wiring (PRD: agentic chat) ──────────────────
+  // Keep the latest inputs in a ref so the agent can snapshot a baseline at the
+  // moment of its first mutation (powers "Undo all agent changes").
+  const inputsRef = useRef(inputs);
+  inputsRef.current = inputs;
+
+  const askResults = useMemo(
+    () => ({
+      earliest,
+      sustainable,
+      mcSuccess: mcResult?.successRate ?? null,
+      totalAtRetirement,
+      survives: result ? result.depleted == null : null,
+      depletionAge: result?.depleted == null ? null : Math.ceil(result.depleted),
+    }),
+    [earliest, sustainable, mcResult, totalAtRetirement, result],
+  );
+
+  // Write-tool actions the agent drives. setInputs is stable; onCommitAge drives
+  // the Retire-at control + recompute.
+  const askActions = useMemo(
+    () => ({
+      getInputs: () => inputsRef.current,
+      applyInputs: (patch) => setInputs((prev) => ({ ...prev, ...patch })),
+      applyAge: (age) => onCommitAge(age),
+      applyScenario: (patch) => setInputs((prev) => ({ ...prev, ...patch })),
+      restoreInputs: (snap) => setInputs(snap),
+    }),
+    [onCommitAge],
+  );
+
+  const askDrawer = (variant) =>
+    isAskEnabled() ? (
+      <ChatDrawer variant={variant} inputs={inputs} plan={plan} results={askResults} actions={askActions} />
+    ) : null;
+
   // ── Mobile (≤767px): a dedicated single-column shell fed the same props.
   // All hooks above run unconditionally, so this early return is hook-safe.
   if (isMobile) {
@@ -224,6 +262,7 @@ export default function App() {
           onRunMc={() => setMaxMcOn(true)}
         />
         {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+        {askDrawer("sheet")}
       </>
     );
   }
@@ -422,6 +461,7 @@ export default function App() {
       </div>
 
       {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+      {askDrawer("dock")}
     </div>
   );
 }

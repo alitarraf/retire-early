@@ -3,7 +3,6 @@ import { makePlan, projectAtRetirement, survivesAt } from "../analysis/plan.js";
 import { earliestRetireAge } from "../analysis/earliestRetireAge.js";
 import { sensitivity } from "../analysis/sensitivity.js";
 import { marginalValues } from "../analysis/marginalValue.js";
-import { optimalConversion } from "../analysis/optimalConversion.js";
 import { sustainableSpend } from "../analysis/sustainableSpend.js";
 
 // ── Scenario D — earliest-age and verdict must agree ──────────
@@ -77,16 +76,24 @@ describe("analysis routines return sane shapes", () => {
     for (const r of marginalValues(plan)) expect(r.gain).toBeGreaterThanOrEqual(0);
   });
 
-  it("optimal conversion is within the search range", () => {
-    const best = optimalConversion(plan);
-    expect(best.amount).toBeGreaterThanOrEqual(0);
-    expect(best.amount).toBeLessThanOrEqual(60000);
-    expect(best.endVal).toBeGreaterThanOrEqual(best.baseEnd);
-  });
-
   it("sustainable spend is a positive monthly figure", () => {
     const s = sustainableSpend(plan);
     expect(s).toBeGreaterThan(0);
     expect(s).toBeLessThan(50000);
+  });
+
+  it("sustainable spend respects the full pipeline: rule 55 sustains more", () => {
+    // Early retiree with a locked 401k: unlocking it via rule 55 must never
+    // reduce — and here strictly raises — the sustainable spend.
+    const early = makePlan({ retireAge: 55, k401Today: 900_000, cashDeposit: 150_000 });
+    const with55 = makePlan({ retireAge: 55, k401Today: 900_000, cashDeposit: 150_000, rule55: true });
+    expect(sustainableSpend(with55)).toBeGreaterThan(sustainableSpend(early));
+  });
+
+  it("sustainable spend prices in lifestyle costs the old reduced sim ignored", () => {
+    // A chunky one-time expense must lower the sustainable number.
+    const clean = makePlan({});
+    const withOneTime = makePlan({ oneTimeExpenses: [{ age: 60, amount: 400_000 }] });
+    expect(sustainableSpend(withOneTime)).toBeLessThan(sustainableSpend(clean));
   });
 });

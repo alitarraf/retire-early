@@ -113,6 +113,9 @@ export function simulate({
   autoMedicare = false,      // true: at 65+ add base Part B + income-tested IRMAA (2-yr MAGI lookback)
                              // per person instead of the flat monthlyIrmaaSurcharge
   preRetirementMagi = 0,     // MAGI in the years before retirement (≈ salary); seeds the IRMAA lookback
+  hsaQualifiedFraction = 1,  // share of monthly spend that is qualified medical (tax-free HSA draws);
+                             // 1 = legacy all-medical assumption. Post-65 non-qualified HSA draws are
+                             // taxed as ordinary income (no penalty)
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
@@ -373,8 +376,15 @@ export function simulate({
     if (need > 0 && age >= 59.5 && re > 0) { const d = Math.min(need, re); re -= d; need -= d; }
     if (need > 0 && rv > 0) { const d = Math.min(need, rv); rv -= d; need -= d; }
     if (need > 0 && mn > 0) { const d = Math.min(need, mn); mn -= d; need -= d; }
-    // HSA: tax-free draw (treating all spend as qualified medical, the common retirement assumption).
-    if (need > 0 && hsa > 0) { const d = Math.min(need, hsa); hsa -= d; need -= d; }
+    // HSA (qualified): tax-free draw for the medical share of spending,
+    // capped at hsaQualifiedFraction of this month's expenses (default 1 =
+    // legacy "all spend is medical" assumption). Non-qualified HSA draws are
+    // a LAST-RESORT step after cash — see below.
+    if (need > 0 && hsa > 0) {
+      const qualCap = hsaQualifiedFraction >= 1 ? need : Math.min(need, effSpend * hsaQualifiedFraction);
+      const d = Math.min(qualCap, hsa);
+      hsa -= d; need -= d;
+    }
     if (need > 0 && bk > 0) {
       const gainFrac = Math.max(0, (bk - bb) / bk);
       const effTax = gainFrac * ltcgRateNow / 100;
@@ -404,6 +414,23 @@ export function simulate({
       if (trackMagi) magiYearAccum += draw;
     }
     if (need > 0 && cd > 0) { const d = Math.min(need, cd); cd -= d; need -= d; }
+    // HSA (non-qualified) — last resort, only reachable when
+    // hsaQualifiedFraction < 1 capped the medical draw above. Taxed as
+    // ordinary income; +20% penalty before 65 (IRC §223(f)(4)). The penalty
+    // rides through the gross-up as an addition to the flat rate.
+    if (need > 0 && hsa > 0 && hsaQualifiedFraction < 1) {
+      const flatFrac = stateTaxRate / 100 + (age >= 65 ? 0 : 0.20);
+      const gross = grossUpMonthly(need, drawBase, filingStatus, flatFrac, taxIdx);
+      const draw = Math.min(gross, hsa);
+      hsa -= draw;
+      const dd = draw * 12;
+      const fedRate = dd > 0
+        ? (federalTax(drawBase + dd, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / dd
+        : 0;
+      need -= draw * (1 - fedRate - flatFrac);
+      yearOrdAccum += draw;
+      if (trackMagi) magiYearAccum += draw;
+    }
 
     // Depletion / bridge-shortfall accounting.
     const lockedK = k401Accessible ? 0 : k;

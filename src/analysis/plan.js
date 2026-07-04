@@ -84,6 +84,7 @@ export const DEFAULTS = {
   monthlyIrmaaSurcharge: 0, // flat IRMAA surcharge at 65+ (manual path; ignored when autoMedicare)
   autoMedicare: false, // income-tested Part B + IRMAA (2-yr lookback); off by default because
                        // many users already carry Medicare premiums inside monthlyExpense
+  hsaQualifiedFraction: 1, // share of spend that is qualified medical for HSA draws (1 = legacy)
   stateSsExemptRate: 0,     // 0 = SS fully taxable at state rate; 1 = fully exempt
 
   // Estate & legacy
@@ -231,6 +232,7 @@ export function simParamsAt(plan, age, overrides = {}) {
     guardrailLower: overrides.guardrailLower ?? plan.guardrailLower,
     monthlyIrmaaSurcharge: overrides.monthlyIrmaaSurcharge ?? plan.monthlyIrmaaSurcharge,
     autoMedicare: plan.autoMedicare,
+    hsaQualifiedFraction: plan.hsaQualifiedFraction,
     // IRMAA's 2-year lookback covers the final working years right after
     // retirement; salary approximates pre-retirement MAGI.
     preRetirementMagi: plan.salary,

@@ -178,10 +178,12 @@ export function DocsPanel() {
       <P>The simulation runs month by month from retire age to life expectancy. Each month:</P>
       <div style={{ marginBottom: 16, marginTop: 4 }}>
         {[
-          ["All balances grow", "Every account (401k, Roth, brokerage, munis, HSA, CD) grows at the monthly equivalent of the stock return."],
-          ["Social Security kicks in at SS age", "Inflated by inflation each month. Up to 85% is taxable federally; state exemption reduces state tax on SS."],
-          ["ACA premium applied (pre-65)", "Added to expenses when prior-year income exceeded the FPL cliff."],
-          ["IRMAA applied (65+)", "Medicare surcharge added to expenses."],
+          ["All balances grow", "Stocks (401k, Roth, brokerage, HSA) grow at your stock return; cash/CDs and munis grow at their own yields — so a cash buffer holds its value through a modeled crash."],
+          ["Tax brackets index with inflation", "Brackets, the standard deduction, and the FPL are inflation-adjusted every year (as the IRS/HHS do), so a constant-real income doesn't creep into higher brackets over 30 years. SS provisional thresholds stay frozen — that's real law."],
+          ["Social Security kicks in at SS age", "Inflated each month. Up to 85% is taxable federally (IRC §86 provisional income); state exemption reduces state tax on SS."],
+          ["Income & expense streams applied", "Pensions/annuities/part-time income offset costs (taxable streams raise SS taxation, ACA and IRMAA like real income); ending costs like a mortgage stop at their end age."],
+          ["ACA premium applied (pre-65)", "Sliding scale: below 400% FPL you pay 2.1–9.96% of prior-year MAGI toward the benchmark premium (2026 table); at or above the cliff, the full premium."],
+          ["Medicare applied (65+)", "In auto mode: base Part B plus IRMAA surcharges income-tested against your MAGI from two years earlier. Otherwise your flat surcharge."],
           ["Expenses are covered in draw order", "See below."],
           ["Guardrails checked at year-end", "WR = (spend − SS) × 12 ÷ portfolio. Cut 10% if above upper; raise 10% if below lower."],
           ["RMD forced at year-end (73 or 75)", "Minimum 401k draw, net of tax, moves to brokerage if not already withdrawn."],
@@ -196,12 +198,13 @@ export function DocsPanel() {
         {[
           ["Roth contributions", "Always tax-free, no age restriction. Drawn first."],
           ["Roth earnings (59½+)", "Tax-free after 59½. Locked before."],
-          ["Converted Roth (59½+ AND 5-yr lock cleared)", "Conversions must be 5 years old and you must be 59½."],
+          ["Converted Roth (5 years after each conversion — any age)", "Converted PRINCIPAL is penalty-free once its 5-year clock clears, even before 59½ — this is what makes the Roth conversion ladder a real pre-59½ bridge. Growth on conversions stays locked until 59½."],
           ["Municipal bonds", "Tax-free income (or state-only taxable). Efficient bridge asset."],
-          ["HSA", "Tax-free draws (assumed qualified medical). More efficient than brokerage."],
-          ["Taxable brokerage", "Only gain above cost basis is taxed at LTCG rate."],
+          ["HSA (medical share)", "Tax-free draws up to your medical share of spending (expert setting; default treats all spending as qualified)."],
+          ["Taxable brokerage", "Only gain above cost basis is taxed. By default the rate comes from the real LTCG brackets — gains stack on your other income, so low-income years pay 0% — plus the 3.8% NIIT above $200k/$250k MAGI."],
           ["401k (59½+, or Rule of 55 / SEPP)", "Taxed as ordinary income at retirement brackets."],
-          ["CD / cash", "Drawn last. Taxed as ordinary income on any gains."],
+          ["CD / cash", "Already-taxed money."],
+          ["HSA (non-qualified, last resort)", "Taxed as ordinary income, plus a 20% penalty before 65 — the engine only touches it when everything else is gone."],
         ].map(([label, detail], i) => (
           <DrawStep key={i} n={i + 1} label={label} detail={detail} />
         ))}
@@ -210,17 +213,24 @@ export function DocsPanel() {
       {/* ── Caveats ── */}
       <H2>Limitations & assumptions</H2>
       <Callout tone="warn">
-        This is a planning tool, not financial advice. It does not account for: variable income in semi-retirement, Social Security claiming optimization for couples, state tax on all income types (only 401k and brokerage are state-taxed; some states treat income differently), or changes to tax law. One-time large expenses and a declining spending curve <em>can</em> now be modeled via the Advanced inputs. Verify Social Security projections at ssa.gov and tax figures with a CPA before making major decisions.
+        This is a planning tool, not financial advice. Part-time income, pensions, a survivor scenario, one-time
+        expenses/windfalls, and a declining spending curve <em>can</em> now be modeled (Spending, Estate and
+        Advanced inputs — several behind the Expert detail level). Verify Social Security projections at ssa.gov
+        and tax figures with a CPA before making major decisions.
       </Callout>
       {[
-        ["All returns are nominal", "The stock return you enter is the nominal rate (before inflation). Real return = stock return − inflation. Default: 10% − 3% = 7% real."],
+        ["All returns are nominal", "The stock return you enter is the nominal rate (before inflation). Real return = stock return − inflation. Default: 10% − 3% = 7% real. Cash/CDs and munis use their own yields in retirement."],
         ["SS benefit is in today's dollars", "The engine inflates it each month at the inflation rate. This assumes SS COLA tracks your personal inflation, which is a reasonable approximation."],
-        ["ACA subsidy model is simplified", "Below 400% FPL = fully subsidized; above = full premium. The actual ACA subsidy curve is more nuanced and changed with the IRA. Use this as a directional estimate."],
-        ["Tax brackets are 2026 IRS figures", "Tax law changes frequently. All brackets are in the constants file and can be updated for any year."],
-        ["Spouse SS is treated as a pooled benefit", "The model adds spouse SS income to the household pool at the spouse SS age. Spousal benefit optimization (e.g. file-and-suspend strategies) is not modeled."],
-        ["Monte Carlo uses σ=12% annually", "This is a typical equity volatility estimate. Bond-heavy portfolios would have lower standard deviation; your actual sequence of returns will differ."],
-        ["Forced RMDs are reinvested, not spent", "When a Required Minimum Distribution is larger than your spending need, the full pre-tax amount is reinvested in your taxable brokerage and the income tax is paid from cash (then brokerage). This models a retiree who doesn't need the RMD to live on — it moves money out of the tax-deferred account but keeps it invested."],
-        ["Phase spending & one-time costs are your estimates", "The go-go/slow-go/no-go multipliers and any one-time expenses you enter are illustrative inputs, not predictions. Real spending curves vary widely; use them to pressure-test, not to forecast precisely."],
+        ["Tax figures are 2026 as published", "Brackets (Rev. Proc. 2025-32), the ACA percentage table (Rev. Proc. 2025-25), and Medicare/IRMAA (CMS 2026) — all inflation-indexed forward by your inflation assumption. Tax law changes; the constants live in one file and are updated annually."],
+        ["Roth conversion pro-rata rule is not modeled", "Conversions are treated as fully taxable — correct when your traditional accounts are all pre-tax dollars. If you hold nondeductible (after-tax) IRA basis, the real tax on a conversion is lower than modeled."],
+        ["RMDs use the Uniform Lifetime Table only", "A spouse more than 10 years younger would use the Joint Life table (smaller RMDs). Inherited-account RMDs and Qualified Charitable Distributions are not modeled."],
+        ["State tax is one flat rate", "Applied to all taxable income types alike. No state brackets, deductions, or retirement-income exclusions beyond the SS exemption setting."],
+        ["One household 401k pot", "Balances are pooled, and access ages key off the primary. Per-spouse account modeling (separate 59½ clocks, per-owner RMDs) is not supported yet."],
+        ["Dividend drag is not modeled", "Brokerage returns compound untaxed until you sell; real funds distribute taxable dividends along the way, which slightly overstates taxable-account compounding."],
+        ["Spouse SS is a pooled benefit", "Spouse SS joins the household pool at their claiming age; the survivor scenario keeps the larger benefit. Claiming-strategy optimization for couples is not modeled."],
+        ["Monte Carlo uses σ=12% annually", "A typical equity volatility estimate. Bond-heavy portfolios would have lower standard deviation; your actual sequence of returns will differ."],
+        ["Forced RMDs are reinvested, not spent", "When a Required Minimum Distribution is larger than your spending need, the full pre-tax amount is reinvested in your taxable brokerage and the income tax is paid from cash (then brokerage)."],
+        ["Phase spending & one-time costs are your estimates", "The go-go/slow-go/no-go multipliers and any one-time expenses you enter are illustrative inputs, not predictions. Use them to pressure-test, not to forecast precisely."],
       ].map(([title, desc]) => (
         <div key={title} style={{ marginBottom: 10, fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
           <strong style={{ color: "#1a2e28" }}>{title}. </strong>{desc}

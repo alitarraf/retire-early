@@ -59,7 +59,8 @@ export const DEFAULTS = {
 
   // Tax
   employmentBracket: 22,
-  ltcgBracket: 15,
+  ltcgBracket: 15, // manual LTCG rate; only used when autoLtcg is false
+  autoLtcg: true,  // derive the LTCG rate from real brackets (stacking + NIIT) each sim year
   stateKey: "Oregon",
   stateTaxEnabled: true,
 
@@ -229,6 +230,7 @@ export function simParamsAt(plan, age, overrides = {}) {
     monthlyIrmaaSurcharge: overrides.monthlyIrmaaSurcharge ?? plan.monthlyIrmaaSurcharge,
     stateSsExemptRate: overrides.stateSsExemptRate ?? plan.stateSsExemptRate,
     assumeStepUpBasis: overrides.assumeStepUpBasis ?? plan.assumeStepUpBasis,
+    autoLtcg: plan.autoLtcg,
     // One-time expenses: entered in today's $; inflate to retire-date $ (same basis as monthlyExpense)
     // and keep only entries that land within the simulated window (retirement → life expectancy).
     oneTimeExpenses: (overrides.oneTimeExpenses ?? plan.oneTimeExpenses ?? [])

@@ -73,8 +73,37 @@ export const CONTRIB_LIMITS = {
   hsaCatchup: 1000,     // additional catch-up at age 55+
 };
 
-// Long-term capital-gains rate options offered in the UI.
+// Long-term capital-gains rate options offered in the UI (manual override
+// when autoLtcg is off).
 export const LTCG_RATES = [0, 15, 20];
+
+// 2026 LTCG brackets (Rev. Proc. 2025-32). `upTo` is the top of the band of
+// TAXABLE income; gains stack on top of ordinary taxable income. These
+// thresholds ARE inflation-indexed annually (unlike NIIT).
+export const LTCG_BRACKETS = {
+  single: [
+    { upTo: 49450, rate: 0 },
+    { upTo: 545500, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+  mfj: [
+    { upTo: 98900, rate: 0 },
+    { upTo: 613700, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+  hoh: [
+    { upTo: 66200, rate: 0 },
+    { upTo: 579600, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+};
+
+// Net Investment Income Tax (IRC §1411): 3.8% on investment income above the
+// MAGI threshold. Thresholds are NOT inflation-indexed — fixed in law.
+export const NIIT = {
+  rate: 0.038,
+  threshold: { single: 200000, mfj: 250000, hoh: 200000 },
+};
 
 // Ordinary employment-bracket options offered in the UI.
 export const EMPLOYMENT_BRACKETS = [10, 12, 22, 24, 32, 35, 37];

@@ -8,6 +8,8 @@ import {
   STD_DEDUCTION,
   DEFAULT_FILING_STATUS,
   SS_PROVISIONAL_THRESHOLDS,
+  LTCG_BRACKETS,
+  NIIT,
 } from "../constants/brackets.js";
 
 function bracketsFor(filingStatus) {
@@ -69,6 +71,28 @@ export function taxableSsAmount(annualGrossSS, otherOrdinaryIncome, filingStatus
  * Top (marginal) bracket rate at a given income level, after the
  * standard deduction. Used for Roth-conversion cost.
  */
+/**
+ * Federal LTCG rate for gains stacked on top of `ordinaryGrossIncome`
+ * (pre-deduction). Gains sit above ordinary taxable income in the LTCG
+ * brackets; this returns the rate at that stacking point. A gain large
+ * enough to straddle a breakpoint is approximated at the single rate where
+ * the stack begins (the engine applies one effective rate per year).
+ * LTCG thresholds are IRS inflation-indexed, so `indexFactor` applies.
+ */
+export function ltcgRateAt(ordinaryGrossIncome, filingStatus = DEFAULT_FILING_STATUS, indexFactor = 1) {
+  const brackets = LTCG_BRACKETS[filingStatus] ?? LTCG_BRACKETS[DEFAULT_FILING_STATUS];
+  const ordTaxable = Math.max(0, ordinaryGrossIncome - deductionFor(filingStatus) * indexFactor);
+  for (const { upTo, rate } of brackets) {
+    if (ordTaxable < upTo * indexFactor) return rate;
+  }
+  return brackets[brackets.length - 1].rate;
+}
+
+/** True when MAGI crosses the (non-indexed) NIIT threshold for the filing status. */
+export function niitApplies(magi, filingStatus = DEFAULT_FILING_STATUS) {
+  return magi > (NIIT.threshold[filingStatus] ?? NIIT.threshold[DEFAULT_FILING_STATUS]);
+}
+
 export function marginalFedRate(income, filingStatus = DEFAULT_FILING_STATUS, indexFactor = 1) {
   const taxable = Math.max(0, income - deductionFor(filingStatus) * indexFactor);
   for (const { upTo, rate } of bracketsFor(filingStatus)) {

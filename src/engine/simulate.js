@@ -34,11 +34,13 @@ import { DEFAULT_FILING_STATUS, ACA, STD_DEDUCTION } from "../constants/brackets
 // net(gross) is monotonically increasing in gross (marginal tax < 100%), so a bisection
 // converges robustly. The previous 3-iteration fixed point could stall when the draw
 // straddled a bracket boundary (the marginal rate jumps mid-interval); bisection does not.
-export function grossUpMonthly(needMonthly, base, filingStatus, stateRateFrac) {
+export function grossUpMonthly(needMonthly, base, filingStatus, stateRateFrac, indexFactor = 1) {
   if (needMonthly <= 0) return 0;
   const netOf = (g) => {
     const d = g * 12;
-    const fedRate = d > 0 ? (federalTax(base + d, filingStatus) - federalTax(base, filingStatus)) / d : 0;
+    const fedRate = d > 0
+      ? (federalTax(base + d, filingStatus, indexFactor) - federalTax(base, filingStatus, indexFactor)) / d
+      : 0;
     return g * (1 - fedRate - stateRateFrac);
   };
   let lo = needMonthly; // net ≤ gross, so the answer is at least the net needed
@@ -92,6 +94,9 @@ export function simulate({
   noGoAge = Infinity,        // age the no-go phase begins
   conversionCeiling = 0,     // bracket-fill: convert up to this TAXABLE-income top each year; 0 = use fixed amount
   conversionEndAge = 59.5,   // conversions allowed while age < this (59.5 = bridge only; raise for RMD-prep years)
+  taxIndexYears = null,      // years between TAX_YEAR and the retirement date; brackets/deduction/FPL
+                             // inflation-index from that offset and keep indexing through retirement.
+                             // null = legacy behavior: frozen at TAX_YEAR figures for the whole sim.
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const mi = inflationRate / 100 / 12;
@@ -121,6 +126,7 @@ export function simulate({
   let yearOrdAccum = 0;       // current year accumulator; saved to priorYearOrdIncome at year end
   let taxableSsFrac = 0;      // fraction of gross SS that is federally taxable (set at year start)
   let drawBase = 0;           // annual income base for marginal-delta rate calc (set at year start)
+  let taxIdx = 1;             // this year's bracket/deduction/FPL inflation index (set at year start)
 
   // ACA MAGI tracking — trailing model: prior-year MAGI determines current-year premium status.
   // MAGI sources: traditional 401k draws, Roth conversions, brokerage gains, actual taxable SS.
@@ -149,6 +155,10 @@ export function simulate({
       // Update monthly return rate for this year (Monte Carlo: per-year stochastic returns).
       if (returnSeries) mr = (returnSeries[yr] ?? stockReturn) / 100 / 12;
 
+      // Tax-code inflation index for this year: brackets, standard deduction, and FPL
+      // are adjusted annually by the IRS/HHS. SS provisional thresholds stay frozen (law).
+      taxIdx = taxIndexYears == null ? 1 : Math.pow(1 + inflationRate / 100, taxIndexYears + yr);
+
       // RMD: reset annual tracker and set this year's minimum.
       rmdWithdrawnThisYear = 0;
       rmdForThisYear = (rmdAge > 0 && age >= rmdAge && priorYearEndK > 0)
@@ -157,7 +167,7 @@ export function simulate({
 
       // ACA: determine premium status from prior year's MAGI.
       if (monthlyAcaFullPremium > 0) {
-        const fpl = ACA.fplBase + Math.max(0, householdSize - 1) * ACA.fplPerAdditionalPerson;
+        const fpl = (ACA.fplBase + Math.max(0, householdSize - 1) * ACA.fplPerAdditionalPerson) * taxIdx;
         acaPremiumActive = priorYearMagi >= fpl * ACA.cliffMultiple;
         magiYearAccum = 0;
       }
@@ -190,13 +200,13 @@ export function simulate({
     if (convMode && age < conversionEndAge && !scheduled.has(yr) && m % 12 === 0) {
       scheduled.add(yr);
       const target = convMode === "fill"
-        ? Math.max(0, conversionCeiling + (STD_DEDUCTION[filingStatus] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS]) - drawBase)
+        ? Math.max(0, (conversionCeiling + (STD_DEDUCTION[filingStatus] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS])) * taxIdx - drawBase)
         : annualRothConversion;
       let conv = Math.min(target, k);
       if (conv > 0) {
         // Tax on conversion: marginal delta from drawBase (stacked on other income this year).
         const taxOf = (amt) =>
-          (federalTax(drawBase + amt, filingStatus) - federalTax(drawBase, filingStatus)) + amt * stateTaxRate / 100;
+          (federalTax(drawBase + amt, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) + amt * stateTaxRate / 100;
         let tax = taxOf(conv);
         // You can only convert as much as you can pay tax on from liquid funds (cd + bk). Without
         // this, a large bracket-fill with little cash would be silently under-taxed — and the
@@ -252,7 +262,7 @@ export function simulate({
       // Federal tax: SS occupies [0, taxableSS]; draws occupy [taxableSS, taxableSS+draw].
       // Using base=0 here avoids double-counting the priorYearOrdIncome bracket slice.
       // priorYearOrdIncome is still used above for provisional income (taxable fraction).
-      const ssFedTax = federalTax(taxableAnnual, filingStatus) / 12;
+      const ssFedTax = federalTax(taxableAnnual, filingStatus, taxIdx) / 12;
       ss = grossSS - ssFedTax - grossSS * effectiveSsStateTaxRate / 100;
       if (monthlyAcaFullPremium > 0) magiYearAccum += taxableMonthly;
     }
@@ -281,7 +291,7 @@ export function simulate({
       const seppGross = Math.min(annualSepp / 12, k);
       const seppD = seppGross * 12;
       const seppFedRate = seppD > 0
-        ? (federalTax(drawBase + seppD, filingStatus) - federalTax(drawBase, filingStatus)) / seppD
+        ? (federalTax(drawBase + seppD, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / seppD
         : 0;
       const seppEff = seppFedRate + stateTaxRate / 100;
       k -= seppGross;
@@ -315,12 +325,12 @@ export function simulate({
     const k401Accessible = age >= 59.5 || rule55;
     if (need > 0 && k401Accessible && k > 0) {
       // Gross-up via bisection: rate = marginal delta at (drawBase + annualized draw).
-      const gross = grossUpMonthly(need, drawBase, filingStatus, stateTaxRate / 100);
+      const gross = grossUpMonthly(need, drawBase, filingStatus, stateTaxRate / 100, taxIdx);
       const draw = Math.min(gross, k);
       k -= draw;
       const d = draw * 12;
       const fedRate = d > 0
-        ? (federalTax(drawBase + d, filingStatus) - federalTax(drawBase, filingStatus)) / d
+        ? (federalTax(drawBase + d, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / d
         : 0;
       need -= draw * (1 - fedRate - stateTaxRate / 100);
       if (taxSummary.k401EffRate === null) taxSummary.k401EffRate = fedRate + stateTaxRate / 100;
@@ -343,7 +353,7 @@ export function simulate({
     if (m % 12 === 11 && rmdForThisYear > rmdWithdrawnThisYear && k > 0) {
       const shortfall = Math.min(rmdForThisYear - rmdWithdrawnThisYear, k);
       const rmdFedRate = shortfall > 0
-        ? (federalTax(drawBase + shortfall, filingStatus) - federalTax(drawBase, filingStatus)) / shortfall
+        ? (federalTax(drawBase + shortfall, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / shortfall
         : 0;
       const tax = shortfall * (rmdFedRate + stateTaxRate / 100);
       k -= shortfall;

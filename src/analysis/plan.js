@@ -202,6 +202,9 @@ export function simParamsAt(plan, age, overrides = {}) {
       Math.pow(1 + plan.inflationRate / 100, yrs),
     inflationRate: plan.inflationRate,
     stockReturn: plan.stockReturn,
+    // Brackets/deduction/FPL are IRS-inflation-indexed annually; "today" in the
+    // model is TAX_YEAR, so the retirement date sits `yrs` index-years out.
+    taxIndexYears: yrs,
     ...proj,
     brokerageLtcgRate: plan.brokerageLtcgRate,
     stateTaxRate: plan.effectiveStateTax,

@@ -18,37 +18,42 @@ function deductionFor(filingStatus) {
   return STD_DEDUCTION[filingStatus] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS];
 }
 
-function applyBrackets(income, filingStatus) {
-  const taxable = Math.max(0, income - deductionFor(filingStatus));
+// `indexFactor` scales bracket tops and the standard deduction to a future
+// tax year (IRS inflation adjustments): 1 = TAX_YEAR as published.
+function applyBrackets(income, filingStatus, indexFactor = 1) {
+  const taxable = Math.max(0, income - deductionFor(filingStatus) * indexFactor);
   if (taxable <= 0 || income <= 0) return 0;
   let tax = 0, prev = 0;
   for (const { upTo, rate } of bracketsFor(filingStatus)) {
-    const chunk = Math.min(taxable - prev, upTo - prev);
+    const top = upTo * indexFactor;
+    const chunk = Math.min(taxable - prev, top - prev);
     if (chunk <= 0) break;
     tax += chunk * rate;
-    prev = upTo;
+    prev = top;
     if (prev >= taxable) break;
   }
   return tax;
 }
 
 /** Dollar amount of federal income tax on `income`, after the standard deduction. */
-export function federalTax(income, filingStatus = DEFAULT_FILING_STATUS) {
-  return applyBrackets(income, filingStatus);
+export function federalTax(income, filingStatus = DEFAULT_FILING_STATUS, indexFactor = 1) {
+  return applyBrackets(income, filingStatus, indexFactor);
 }
 
 /**
  * Blended (effective) federal rate on a withdrawal/income amount,
  * after the standard deduction. Returns tax / gross.
  */
-export function effectiveFedRate(income, filingStatus = DEFAULT_FILING_STATUS) {
+export function effectiveFedRate(income, filingStatus = DEFAULT_FILING_STATUS, indexFactor = 1) {
   if (income <= 0) return 0;
-  return applyBrackets(income, filingStatus) / income;
+  return applyBrackets(income, filingStatus, indexFactor) / income;
 }
 
 /**
  * Annual taxable Social Security amount under IRC §86 provisional income rules.
  * `otherOrdinaryIncome` is annual income from all sources except SS (e.g. 401k draws).
+ * The provisional thresholds are deliberately NOT inflation-indexed — they are
+ * frozen in law (unchanged since 1983/1993), so no indexFactor applies here.
  */
 export function taxableSsAmount(annualGrossSS, otherOrdinaryIncome, filingStatus = DEFAULT_FILING_STATUS) {
   if (annualGrossSS <= 0) return 0;
@@ -64,10 +69,10 @@ export function taxableSsAmount(annualGrossSS, otherOrdinaryIncome, filingStatus
  * Top (marginal) bracket rate at a given income level, after the
  * standard deduction. Used for Roth-conversion cost.
  */
-export function marginalFedRate(income, filingStatus = DEFAULT_FILING_STATUS) {
-  const taxable = Math.max(0, income - deductionFor(filingStatus));
+export function marginalFedRate(income, filingStatus = DEFAULT_FILING_STATUS, indexFactor = 1) {
+  const taxable = Math.max(0, income - deductionFor(filingStatus) * indexFactor);
   for (const { upTo, rate } of bracketsFor(filingStatus)) {
-    if (taxable <= upTo) return rate;
+    if (taxable <= upTo * indexFactor) return rate;
   }
   return 0.37;
 }

@@ -26,7 +26,14 @@
 
 import { federalTax, taxableSsAmount, ltcgRateAt, niitApplies } from "./tax.js";
 import { rmdFactor } from "./rmd.js";
-import { DEFAULT_FILING_STATUS, ACA, acaApplicablePct, STD_DEDUCTION } from "../constants/brackets.js";
+import {
+  DEFAULT_FILING_STATUS,
+  ACA,
+  acaApplicablePct,
+  STD_DEDUCTION,
+  MEDICARE,
+  irmaaMonthlySurcharge,
+} from "../constants/brackets.js";
 
 // Gross-up solver for a tax-deferred (401k) withdrawal: find the monthly PRE-tax draw
 // whose after-tax value equals `needMonthly`, where the effective rate is the marginal
@@ -103,6 +110,9 @@ export function simulate({
   autoLtcg = false,          // true: derive the brokerage gain rate each year from real LTCG brackets
                              // (stacked on trailing ordinary income) + state + NIIT, instead of the
                              // flat user-picked brokerageLtcgRate
+  autoMedicare = false,      // true: at 65+ add base Part B + income-tested IRMAA (2-yr MAGI lookback)
+                             // per person instead of the flat monthlyIrmaaSurcharge
+  preRetirementMagi = 0,     // MAGI in the years before retirement (≈ salary); seeds the IRMAA lookback
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
@@ -142,8 +152,14 @@ export function simulate({
   let magiYearAccum = 0;     // running MAGI total for the current calendar year
   let priorYearMagi = 0;     // MAGI from the prior year; used at year start to set premium status
   let acaMonthlyDue = 0; // this year's monthly ACA premium after the credit (set at year start)
-  // MAGI is tracked whenever any consumer needs it (ACA premium status, NIIT).
-  const trackMagi = monthlyAcaFullPremium > 0 || autoLtcg;
+  // MAGI is tracked whenever any consumer needs it (ACA premium, NIIT, IRMAA).
+  const trackMagi = monthlyAcaFullPremium > 0 || autoLtcg || autoMedicare;
+  // IRMAA uses MAGI from TWO years prior (SSA lookback). Both ring slots are
+  // seeded with pre-retirement MAGI so retirement years 1–2 reflect final
+  // working-year income. Kept separate from priorYearMagi, which stays
+  // 0-seeded for the ACA/NIIT trailing model.
+  let magiTwoYearsAgo = preRetirementMagi;
+  let magiLastYearIrmaa = preRetirementMagi;
   // Effective % rate applied to the gain portion of brokerage draws this year.
   // autoLtcg recomputes it each year start; otherwise it's the flat input.
   let ltcgRateNow = brokerageLtcgRate;
@@ -322,7 +338,17 @@ export function simulate({
     // Applies pre-Medicare only (age < 65). Simplified: below cliff = fully subsidized.
     if (monthlyAcaFullPremium > 0 && age < 65) need += acaMonthlyDue;
     // IRMAA Medicare surcharge: added to expenses at age 65+ when income exceeds thresholds.
-    if (monthlyIrmaaSurcharge > 0 && age >= 65) need += monthlyIrmaaSurcharge;
+    // Medicare at 65+: autoMedicare adds base Part B + income-tested IRMAA
+    // (2-year MAGI lookback, hard tier cliffs) per covered person; otherwise
+    // the flat user-entered surcharge applies. MFJ covers two people —
+    // approximation: both go on Medicare when the primary turns 65.
+    if (autoMedicare && age >= 65) {
+      const persons = filingStatus === "mfj" ? 2 : 1;
+      need += (MEDICARE.partBBase * taxIdx +
+        irmaaMonthlySurcharge(magiTwoYearsAgo, filingStatus, taxIdx)) * persons;
+    } else if (monthlyIrmaaSurcharge > 0 && age >= 65) {
+      need += monthlyIrmaaSurcharge;
+    }
 
     // 72(t) SEPP: forced monthly 401k draw during the SEPP period (before normal draw order).
     // After-tax income reduces need; any excess is banked in CD for later use.
@@ -433,7 +459,11 @@ export function simulate({
     if (m % 12 === 11) {
       priorYearEndK = k;
       priorYearOrdIncome = yearOrdAccum;
-      if (trackMagi) priorYearMagi = magiYearAccum;
+      if (trackMagi) {
+        magiTwoYearsAgo = magiLastYearIrmaa;
+        magiLastYearIrmaa = magiYearAccum;
+        priorYearMagi = magiYearAccum;
+      }
     }
 
     // Yearly snapshot.

@@ -165,6 +165,46 @@ export function acaApplicablePct(fplRatio) {
   return null;
 }
 
+// ── Medicare Part B / IRMAA (2026, CMS) ──
+// IRMAA is a hard cliff per tier, based on MAGI from TWO years prior.
+// Thresholds and surcharges below are 2026 figures; the engine indexes both
+// by the plan's inflation rate (approximation — real premium growth has
+// historically outpaced CPI; the top tier is frozen until 2028 by law).
+export const MEDICARE = {
+  partBBase: 202.90, // standard monthly Part B premium, per person
+  irmaa: {
+    single: [
+      { magiUpTo: 109000, partB: 0, partD: 0 },
+      { magiUpTo: 137000, partB: 81.20, partD: 14.50 },
+      { magiUpTo: 171000, partB: 202.90, partD: 37.50 },
+      { magiUpTo: 205000, partB: 324.60, partD: 60.40 },
+      { magiUpTo: 500000, partB: 446.30, partD: 83.30 },
+      { magiUpTo: Infinity, partB: 487.00, partD: 91.00 },
+    ],
+    mfj: [
+      { magiUpTo: 218000, partB: 0, partD: 0 },
+      { magiUpTo: 274000, partB: 81.20, partD: 14.50 },
+      { magiUpTo: 342000, partB: 202.90, partD: 37.50 },
+      { magiUpTo: 410000, partB: 324.60, partD: 60.40 },
+      { magiUpTo: 750000, partB: 446.30, partD: 83.30 },
+      { magiUpTo: Infinity, partB: 487.00, partD: 91.00 },
+    ],
+  },
+};
+
+/**
+ * Monthly IRMAA surcharge (Part B + Part D, per person) for a lookback MAGI.
+ * hoh uses the single scale (SSA has no separate hoh table).
+ */
+export function irmaaMonthlySurcharge(magi, filingStatus = "single", indexFactor = 1) {
+  const tiers = MEDICARE.irmaa[filingStatus] ?? MEDICARE.irmaa.single;
+  for (const t of tiers) {
+    if (magi <= t.magiUpTo * indexFactor) return (t.partB + t.partD) * indexFactor;
+  }
+  const top = tiers[tiers.length - 1];
+  return (top.partB + top.partD) * indexFactor;
+}
+
 // ── Social Security provisional income thresholds (IRC §86) ──
 // NOT inflation-adjusted — unchanged since 1983/1993 as enacted.
 // Provisional Income = other AGI + ½ gross SS.

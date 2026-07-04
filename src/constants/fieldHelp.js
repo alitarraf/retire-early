@@ -6,6 +6,41 @@
 
 export const FIELD_HELP = {
   // ── You / Timeline ──────────────────────────────────────────
+  autoLtcg: {
+    label: "Capital gains model",
+    context:
+      "Real brackets: the rate on brokerage gains is derived each year from the actual LTCG brackets (0/15/20% depending on your other income) plus the 3.8% NIIT above $200k/$250k MAGI. Flat rate: you pick one rate that applies always.",
+  },
+  autoMedicare: {
+    label: "Medicare model",
+    context:
+      "By income: adds the real Part B premium plus IRMAA surcharges from age 65, income-tested against your MAGI from two years earlier (so a big Roth conversion at 63 raises your premium at 65). Flat: you enter one fixed surcharge.",
+  },
+  hsaQualifiedFraction: {
+    label: "Medical share of spending",
+    context:
+      "HSA withdrawals are only tax-free for qualified medical costs. This caps tax-free HSA draws at this share of your spending; the rest can still come from the HSA but is taxed (plus a 20% penalty before 65). 100% = treat all spending as medical (optimistic).",
+  },
+  survivorAge: {
+    label: "Survivor scenario",
+    context:
+      "Models one spouse dying at this age (yours): the survivor files single (higher tax brackets on the same income — the 'widow's tax'), keeps only the larger Social Security benefit, and household size drops for ACA purposes. 0 = not modeled.",
+  },
+  survivorSpendFraction: {
+    label: "Survivor spending",
+    context:
+      "Share of household spending that continues after a spouse dies. Studies suggest a single retiree spends roughly 70–80% of the couple's budget.",
+  },
+  incomeStreams: {
+    label: "Other income",
+    context:
+      "Pension, annuity, part-time work, or rental income. Taxable streams behave like real ordinary income: they raise the tax on your 401k withdrawals, Social Security taxation, ACA premiums, and IRMAA. Fixed $ streams keep their nominal amount (typical private pension); COLA streams grow with inflation.",
+  },
+  expenseStreams: {
+    label: "Expenses that end",
+    context:
+      "Recurring costs on top of monthly expenses that stop at a known age — a mortgage payment, a car loan. 'Fixed payment' keeps the nominal amount (a mortgage doesn't inflate); property tax and insurance belong in monthly expenses instead.",
+  },
   alreadyRetired: {
     label: "Life stage",
     context:

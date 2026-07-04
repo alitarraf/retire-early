@@ -19,6 +19,7 @@ import { MaximizeCenter } from "../panels/MaximizeCenter.jsx";
 import { AdvicePanel } from "../panels/AdvicePanel.jsx";
 import { DocsPanel } from "../panels/DocsPanel.jsx";
 import { INPUT_SECTIONS, FINE_TUNING_KEYS } from "../panels/InputsSidebar.jsx";
+import { ExpertToggle } from "../panels/inputs/atoms.jsx";
 
 const NAV = [
   { key: "you", label: "You" },
@@ -368,6 +369,7 @@ function SectionEditor({ section, ftSub, setFtSub, onDone, inputs, set, plan, le
             );
           })}
         </div>
+        <ExpertToggle />
         <div style={{ padding: "16px 16px 32px" }}>
           <Sub inputs={inputs} set={set} plan={plan} {...subExtra} />
         </div>

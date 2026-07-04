@@ -220,9 +220,9 @@ export const FIELD_HELP = {
 
   // ── Healthcare ──────────────────────────────────────────────
   monthlyAcaFullPremium: {
-    label: "ACA full premium / mo",
+    label: "ACA benchmark premium / mo",
     context:
-      "Unsubsidized marketplace premium (ages 55–64). Added to expenses only above the subsidy cliff. At 65 Medicare replaces it. Enter only if not already in your monthly expenses.",
+      "Unsubsidized benchmark silver-plan premium for your household (pre-65). Below 400% FPL you pay a sliding share of income (2.1–9.96%); above the cliff you pay this full amount. At 65 Medicare replaces it. Enter only if not already in your monthly expenses.",
   },
   monthlyIrmaaSurcharge: {
     label: "IRMAA / mo",

@@ -101,3 +101,64 @@ describe("ACA: premium stops at Medicare eligibility age 65", () => {
     expect(lastTotal(at65Aca)).toBeCloseTo(lastTotal(at65NoAca), -3);
   });
 });
+
+// ── Phase 1E: sliding-scale premium (Rev. Proc. 2025-25) ─────────────────
+// Below 400% FPL the household pays min(benchmark, applicablePct × MAGI);
+// the binary free-or-full cliff is gone below 400%, retained at/above it.
+
+import { acaApplicablePct, ACA } from "../constants/brackets.js";
+
+describe("acaApplicablePct(): 2026 applicable-percentage table", () => {
+  it("flat 2.10% below 133% FPL", () => {
+    expect(acaApplicablePct(0.5)).toBeCloseTo(0.021, 6);
+    expect(acaApplicablePct(1.32)).toBeCloseTo(0.021, 6);
+  });
+
+  it("interpolates linearly inside bands", () => {
+    // midpoint of 150–200% band: (0.0419 + 0.0660) / 2
+    expect(acaApplicablePct(1.75)).toBeCloseTo((0.0419 + 0.066) / 2, 4);
+    // midpoint of 250–300% band
+    expect(acaApplicablePct(2.75)).toBeCloseTo((0.0844 + 0.0996) / 2, 4);
+  });
+
+  it("flat 9.96% across 300–400% FPL", () => {
+    expect(acaApplicablePct(3.0)).toBeCloseTo(0.0996, 6);
+    expect(acaApplicablePct(3.99)).toBeCloseTo(0.0996, 6);
+  });
+
+  it("cliff at 400% FPL: no credit", () => {
+    expect(acaApplicablePct(4.0)).toBeNull();
+    expect(acaApplicablePct(7.5)).toBeNull();
+  });
+
+  it("is monotone non-decreasing below the cliff", () => {
+    let prev = 0;
+    for (let r = 0.1; r < 4.0; r += 0.05) {
+      const p = acaApplicablePct(r);
+      expect(p).toBeGreaterThanOrEqual(prev - 1e-12);
+      prev = p;
+    }
+  });
+});
+
+describe("ACA sliding scale in simulate()", () => {
+  it("below-cliff income pays a partial premium: between free and full", () => {
+    // Couple household (~$84.6k cliff); ~$65k MAGI sits near 300% FPL → ~9.96%.
+    const free = simulate({ ...high401kBase, householdSize: 2 });
+    const partial = simulate({ ...high401kBase, householdSize: 2, monthlyAcaFullPremium: 2000 });
+    const fullCliff = simulate({ ...high401kBase, householdSize: 1, monthlyAcaFullPremium: 2000 });
+    // Pays something (wealth below the no-premium run)…
+    expect(snapAt(partial, 65).total).toBeLessThan(snapAt(free, 65).total);
+    // …but less than the above-cliff household paying the full benchmark.
+    expect(snapAt(partial, 65).total).toBeGreaterThan(snapAt(fullCliff, 65).total);
+  });
+
+  it("contribution is capped at the full benchmark premium", () => {
+    // Tiny benchmark premium: pct × MAGI would exceed it, so the cap binds and
+    // the below-cliff household pays exactly the full (tiny) premium — same as
+    // an above-cliff household with the same benchmark.
+    const below = simulate({ ...high401kBase, householdSize: 2, monthlyAcaFullPremium: 100 });
+    const above = simulate({ ...high401kBase, householdSize: 1, monthlyAcaFullPremium: 100 });
+    expect(Math.abs(snapAt(below, 65).total - snapAt(above, 65).total)).toBeLessThan(5_000);
+  });
+});

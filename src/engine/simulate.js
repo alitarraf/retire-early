@@ -26,7 +26,7 @@
 
 import { federalTax, taxableSsAmount, ltcgRateAt, niitApplies } from "./tax.js";
 import { rmdFactor } from "./rmd.js";
-import { DEFAULT_FILING_STATUS, ACA, STD_DEDUCTION } from "../constants/brackets.js";
+import { DEFAULT_FILING_STATUS, ACA, acaApplicablePct, STD_DEDUCTION } from "../constants/brackets.js";
 
 // Gross-up solver for a tax-deferred (401k) withdrawal: find the monthly PRE-tax draw
 // whose after-tax value equals `needMonthly`, where the effective rate is the marginal
@@ -76,7 +76,7 @@ export function simulate({
   annualRothConversion = 0,
   filingStatus = DEFAULT_FILING_STATUS,
   rmdAge = 0, // 0 = disabled; set to 73 or 75 (SECURE 2.0) to enforce RMDs
-  monthlyAcaFullPremium = 0, // full unsubsidized ACA premium; 0 = not tracked
+  monthlyAcaFullPremium = 0, // benchmark silver-plan premium (unsubsidized); 0 = not tracked
   householdSize = 2, // for FPL cliff calculation; affects ACA threshold
   rule55 = false, // unlock 401k penalty-free from retireAge (must have left employer at ≥55)
   annualSepp = 0, // annual 72(t) SEPP amount; 0 = disabled; period ends at max(retireAge+5, 59.5)
@@ -141,7 +141,7 @@ export function simulate({
   // Roth draws and muni income do NOT count. Applies to ages 55–64 (pre-Medicare) only.
   let magiYearAccum = 0;     // running MAGI total for the current calendar year
   let priorYearMagi = 0;     // MAGI from the prior year; used at year start to set premium status
-  let acaPremiumActive = false; // true when prior-year MAGI crossed the FPL cliff
+  let acaMonthlyDue = 0; // this year's monthly ACA premium after the credit (set at year start)
   // MAGI is tracked whenever any consumer needs it (ACA premium status, NIIT).
   const trackMagi = monthlyAcaFullPremium > 0 || autoLtcg;
   // Effective % rate applied to the gain portion of brokerage draws this year.
@@ -178,10 +178,16 @@ export function simulate({
         ? priorYearEndK / rmdFactor(Math.floor(age))
         : 0;
 
-      // ACA: determine premium status from prior year's MAGI.
+      // ACA sliding scale: prior-year MAGI sets this year's premium.
+      // monthlyAcaFullPremium is the BENCHMARK SILVER premium; below 400% FPL
+      // the household pays min(full, applicablePct × MAGI); at/above the
+      // cliff there is no credit and the full premium is due.
       if (monthlyAcaFullPremium > 0) {
         const fpl = (ACA.fplBase + Math.max(0, householdSize - 1) * ACA.fplPerAdditionalPerson) * taxIdx;
-        acaPremiumActive = priorYearMagi >= fpl * ACA.cliffMultiple;
+        const pct = acaApplicablePct(priorYearMagi / fpl);
+        acaMonthlyDue = pct == null
+          ? monthlyAcaFullPremium
+          : Math.min(monthlyAcaFullPremium, (priorYearMagi * pct) / 12);
       }
       if (trackMagi) magiYearAccum = 0;
 
@@ -312,9 +318,9 @@ export function simulate({
         need += e.amount * Math.pow(1 + mi, m);
       }
     }
-    // ACA healthcare premium: full price when prior-year MAGI crossed the FPL cliff.
+    // ACA healthcare premium: this year's post-credit amount (full at/above the cliff).
     // Applies pre-Medicare only (age < 65). Simplified: below cliff = fully subsidized.
-    if (monthlyAcaFullPremium > 0 && age < 65 && acaPremiumActive) need += monthlyAcaFullPremium;
+    if (monthlyAcaFullPremium > 0 && age < 65) need += acaMonthlyDue;
     // IRMAA Medicare surcharge: added to expenses at age 65+ when income exceeds thresholds.
     if (monthlyIrmaaSurcharge > 0 && age >= 65) need += monthlyIrmaaSurcharge;
 

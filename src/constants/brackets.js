@@ -138,7 +138,32 @@ export const ACA = {
   fplBase: 15650, // household of 1
   fplPerAdditionalPerson: 5500,
   cliffMultiple: 4.0, // 400% FPL cliff is back for 2026
+  // 2026 applicable-percentage table (Rev. Proc. 2025-25): the share of MAGI a
+  // household contributes toward the benchmark silver plan, linearly
+  // interpolated within each FPL band. Enhanced (ARPA/IRA) credits expired
+  // 12/31/2025; ≥400% FPL gets no credit (the cliff).
+  applicablePcts: [
+    { fplFrom: 0.00, fplTo: 1.33, pctFrom: 0.0210, pctTo: 0.0210 },
+    { fplFrom: 1.33, fplTo: 1.50, pctFrom: 0.0314, pctTo: 0.0419 },
+    { fplFrom: 1.50, fplTo: 2.00, pctFrom: 0.0419, pctTo: 0.0660 },
+    { fplFrom: 2.00, fplTo: 2.50, pctFrom: 0.0660, pctTo: 0.0844 },
+    { fplFrom: 2.50, fplTo: 3.00, pctFrom: 0.0844, pctTo: 0.0996 },
+    { fplFrom: 3.00, fplTo: 4.00, pctFrom: 0.0996, pctTo: 0.0996 },
+  ],
 };
+
+/** Applicable percentage for a MAGI/FPL ratio (linear within bands; cliff ≥ 4.0). */
+export function acaApplicablePct(fplRatio) {
+  if (fplRatio >= ACA.cliffMultiple) return null; // no credit — pay full premium
+  for (const b of ACA.applicablePcts) {
+    if (fplRatio < b.fplTo) {
+      const span = b.fplTo - b.fplFrom;
+      const t = span > 0 ? Math.max(0, fplRatio - b.fplFrom) / span : 0;
+      return b.pctFrom + (b.pctTo - b.pctFrom) * t;
+    }
+  }
+  return null;
+}
 
 // ── Social Security provisional income thresholds (IRC §86) ──
 // NOT inflation-adjusted — unchanged since 1983/1993 as enacted.

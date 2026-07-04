@@ -116,6 +116,15 @@ export function simulate({
   hsaQualifiedFraction = 1,  // share of monthly spend that is qualified medical (tax-free HSA draws);
                              // 1 = legacy all-medical assumption. Post-65 non-qualified HSA draws are
                              // taxed as ordinary income (no penalty)
+  incomeStreams = [],        // [{ label, monthly, startAge, endAge, cola, taxType, survivorPct }]
+                             // pension/annuity/part-time/rental income, monthly in RETIRE-DATE $.
+                             // cola: true inflates monthly (default false — typical private pension).
+                             // taxType "ordinary" (default) is taxed & feeds MAGI; "free" is not.
+  expenseStreams = [],       // [{ label, monthly, startAge, endAge, inflate }] recurring costs that
+                             // END (mortgage P&I): inflate=false (default) keeps the payment nominal
+  survivorAge = 0,           // primary's age when the spouse dies; 0 = never. From then: single
+                             // filing, larger SS benefit only, householdSize−1, reduced spending
+  survivorSpendFraction = 0.75, // share of base spending that continues after the spouse's death
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
@@ -163,6 +172,17 @@ export function simulate({
   // 0-seeded for the ACA/NIIT trailing model.
   let magiTwoYearsAgo = preRetirementMagi;
   let magiLastYearIrmaa = preRetirementMagi;
+  // Survivor transition state (set at year start): after survivorAge the
+  // survivor files single with a smaller household and reduced spending.
+  let survivedNow = false;
+  let fsNow = filingStatus;
+  let hhNow = householdSize;
+  // Effective fed rate on ordinary income-stream dollars (set at year start).
+  let streamEffFedRate = 0;
+  const streamAmt = (s, m) => s.monthly *
+    (s.cola === true ? Math.pow(1 + mi, m) : 1) *
+    (survivedNow && s.survivorPct != null ? s.survivorPct : 1);
+  const streamActive = (s, age) => age >= (s.startAge ?? 0) && age < (s.endAge ?? Infinity);
   // Effective % rate applied to the gain portion of brokerage draws this year.
   // autoLtcg recomputes it each year start; otherwise it's the flat input.
   let ltcgRateNow = brokerageLtcgRate;
@@ -191,6 +211,12 @@ export function simulate({
       // are adjusted annually by the IRS/HHS. SS provisional thresholds stay frozen (law).
       taxIdx = taxIndexYears == null ? 1 : Math.pow(1 + inflationRate / 100, taxIndexYears + yr);
 
+      // Survivor transition — the "widow's tax torpedo": same-ish income,
+      // single brackets, one SS check, smaller household.
+      survivedNow = survivorAge > 0 && age >= survivorAge;
+      fsNow = survivedNow ? "single" : filingStatus;
+      hhNow = survivedNow ? Math.max(1, householdSize - 1) : householdSize;
+
       // RMD: reset annual tracker and set this year's minimum.
       rmdWithdrawnThisYear = 0;
       rmdForThisYear = (rmdAge > 0 && age >= rmdAge && priorYearEndK > 0)
@@ -202,7 +228,7 @@ export function simulate({
       // the household pays min(full, applicablePct × MAGI); at/above the
       // cliff there is no credit and the full premium is due.
       if (monthlyAcaFullPremium > 0) {
-        const fpl = (ACA.fplBase + Math.max(0, householdSize - 1) * ACA.fplPerAdditionalPerson) * taxIdx;
+        const fpl = (ACA.fplBase + Math.max(0, hhNow - 1) * ACA.fplPerAdditionalPerson) * taxIdx;
         const pct = acaApplicablePct(priorYearMagi / fpl);
         acaMonthlyDue = pct == null
           ? monthlyAcaFullPremium
@@ -214,8 +240,9 @@ export function simulate({
       // ordinary income as the "other income" base (trailing-year model, same as ACA).
       const ss1Est = age >= ssAge ? ssBenefit * Math.pow(1 + mi, m) : 0;
       const ss2Est = age >= ss2Age ? ss2Benefit * Math.pow(1 + mi, m) : 0;
-      const annualSsEst = (ss1Est + ss2Est) * 12;
-      const taxableSsAnnualEst = taxableSsAmount(annualSsEst, priorYearOrdIncome, filingStatus);
+      // Survivor keeps the larger of the two benefits (survivor benefit).
+      const annualSsEst = (survivedNow ? Math.max(ss1Est, ss2Est) : ss1Est + ss2Est) * 12;
+      const taxableSsAnnualEst = taxableSsAmount(annualSsEst, priorYearOrdIncome, fsNow);
       taxableSsFrac = annualSsEst > 0 ? taxableSsAnnualEst / annualSsEst : 0;
       // drawBase: taxable SS is the only income that stacks BELOW 401k draws.
       // Prior-year 401k income is NOT added here — it is the same income category and
@@ -224,14 +251,30 @@ export function simulate({
       drawBase = taxableSsAnnualEst;
       yearOrdAccum = 0;
 
+      // Income streams: estimate this year's ordinary stream income, derive
+      // its blended fed rate stacked above taxable SS, then fold it into
+      // drawBase so 401k draws/conversions/SEPP stack above BOTH — a pension
+      // correctly pushes later draws into higher brackets.
+      if (incomeStreams.length > 0) {
+        let ordMo = 0;
+        for (const s of incomeStreams) {
+          if (streamActive(s, age) && (s.taxType ?? "ordinary") === "ordinary") ordMo += streamAmt(s, m);
+        }
+        const ordAnnual = ordMo * 12;
+        streamEffFedRate = ordAnnual > 0
+          ? (federalTax(drawBase + ordAnnual, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / ordAnnual
+          : 0;
+        drawBase += ordAnnual;
+      }
+
       // autoLtcg: this year's effective rate on the gain portion of brokerage
       // draws. Federal rate = LTCG brackets with gains stacked on trailing
       // ordinary income (prior-year draws/conversions + this year's taxable
       // SS), + flat state rate, + NIIT when trailing MAGI crosses the
       // (non-indexed) threshold. Trailing-year model, same as SS/ACA.
       if (autoLtcg) {
-        const fedLtcg = ltcgRateAt(priorYearOrdIncome + taxableSsAnnualEst, filingStatus, taxIdx) * 100;
-        const niit = niitApplies(priorYearMagi, filingStatus) ? 3.8 : 0;
+        const fedLtcg = ltcgRateAt(priorYearOrdIncome + taxableSsAnnualEst, fsNow, taxIdx) * 100;
+        const niit = niitApplies(priorYearMagi, fsNow) ? 3.8 : 0;
         ltcgRateNow = fedLtcg + stateTaxRate + niit;
       }
       // Transparency: record the SS taxable fraction the first year SS is active.
@@ -249,13 +292,13 @@ export function simulate({
     if (convMode && age < conversionEndAge && !scheduled.has(yr) && m % 12 === 0) {
       scheduled.add(yr);
       const target = convMode === "fill"
-        ? Math.max(0, (conversionCeiling + (STD_DEDUCTION[filingStatus] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS])) * taxIdx - drawBase)
+        ? Math.max(0, (conversionCeiling + (STD_DEDUCTION[fsNow] ?? STD_DEDUCTION[DEFAULT_FILING_STATUS])) * taxIdx - drawBase)
         : annualRothConversion;
       let conv = Math.min(target, k);
       if (conv > 0) {
         // Tax on conversion: marginal delta from drawBase (stacked on other income this year).
         const taxOf = (amt) =>
-          (federalTax(drawBase + amt, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) + amt * stateTaxRate / 100;
+          (federalTax(drawBase + amt, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) + amt * stateTaxRate / 100;
         let tax = taxOf(conv);
         // You can only convert as much as you can pay tax on from liquid funds (cd + bk). Without
         // this, a large bracket-fill with little cash would be silently under-taxed — and the
@@ -311,7 +354,8 @@ export function simulate({
     // Social Security, inflated; taxable fraction from provisional income formula (IRC §86).
     const ss1 = age >= ssAge ? ssBenefit * Math.pow(1 + mi, m) : 0;
     const ss2 = age >= ss2Age ? ss2Benefit * Math.pow(1 + mi, m) : 0;
-    const grossSS = ss1 + ss2;
+    // Survivor keeps the larger benefit only (survivor benefit).
+    const grossSS = survivedNow ? Math.max(ss1, ss2) : ss1 + ss2;
     const effectiveSsStateTaxRate = stateTaxRate * (1 - stateSsExemptRate);
     let ss = 0;
     if (grossSS > 0) {
@@ -320,21 +364,31 @@ export function simulate({
       // Federal tax: SS occupies [0, taxableSS]; draws occupy [taxableSS, taxableSS+draw].
       // Using base=0 here avoids double-counting the priorYearOrdIncome bracket slice.
       // priorYearOrdIncome is still used above for provisional income (taxable fraction).
-      const ssFedTax = federalTax(taxableAnnual, filingStatus, taxIdx) / 12;
+      const ssFedTax = federalTax(taxableAnnual, fsNow, taxIdx) / 12;
       ss = grossSS - ssFedTax - grossSS * effectiveSsStateTaxRate / 100;
       if (trackMagi) magiYearAccum += taxableMonthly;
     }
 
-    // Phase-based spending: scale the inflating base spend by the active phase multiplier.
-    const effSpend = spend * phaseMult(age);
+    // Phase-based spending: scale the inflating base spend by the active phase
+    // multiplier; a surviving spouse spends survivorSpendFraction of the base.
+    const effSpend = spend * phaseMult(age) * (survivedNow ? survivorSpendFraction : 1);
     let need = Math.max(0, effSpend - ss);
-    // One-time / lump-sum expenses: fire once when age reaches the entry's age.
-    // Amounts are in retire-date $; inflate per month like spend, then add to this month's need.
+    // One-time expenses & windfalls: fire once when age reaches the entry's age.
+    // Amounts are in retire-date $; inflate per month like spend. NEGATIVE
+    // amounts are windfalls (downsizing, inheritance) — banked into cash below.
     for (let i = 0; i < oneTimeExpenses.length; i++) {
       const e = oneTimeExpenses[i];
-      if (!firedOneTime.has(i) && e && e.amount > 0 && age >= e.age) {
+      if (!firedOneTime.has(i) && e && e.amount !== 0 && age >= e.age) {
         firedOneTime.add(i);
         need += e.amount * Math.pow(1 + mi, m);
+      }
+    }
+    if (need < 0) { cd += -need; need = 0; }
+    // Recurring expense streams that END (mortgage P&I, a loan): active until
+    // endAge; inflate=false (default) keeps the payment flat in nominal terms.
+    for (const s of expenseStreams) {
+      if (s.monthly > 0 && streamActive(s, age)) {
+        need += s.monthly * (s.inflate === true ? Math.pow(1 + mi, m) : 1);
       }
     }
     // ACA healthcare premium: this year's post-credit amount (full at/above the cliff).
@@ -346,11 +400,32 @@ export function simulate({
     // the flat user-entered surcharge applies. MFJ covers two people —
     // approximation: both go on Medicare when the primary turns 65.
     if (autoMedicare && age >= 65) {
-      const persons = filingStatus === "mfj" ? 2 : 1;
+      const persons = fsNow === "mfj" ? 2 : 1;
       need += (MEDICARE.partBBase * taxIdx +
-        irmaaMonthlySurcharge(magiTwoYearsAgo, filingStatus, taxIdx)) * persons;
+        irmaaMonthlySurcharge(magiTwoYearsAgo, fsNow, taxIdx)) * persons;
     } else if (monthlyIrmaaSurcharge > 0 && age >= 65) {
       need += monthlyIrmaaSurcharge;
+    }
+
+    // Income streams (pension/annuity/part-time/rental): net-of-tax income
+    // offsets all costs above; any excess banks into cash. Ordinary streams
+    // were rate-set at year start and count toward ordinary income and MAGI.
+    if (incomeStreams.length > 0) {
+      let net = 0;
+      for (const s of incomeStreams) {
+        if (!streamActive(s, age)) continue;
+        const amt = streamAmt(s, m);
+        if (amt <= 0) continue;
+        if ((s.taxType ?? "ordinary") === "ordinary") {
+          net += amt * (1 - streamEffFedRate - stateTaxRate / 100);
+          yearOrdAccum += amt;
+          if (trackMagi) magiYearAccum += amt;
+        } else {
+          net += amt;
+        }
+      }
+      if (net >= need) { cd += net - need; need = 0; }
+      else need -= net;
     }
 
     // 72(t) SEPP: forced monthly 401k draw during the SEPP period (before normal draw order).
@@ -359,7 +434,7 @@ export function simulate({
       const seppGross = Math.min(annualSepp / 12, k);
       const seppD = seppGross * 12;
       const seppFedRate = seppD > 0
-        ? (federalTax(drawBase + seppD, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / seppD
+        ? (federalTax(drawBase + seppD, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / seppD
         : 0;
       const seppEff = seppFedRate + stateTaxRate / 100;
       k -= seppGross;
@@ -400,12 +475,12 @@ export function simulate({
     const k401Accessible = age >= 59.5 || rule55;
     if (need > 0 && k401Accessible && k > 0) {
       // Gross-up via bisection: rate = marginal delta at (drawBase + annualized draw).
-      const gross = grossUpMonthly(need, drawBase, filingStatus, stateTaxRate / 100, taxIdx);
+      const gross = grossUpMonthly(need, drawBase, fsNow, stateTaxRate / 100, taxIdx);
       const draw = Math.min(gross, k);
       k -= draw;
       const d = draw * 12;
       const fedRate = d > 0
-        ? (federalTax(drawBase + d, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / d
+        ? (federalTax(drawBase + d, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / d
         : 0;
       need -= draw * (1 - fedRate - stateTaxRate / 100);
       if (taxSummary.k401EffRate === null) taxSummary.k401EffRate = fedRate + stateTaxRate / 100;
@@ -420,12 +495,12 @@ export function simulate({
     // rides through the gross-up as an addition to the flat rate.
     if (need > 0 && hsa > 0 && hsaQualifiedFraction < 1) {
       const flatFrac = stateTaxRate / 100 + (age >= 65 ? 0 : 0.20);
-      const gross = grossUpMonthly(need, drawBase, filingStatus, flatFrac, taxIdx);
+      const gross = grossUpMonthly(need, drawBase, fsNow, flatFrac, taxIdx);
       const draw = Math.min(gross, hsa);
       hsa -= draw;
       const dd = draw * 12;
       const fedRate = dd > 0
-        ? (federalTax(drawBase + dd, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / dd
+        ? (federalTax(drawBase + dd, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / dd
         : 0;
       need -= draw * (1 - fedRate - flatFrac);
       yearOrdAccum += draw;
@@ -445,7 +520,7 @@ export function simulate({
     if (m % 12 === 11 && rmdForThisYear > rmdWithdrawnThisYear && k > 0) {
       const shortfall = Math.min(rmdForThisYear - rmdWithdrawnThisYear, k);
       const rmdFedRate = shortfall > 0
-        ? (federalTax(drawBase + shortfall, filingStatus, taxIdx) - federalTax(drawBase, filingStatus, taxIdx)) / shortfall
+        ? (federalTax(drawBase + shortfall, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / shortfall
         : 0;
       const tax = shortfall * (rmdFedRate + stateTaxRate / 100);
       k -= shortfall;

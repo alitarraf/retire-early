@@ -93,7 +93,14 @@ export const DEFAULTS = {
 
   // Advanced inputs
   birthYear: 0,            // 0 = derive from currentAge; else authoritative for RMD start age
-  oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $ (weddings, repairs, …)
+  oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $; NEGATIVE = windfall
+                           // (downsizing proceeds, inheritance) banked into cash
+  incomeStreams: [],       // [{ label, monthly, startAge, endAge, cola, taxType, survivorPct }]
+                           // pension/annuity/part-time/rental, monthly in today's $
+  expenseStreams: [],      // [{ label, monthly, startAge, endAge, inflate }] recurring costs
+                           // that end (mortgage P&I…), monthly in today's $
+  survivorAge: 0,          // primary's age when the spouse dies; 0 = not modeled
+  survivorSpendFraction: 0.75, // share of base spending that continues afterwards
   goGoMult: 1,             // phase spending multiplier, retire → slowGoAge
   slowGoMult: 1,           // phase spending multiplier, slowGoAge → noGoAge
   noGoMult: 1,             // phase spending multiplier, noGoAge+
@@ -242,8 +249,26 @@ export function simParamsAt(plan, age, overrides = {}) {
     // One-time expenses: entered in today's $; inflate to retire-date $ (same basis as monthlyExpense)
     // and keep only entries that land within the simulated window (retirement → life expectancy).
     oneTimeExpenses: (overrides.oneTimeExpenses ?? plan.oneTimeExpenses ?? [])
-      .filter((e) => e && e.amount > 0 && e.age >= age && e.age < plan.lifeExpect)
+      .filter((e) => e && e.amount !== 0 && e.age >= age && e.age < plan.lifeExpect)
       .map((e) => ({ age: e.age, amount: e.amount * Math.pow(1 + plan.inflationRate / 100, yrs) })),
+    // Streams: inflation-linked amounts (cola/inflate true) are entered in
+    // today's $ and scale to retire-date $ like monthlyExpense; fixed-nominal
+    // amounts (a mortgage payment, a non-COLA pension quote) pass through
+    // unchanged. Entries that end before retirement are dropped.
+    incomeStreams: (overrides.incomeStreams ?? plan.incomeStreams ?? [])
+      .filter((s) => s && s.monthly > 0 && (s.endAge == null || s.endAge > age))
+      .map((s) => ({
+        ...s,
+        monthly: s.cola === true ? s.monthly * Math.pow(1 + plan.inflationRate / 100, yrs) : s.monthly,
+      })),
+    expenseStreams: (overrides.expenseStreams ?? plan.expenseStreams ?? [])
+      .filter((s) => s && s.monthly > 0 && (s.endAge == null || s.endAge > age))
+      .map((s) => ({
+        ...s,
+        monthly: s.inflate === true ? s.monthly * Math.pow(1 + plan.inflationRate / 100, yrs) : s.monthly,
+      })),
+    survivorAge: overrides.survivorAge ?? plan.survivorAge,
+    survivorSpendFraction: overrides.survivorSpendFraction ?? plan.survivorSpendFraction,
     goGoMult: overrides.goGoMult ?? plan.goGoMult,
     slowGoMult: overrides.slowGoMult ?? plan.slowGoMult,
     noGoMult: overrides.noGoMult ?? plan.noGoMult,

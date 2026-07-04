@@ -34,6 +34,14 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
   L.push(`- Accounts: 401k ${fmt(inputs.k401Today)}, Roth ${fmt(inputs.rothTotal)}, brokerage ${fmt(inputs.existingBrokerage)}, muni ${fmt(inputs.muniBonds)}, cash ${fmt(inputs.cashDeposit)}.`);
   L.push(`- Assumptions: ${inputs.stockReturn}% stock return, ${inputs.inflationRate}% inflation; SS at ${inputs.ssAge}.`);
   L.push(`- Scenario overlay: ${inputs.scenarioMode}.`);
+  if (results.tab) L.push(`- Dashboard tab the user is viewing: ${results.tab} (switchable via set_view).`);
+  if (plan.incomeStreams?.length) {
+    L.push(`- Income streams: ${plan.incomeStreams.map((s) => `${s.label ?? "stream"} ${fmt(s.monthly)}/mo from ${s.startAge ?? "now"}${s.endAge ? ` to ${s.endAge}` : ""}`).join("; ")}.`);
+  }
+  if (plan.expenseStreams?.length) {
+    L.push(`- Expense streams: ${plan.expenseStreams.map((s) => `${s.label ?? "cost"} ${fmt(s.monthly)}/mo${s.endAge ? ` until ${s.endAge}` : ""}`).join("; ")}.`);
+  }
+  if (plan.survivorAge > 0) L.push(`- Survivor scenario modeled: spouse dies at primary's age ${plan.survivorAge}; spending continues at ${Math.round(plan.survivorSpendFraction * 100)}%.`);
 
   L.push("");
   L.push("## Latest headline results");

@@ -37,11 +37,35 @@ function err(message, ctx) {
   return ok({ error: message }, ctx, { isError: true });
 }
 
+// Fields whose mutation always requires the user's confirmation, even as a
+// single small change: a mistyped agent patch to a balance or identity field
+// silently rewrites the user's financial reality.
+export const DANGEROUS_FIELDS = new Set([
+  "k401Today",
+  "rothTotal",
+  "existingBrokerage",
+  "existingBrokerageBasis",
+  "cashDeposit",
+  "muniBonds",
+  "hsaBalance",
+  "currentAge",
+  "lifeExpect",
+  "birthYear",
+  "filingStatus",
+  "hasSpouse",
+  "alreadyRetired",
+  "salary",
+]);
+
 /** Graduated-confirmation decision (§4.2). */
 export function shouldStage(changes, confirmMode) {
+  // View switches are harmless and never staged, regardless of mode.
+  if (changes.length > 0 && changes.every((ch) => ch.scope === "view")) return false;
   if (confirmMode === "never") return false;
   if (confirmMode === "always") return true;
   // graduated:
+  if (changes.some((ch) => ch.scope === "revert")) return true; // undo-all always confirms
+  if (changes.some((ch) => DANGEROUS_FIELDS.has(ch.field))) return true;
   if (changes.length >= 2) return true; // 2+ changes in one turn
   const c = changes[0];
   if (!c) return false;
@@ -65,6 +89,14 @@ function applyProposal(kind, payload, plan, actions) {
   } else if (kind === "scenario") {
     newPlan = makePlan({ ...plan, ...payload });
     actions?.applyScenario?.(payload);
+  } else if (kind === "view") {
+    // Pure UI navigation: no plan mutation, no undo baseline.
+    if (payload?.tab) actions?.setView?.(payload.tab);
+    if (payload?.runMonteCarlo) actions?.triggerMc?.();
+  } else if (kind === "revert") {
+    // The baseline snapshot lives in useAsk; the action does the restore and
+    // flips the change-log statuses. The next turn's context reflects it.
+    actions?.undoAllAgentChanges?.();
   }
   return newPlan;
 }
@@ -118,6 +150,13 @@ export function dispatch(name, args = {}, ctx = {}) {
     return ok({ status: "no_change", changes: [], note: "Those values already match the current plan." }, c);
   }
 
+  // View switches are pure navigation: apply immediately, keep them out of
+  // the change log and the write budget (they're not plan mutations).
+  if (proposal.kind === "view") {
+    applyProposal(proposal.kind, proposal.payload, c.plan, c.actions);
+    return ok({ status: "applied", changes: proposal.changes }, c);
+  }
+
   // Stamp ids so the change log, audit trail and confirmation card agree.
   const changes = proposal.changes.map((ch) => ({ ...ch, id: nextChangeId() }));
 
@@ -134,7 +173,8 @@ export function dispatch(name, args = {}, ctx = {}) {
     });
     // Preview numbers so the agent narrates the would-be outcome (not applied yet).
     const previewPlan = applyProposal(proposal.kind, proposal.payload, c.plan, undefined);
-    const preview = proposal.kind === "scenario" ? undefined : planHeadline(previewPlan);
+    const preview =
+      proposal.kind === "scenario" || proposal.kind === "revert" ? undefined : planHeadline(previewPlan);
     return ok(
       { status: "awaiting_confirmation", changes, preview },
       { ...c, changeLog },

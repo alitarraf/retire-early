@@ -254,8 +254,9 @@ export default function App() {
       totalAtRetirement,
       survives: result ? result.depleted == null : null,
       depletionAge: result?.depleted == null ? null : Math.ceil(result.depleted),
+      tab: mode,
     }),
-    [earliest, sustainable, mcResult, totalAtRetirement, result],
+    [earliest, sustainable, mcResult, totalAtRetirement, result, mode],
   );
 
   // Write-tool actions the agent drives. setInputs is stable; onCommitAge drives
@@ -267,6 +268,8 @@ export default function App() {
       applyAge: (age) => onCommitAge(age),
       applyScenario: (patch) => setInputs((prev) => ({ ...prev, ...patch })),
       restoreInputs: (snap) => setInputs(snap),
+      setView: (tab) => setMode(tab),
+      triggerMc: () => setMaxMcOn(true),
     }),
     [onCommitAge],
   );

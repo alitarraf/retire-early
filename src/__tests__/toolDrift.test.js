@@ -42,6 +42,7 @@ describe("tool-description drift guard", () => {
       run_monte_carlo: { age: 60 },
       optimize_roth_conversions: {},
       stress_or_history: { type: "stress", age: 60 },
+      run_analysis: { type: "sensitivity" },
       get_change_log: {},
     };
     for (const [name, entry] of Object.entries(TOOL_REGISTRY)) {

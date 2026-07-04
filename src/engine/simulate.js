@@ -19,7 +19,8 @@
 //
 //  Draw order (preserve / test):
 //    1 Roth contributions  2 Roth earnings (59.5+)  3 Converted Roth
-//    (59.5+ AND 5y lock)  4 Munis  5 Brokerage (LTCG on gain)
+//    (5y elapsed, ANY age — principal only; tranche growth folds into
+//    Roth earnings)  4 Munis  5 Brokerage (LTCG on gain)
 //    6 401k (59.5+, effective bracket)  7 CD / cash
 // ─────────────────────────────────────────────────────────────
 
@@ -229,7 +230,7 @@ export function simulate({
             bb = Math.max(0, bb - fromBk);
             taxDue -= fromBk;
           }
-          tranches.push({ avail: age + 5, amt: conv });
+          tranches.push({ avail: age + 5, amt: conv, principal: conv });
           yearOrdAccum += conv;
           conversions.push({ age: Math.round(age), amount: conv });
           if (monthlyAcaFullPremium > 0) magiYearAccum += conv;
@@ -247,8 +248,14 @@ export function simulate({
     mn = Math.max(0, mn) * (1 + mr);
     hsa = Math.max(0, hsa) * (1 + mr);
     for (const t of tranches) if (t.amt > 0) t.amt *= 1 + mr;
-    // Unlock tranches that have cleared both the 5y lock and 59.5.
-    for (const t of tranches) if (age >= t.avail && t.amt > 0) { rv += t.amt; t.amt = 0; }
+    // Unlock tranches that have cleared the 5y lock: converted PRINCIPAL is
+    // penalty-free at any age (the Roth-ladder bridge); growth on the tranche
+    // folds into Roth earnings and stays 59.5-gated.
+    for (const t of tranches) if (age >= t.avail && t.amt > 0) {
+      rv += Math.min(t.amt, t.principal);
+      re += Math.max(0, t.amt - t.principal);
+      t.amt = 0;
+    }
 
     // Social Security, inflated; taxable fraction from provisional income formula (IRC §86).
     const ss1 = age >= ssAge ? ssBenefit * Math.pow(1 + mi, m) : 0;
@@ -306,7 +313,7 @@ export function simulate({
     // ── Draw order ──
     if (need > 0 && rc > 0) { const d = Math.min(need, rc); rc -= d; need -= d; }
     if (need > 0 && age >= 59.5 && re > 0) { const d = Math.min(need, re); re -= d; need -= d; }
-    if (need > 0 && age >= 59.5 && rv > 0) { const d = Math.min(need, rv); rv -= d; need -= d; }
+    if (need > 0 && rv > 0) { const d = Math.min(need, rv); rv -= d; need -= d; }
     if (need > 0 && mn > 0) { const d = Math.min(need, mn); mn -= d; need -= d; }
     // HSA: tax-free draw (treating all spend as qualified medical, the common retirement assumption).
     if (need > 0 && hsa > 0) { const d = Math.min(need, hsa); hsa -= d; need -= d; }

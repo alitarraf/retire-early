@@ -29,7 +29,7 @@ components/ + App.jsx          ← React UI; calls analysis
 
 `simulate()` is the crown jewel: a pure, side-effect-free month-by-month drawdown that every analysis routine calls repeatedly with varied inputs. Its draw order is a tested invariant — never change it without updating the regression tests:
 
-1. Roth contributions → 2. Roth earnings (59.5+) → 3. Converted Roth (59.5+ AND 5-year lock) → 4. Munis → 5. Brokerage (LTCG on gain fraction) → 6. 401k (59.5+, effective bracket) → 7. CD/cash
+1. Roth contributions → 2. Roth earnings (59.5+) → 3. Converted Roth (5-yr elapsed, ANY age — principal only; tranche growth folds into Roth earnings and stays 59.5-gated) → 4. Munis → 5. HSA → 6. Brokerage (LTCG on gain fraction) → 7. 401k (59.5+, effective bracket) → 8. CD/cash
 
 `simulate()` returns `{ snaps, depleted, bridgeShortfall }`. `depleted` fires only when ALL funds including the unlocked 401k are exhausted; a locked-401k shortfall is counted in `bridgeShortfall` instead (Scenario B test).
 

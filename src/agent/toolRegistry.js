@@ -132,6 +132,12 @@ export const TOOL_REGISTRY = {
     schema: {},
     returnKeys: ["earliestAge", "targetAge"],
     handler(args, plan) {
+      if (plan.alreadyRetired) {
+        return {
+          alreadyRetired: true,
+          note: "The user is already retired — there is no earliest retirement age to find. Discuss sustainable spend, conversions, or RMDs instead.",
+        };
+      }
       const earliestAge = earliestRetireAge(plan);
       return { earliestAge, targetAge: plan.retireAge };
     },
@@ -277,6 +283,11 @@ export const TOOL_REGISTRY = {
     returnKeys: ["status", "changes"],
     writeKind: "age",
     buildProposal(args, plan) {
+      if (plan.alreadyRetired) {
+        throw new Error(
+          "The user is already retired — the retirement age is pinned to their current age. Suggest adjusting spending, conversions, or scenario settings instead.",
+        );
+      }
       const to = args.age;
       const changes =
         to != null && to !== plan.retireAge

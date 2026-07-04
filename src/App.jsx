@@ -13,6 +13,7 @@ import { HISTORICAL_SCENARIOS } from "./constants/historicalReturns.js";
 import { InputsSidebar } from "./components/panels/InputsSidebar.jsx";
 import { RetireAtControl } from "./components/panels/RetireAtControl.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
+import { RetiredPanel } from "./components/panels/RetiredPanel.jsx";
 import { MaximizeCenter } from "./components/panels/MaximizeCenter.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
@@ -85,6 +86,13 @@ export default function App() {
   };
 
   const plan = useMemo(() => makePlan(inputs), [inputs]);
+  // Already-retired mode: the "when can I retire" machinery is meaningless;
+  // the first tab becomes a retiree dashboard planned from today.
+  const retired = plan.alreadyRetired;
+  const tabs = useMemo(
+    () => TABS.map((t) => (retired && t.key === "early" ? { ...t, label: "My Retirement" } : t)),
+    [retired],
+  );
 
   // Drag-aware "Retire at": during a slider drag we update `dragAge` ONLY (never
   // setInputs), so `inputs`/`plan` stay referentially stable and every expensive
@@ -104,15 +112,18 @@ export default function App() {
   );
   const result = useMemo(() => runMain(livePlan), [livePlan]);
 
-  // Early-mode analysis
-  const earliest = useMemo(() => earliestRetireAge(plan), [plan]);
-  const sensitivityRows = useMemo(() => (mode === "early" ? sensitivity(plan) : []), [plan, mode]);
+  // Early-mode analysis (skipped when already retired — no age to search for)
+  const earliest = useMemo(() => (retired ? null : earliestRetireAge(plan)), [plan, retired]);
+  const sensitivityRows = useMemo(
+    () => (mode === "early" && !retired ? sensitivity(plan) : []),
+    [plan, mode, retired],
+  );
 
   // Goal-seek: "to retire at your configured Retire-at age, how much must I save?"
   // Keyed to the single source of truth (plan.retireAge) — no separate target input.
   const retireBy = useMemo(
-    () => (mode === "early" ? retireByAge(plan, plan.retireAge) : null),
-    [plan, mode],
+    () => (mode === "early" && !retired ? retireByAge(plan, plan.retireAge) : null),
+    [plan, mode, retired],
   );
 
   // Monte Carlo — seeded so same inputs → same result. Live in Retire Early
@@ -177,9 +188,13 @@ export default function App() {
     return null;
   }, [plan.scenarioMode, plan.stressDropPct, plan.stressYears, plan.historicalScenario, plan.historicalLens, stressResult, historicalResult]);
 
-  // Maximize-mode analysis
+  // Maximize-mode analysis (the optimizer also powers the retiree dashboard's
+  // "this year's moves" card, so it runs in retired mode on any tab)
   const marginalRows = useMemo(() => (mode === "maximize" ? marginalValues(plan) : []), [plan, mode]);
-  const dynamicOpt = useMemo(() => (mode === "maximize" ? dynamicOptimizer(plan) : null), [plan, mode]);
+  const dynamicOpt = useMemo(
+    () => (mode === "maximize" || retired ? dynamicOptimizer(plan) : null),
+    [plan, mode, retired],
+  );
 
   // "Apply these conversions" — writes the recommended bracket-fill strategy into the plan inputs.
   const applyOptimized = (opt) =>
@@ -284,7 +299,7 @@ export default function App() {
         <MobileShell
           mode={mode}
           setMode={setMode}
-          tabs={TABS}
+          tabs={tabs}
           inputs={inputs}
           set={set}
           plan={livePlan}
@@ -357,7 +372,7 @@ export default function App() {
 
         {/* Tab strip */}
         <div style={{ display: "flex", gap: 2, flex: 1 }}>
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setMode(t.key)}
@@ -405,14 +420,25 @@ export default function App() {
         {/* Left column: Retire-at command card pinned under the navbar, then the
             accordion inputs below it (both always visible, all tabs). */}
         <div style={{ display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", background: "#fafcfc" }}>
-          <RetireAtControl
-            value={livePlan.retireAge}
-            min={plan.currentAge}
-            max={80}
-            earliest={earliest}
-            onScrub={onScrubAge}
-            onCommit={onCommitAge}
-          />
+          {retired ? (
+            <div style={{ padding: "16px 18px", background: "#1a2e28", flexShrink: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7ecfbb", marginBottom: 4 }}>
+                Retired
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
+                Planning from age {plan.currentAge} → {plan.lifeExpect}
+              </div>
+            </div>
+          ) : (
+            <RetireAtControl
+              value={livePlan.retireAge}
+              min={plan.currentAge}
+              max={80}
+              earliest={earliest}
+              onScrub={onScrubAge}
+              onCommit={onCommitAge}
+            />
+          )}
           {/* flex:1 + minHeight:0 gives InputsSidebar's height:100% a definite
               height so its pinned bottom caption isn't pushed off-screen. */}
           <div style={{ flex: 1, minHeight: 0 }}>
@@ -453,6 +479,17 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+              ) : mode === "early" && retired ? (
+                <RetiredPanel
+                  plan={livePlan}
+                  result={result}
+                  mcResult={mcResult}
+                  scenario={scenario}
+                  totalAtRetirement={totalAtRetirement}
+                  sustainable={sustainable}
+                  dynamicOpt={dynamicOpt}
+                  onApplyOptimized={applyOptimized}
+                />
               ) : mode === "early" ? (
                 <EarlyPanel
                   plan={livePlan}

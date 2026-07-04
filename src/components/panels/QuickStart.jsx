@@ -17,6 +17,7 @@ export function QuickStart({ onApply, onSkip }) {
   const apply = () => {
     onApply({
       currentAge: age,
+      alreadyRetired: status === "retired",
       retireAge: effectiveRetireAge,
       monthlyExpense: spend,
       // Put the lump into taxable brokerage as a neutral starting bucket and

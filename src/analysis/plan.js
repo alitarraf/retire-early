@@ -91,6 +91,10 @@ export const DEFAULTS = {
   assumeStepUpBasis: true, // heirs inherit brokerage at market value (unrealized gains erased)
   legacyTarget: 0,         // desired estate at death, today's $; 0 = none (display-only gap)
 
+  // Life stage
+  alreadyRetired: false,   // true = plan from today: retireAge pinned to currentAge,
+                           // accumulation inputs ignored, retiree-focused results
+
   // Advanced inputs
   birthYear: 0,            // 0 = derive from currentAge; else authoritative for RMD start age
   oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $; NEGATIVE = windfall
@@ -118,6 +122,21 @@ export const DEFAULTS = {
 /** Normalize raw inputs into a plan with derived fields. */
 export function makePlan(raw) {
   const p = { ...DEFAULTS, ...raw };
+
+  // Already retired: planning starts NOW. Force the retirement age to today
+  // and zero all accumulation flows in the NORMALIZED plan only — the raw
+  // inputs are untouched, so toggling back restores them.
+  if (p.alreadyRetired) {
+    p.retireAge = p.currentAge;
+    p.salary = 0;
+    p.employerMatchPct = 0;
+    p.k401AnnualContrib = 0;
+    p.rothAnnualContrib = 0;
+    p.hsaAnnualContrib = 0;
+    p.cashMonthlyContrib = 0;
+    p.muniMonthlyContrib = 0;
+    p.brokerageMonthlyContrib = 0;
+  }
 
   const stateRate = STATE_TAXES.find((s) => s.name === p.stateKey)?.rate ?? 0;
   const effectiveStateTax = p.stateTaxEnabled ? stateRate : 0;

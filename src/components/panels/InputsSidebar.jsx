@@ -217,6 +217,16 @@ function YouFields({ inputs, set, plan }) {
   const isMFJ = inputs.filingStatus === FILING_STATUS.MFJ;
   return (
     <>
+      <Field label="Life stage" help="alreadyRetired">
+        <Toggle
+          value={inputs.alreadyRetired ? "retired" : "planning"}
+          onChange={(v) => set("alreadyRetired")(v === "retired")}
+          options={[
+            { value: "planning", label: "Still working" },
+            { value: "retired", label: "Retired" },
+          ]}
+        />
+      </Field>
       <Field label="Filing status" help="filingStatus">
         <Select
           value={inputs.filingStatus}
@@ -261,6 +271,7 @@ function YouFields({ inputs, set, plan }) {
 }
 
 function MoneyFields({ inputs, set, plan }) {
+  const ret = plan.alreadyRetired;
   // What the user saves per month across every account (their own contributions,
   // excluding employer match). 401k/Roth/HSA are entered yearly; the rest monthly.
   const monthlySavings =
@@ -270,47 +281,59 @@ function MoneyFields({ inputs, set, plan }) {
   const savingsPctSalary = inputs.salary > 0 ? (annualSavings / inputs.salary) * 100 : 0;
   return (
     <>
-      <div style={{ fontSize: 12, color: "#4a5e58", background: "#f0f5f4", borderRadius: 8, padding: "8px 11px", marginBottom: 12 }}>
-        You save{" "}
-        <strong style={{ color: "#3d8c78", fontFamily: "'JetBrains Mono', monospace" }}>
-          {fmt(Math.round(monthlySavings))}/mo
-        </strong>{" "}
-        ({fmtK(annualSavings)}/yr){savingsPctSalary > 0 ? ` · ${Math.round(savingsPctSalary)}% of salary` : ""}
-      </div>
-      <Field label="Salary (for match calc)" help="salary">
-        <NumInput value={inputs.salary} onChange={set("salary")} prefix="$" step={5000} width={120} />
-      </Field>
-      <Divider />
+      {!ret && (
+        <>
+          <div style={{ fontSize: 12, color: "#4a5e58", background: "#f0f5f4", borderRadius: 8, padding: "8px 11px", marginBottom: 12 }}>
+            You save{" "}
+            <strong style={{ color: "#3d8c78", fontFamily: "'JetBrains Mono', monospace" }}>
+              {fmt(Math.round(monthlySavings))}/mo
+            </strong>{" "}
+            ({fmtK(annualSavings)}/yr){savingsPctSalary > 0 ? ` · ${Math.round(savingsPctSalary)}% of salary` : ""}
+          </div>
+          <Field label="Salary (for match calc)" help="salary">
+            <NumInput value={inputs.salary} onChange={set("salary")} prefix="$" step={5000} width={120} />
+          </Field>
+          <Divider />
+        </>
+      )}
       <SubTitle>401k / Traditional</SubTitle>
       <Grid2>
         <Field label="Balance" help="k401Today">
           <NumInput value={inputs.k401Today} onChange={set("k401Today")} prefix="$" step={1000} width={95} />
         </Field>
-        <Field label={`Contrib/yr (max $${(CONTRIB_LIMITS.k401 / 1000).toFixed(0)}k)`} help="k401AnnualContrib">
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NumInput value={inputs.k401AnnualContrib} onChange={set("k401AnnualContrib")} prefix="$" step={500} max={CONTRIB_LIMITS.k401} width={88} />
-            <MaxChip onClick={() => set("k401AnnualContrib")(CONTRIB_LIMITS.k401)} />
-          </div>
-        </Field>
+        {!ret && (
+          <Field label={`Contrib/yr (max $${(CONTRIB_LIMITS.k401 / 1000).toFixed(0)}k)`} help="k401AnnualContrib">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <NumInput value={inputs.k401AnnualContrib} onChange={set("k401AnnualContrib")} prefix="$" step={500} max={CONTRIB_LIMITS.k401} width={88} />
+              <MaxChip onClick={() => set("k401AnnualContrib")(CONTRIB_LIMITS.k401)} />
+            </div>
+          </Field>
+        )}
       </Grid2>
-      <Field label="Employer match % of salary" help="employerMatchPct">
-        <NumInput value={inputs.employerMatchPct} onChange={set("employerMatchPct")} suffix="%" step={0.5} max={20} width={70} />
-      </Field>
-      <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 8 }}>
-        You {fmtK(inputs.k401AnnualContrib)} + match {fmtK(plan.annualEmployerMatch)} = <strong style={{ color: "#3d8c78" }}>{fmtK(plan.total401kAnnual)}/yr</strong>
-      </div>
+      {!ret && (
+        <>
+          <Field label="Employer match % of salary" help="employerMatchPct">
+            <NumInput value={inputs.employerMatchPct} onChange={set("employerMatchPct")} suffix="%" step={0.5} max={20} width={70} />
+          </Field>
+          <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 8 }}>
+            You {fmtK(inputs.k401AnnualContrib)} + match {fmtK(plan.annualEmployerMatch)} = <strong style={{ color: "#3d8c78" }}>{fmtK(plan.total401kAnnual)}/yr</strong>
+          </div>
+        </>
+      )}
       <Divider />
       <SubTitle>Roth IRA</SubTitle>
       <Field label="Total balance" help="rothTotal">
         <NumInput value={inputs.rothTotal} onChange={set("rothTotal")} prefix="$" step={1000} width={120} />
       </Field>
       <Grid2>
-        <Field label={`Contrib/yr (max $${(CONTRIB_LIMITS.rothIra / 1000).toFixed(1)}k)`} help="rothAnnualContrib">
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NumInput value={inputs.rothAnnualContrib} onChange={set("rothAnnualContrib")} prefix="$" step={500} max={CONTRIB_LIMITS.rothIra} width={88} />
-            <MaxChip onClick={() => set("rothAnnualContrib")(CONTRIB_LIMITS.rothIra)} />
-          </div>
-        </Field>
+        {!ret && (
+          <Field label={`Contrib/yr (max $${(CONTRIB_LIMITS.rothIra / 1000).toFixed(1)}k)`} help="rothAnnualContrib">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <NumInput value={inputs.rothAnnualContrib} onChange={set("rothAnnualContrib")} prefix="$" step={500} max={CONTRIB_LIMITS.rothIra} width={88} />
+              <MaxChip onClick={() => set("rothAnnualContrib")(CONTRIB_LIMITS.rothIra)} />
+            </div>
+          </Field>
+        )}
         <Field label="Yrs so far" help="rothYearsContrib">
           <NumInput value={inputs.rothYearsContrib} onChange={set("rothYearsContrib")} min={0} max={40} width={78} />
         </Field>
@@ -327,9 +350,11 @@ function MoneyFields({ inputs, set, plan }) {
         <Field label="Balance" help="cashDeposit">
           <NumInput value={inputs.cashDeposit} onChange={set("cashDeposit")} prefix="$" step={1000} width={95} />
         </Field>
-        <Field label="Contribute/mo" help="cashMonthlyContrib">
-          <NumInput value={inputs.cashMonthlyContrib} onChange={set("cashMonthlyContrib")} prefix="$" step={100} width={95} />
-        </Field>
+        {!ret && (
+          <Field label="Contribute/mo" help="cashMonthlyContrib">
+            <NumInput value={inputs.cashMonthlyContrib} onChange={set("cashMonthlyContrib")} prefix="$" step={100} width={95} />
+          </Field>
+        )}
       </Grid2>
       <Divider />
       <SubTitle>Municipal bonds</SubTitle>
@@ -341,9 +366,11 @@ function MoneyFields({ inputs, set, plan }) {
           <NumInput value={inputs.muniReturn} onChange={set("muniReturn")} suffix="%" step={0.1} width={65} />
         </Field>
       </Grid2>
-      <Field label="Contribute/mo" help="muniMonthlyContrib">
-        <NumInput value={inputs.muniMonthlyContrib} onChange={set("muniMonthlyContrib")} prefix="$" step={100} width={120} />
-      </Field>
+      {!ret && (
+        <Field label="Contribute/mo" help="muniMonthlyContrib">
+          <NumInput value={inputs.muniMonthlyContrib} onChange={set("muniMonthlyContrib")} prefix="$" step={100} width={120} />
+        </Field>
+      )}
       <Field label="Tax status" help="muniDoubleTaxFree">
         <Toggle
           value={inputs.muniDoubleTaxFree ? "free" : "state"}
@@ -361,21 +388,25 @@ function MoneyFields({ inputs, set, plan }) {
           <NumInput value={inputs.existingBrokerageBasis} onChange={set("existingBrokerageBasis")} prefix="$" step={1000} width={95} />
         </Field>
       </Grid2>
-      <Field label="Contribute/mo" help="brokerageMonthlyContrib">
-        <NumInput value={inputs.brokerageMonthlyContrib} onChange={set("brokerageMonthlyContrib")} prefix="$" step={100} width={120} />
-      </Field>
+      {!ret && (
+        <Field label="Contribute/mo" help="brokerageMonthlyContrib">
+          <NumInput value={inputs.brokerageMonthlyContrib} onChange={set("brokerageMonthlyContrib")} prefix="$" step={100} width={120} />
+        </Field>
+      )}
       <Divider />
       <SubTitle>HSA (triple tax-advantaged)</SubTitle>
       <Grid2>
         <Field label="Balance" help="hsaBalance">
           <NumInput value={inputs.hsaBalance} onChange={set("hsaBalance")} prefix="$" step={1000} width={95} />
         </Field>
-        <Field label={`Contrib/yr (${TAX_YEAR} max $${(CONTRIB_LIMITS.hsaFamily / 1000).toFixed(1)}k)`} help="hsaAnnualContrib">
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <NumInput value={inputs.hsaAnnualContrib} onChange={set("hsaAnnualContrib")} prefix="$" step={100} max={CONTRIB_LIMITS.hsaFamily + CONTRIB_LIMITS.hsaCatchup} width={80} />
-            <MaxChip onClick={() => set("hsaAnnualContrib")(CONTRIB_LIMITS.hsaFamily + CONTRIB_LIMITS.hsaCatchup)} />
-          </div>
-        </Field>
+        {!ret && (
+          <Field label={`Contrib/yr (${TAX_YEAR} max $${(CONTRIB_LIMITS.hsaFamily / 1000).toFixed(1)}k)`} help="hsaAnnualContrib">
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <NumInput value={inputs.hsaAnnualContrib} onChange={set("hsaAnnualContrib")} prefix="$" step={100} max={CONTRIB_LIMITS.hsaFamily + CONTRIB_LIMITS.hsaCatchup} width={80} />
+              <MaxChip onClick={() => set("hsaAnnualContrib")(CONTRIB_LIMITS.hsaFamily + CONTRIB_LIMITS.hsaCatchup)} />
+            </div>
+          </Field>
+        )}
       </Grid2>
     </>
   );

@@ -6,6 +6,11 @@
 
 export const FIELD_HELP = {
   // ── You / Timeline ──────────────────────────────────────────
+  alreadyRetired: {
+    label: "Life stage",
+    context:
+      "Retired switches the app to plan from today: the retire-age slider and all contribution fields disappear, and the first tab becomes a retiree dashboard (does the money last, sustainable spend, RMDs, conversions). Your contribution entries are kept and restored if you switch back.",
+  },
   filingStatus: {
     label: "Filing status",
     context:

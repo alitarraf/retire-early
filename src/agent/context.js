@@ -25,7 +25,11 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
   const { earliest, sustainable, mcSuccess, totalAtRetirement, survives, depletionAge } = results;
   const L = [];
   L.push("## Current plan (authoritative — use run_scenario for any what-if)");
-  L.push(`- Current age ${inputs.currentAge}, target retire age ${inputs.retireAge}, life expectancy ${inputs.lifeExpect}, household ${inputs.householdSize}.`);
+  if (plan.alreadyRetired) {
+    L.push(`- The user is ALREADY RETIRED (age ${inputs.currentAge}). Do not suggest retirement-age changes or earliest-retirement searches; focus on sustainable spend, Roth conversions, RMDs, Medicare/IRMAA, and sequence risk. Planning horizon: to ${inputs.lifeExpect}. Household ${inputs.householdSize}.`);
+  } else {
+    L.push(`- Current age ${inputs.currentAge}, target retire age ${inputs.retireAge}, life expectancy ${inputs.lifeExpect}, household ${inputs.householdSize}.`);
+  }
   L.push(`- Monthly spend (today's $): ${fmt(inputs.monthlyExpense)}; at retirement: ${fmt(Math.round(plan.monthlyAtRetirement))}.`);
   L.push(`- Accounts: 401k ${fmt(inputs.k401Today)}, Roth ${fmt(inputs.rothTotal)}, brokerage ${fmt(inputs.existingBrokerage)}, muni ${fmt(inputs.muniBonds)}, cash ${fmt(inputs.cashDeposit)}.`);
   L.push(`- Assumptions: ${inputs.stockReturn}% stock return, ${inputs.inflationRate}% inflation; SS at ${inputs.ssAge}.`);

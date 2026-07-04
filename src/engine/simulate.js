@@ -98,8 +98,12 @@ export function simulate({
   taxIndexYears = null,      // years between TAX_YEAR and the retirement date; brackets/deduction/FPL
                              // inflation-index from that offset and keep indexing through retirement.
                              // null = legacy behavior: frozen at TAX_YEAR figures for the whole sim.
+  cashReturn = null,         // annual % yield on CD/cash in retirement; null = grow at stockReturn (legacy)
+  muniYield = null,          // annual % yield on munis in retirement; null = grow at stockReturn (legacy)
 }) {
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
+  const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
+  const mnMr = muniYield == null ? null : muniYield / 100 / 12;
   const mi = inflationRate / 100 / 12;
   // 72(t): SEPP must continue for 5 years OR until 59.5, whichever is LONGER.
   const seppEnd = annualSepp > 0 ? Math.max(retireAge + 5, 59.5) : Infinity;
@@ -244,8 +248,11 @@ export function simulate({
     rv = Math.max(0, rv) * (1 + mr);
     bk = Math.max(0, bk) * (1 + mr);
     k = Math.max(0, k) * (1 + mr);
-    cd = Math.max(0, cd) * (1 + mr);
-    mn = Math.max(0, mn) * (1 + mr);
+    // Cash and munis compound at their own yields when provided. These stay
+    // fixed even under a stochastic/historical returnSeries — cash doesn't
+    // crash with equities, which is what makes a cash buffer worth modeling.
+    cd = Math.max(0, cd) * (1 + (cdMr ?? mr));
+    mn = Math.max(0, mn) * (1 + (mnMr ?? mr));
     hsa = Math.max(0, hsa) * (1 + mr);
     for (const t of tranches) if (t.amt > 0) t.amt *= 1 + mr;
     // Unlock tranches that have cleared the 5y lock: converted PRINCIPAL is

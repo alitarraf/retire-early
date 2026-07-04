@@ -205,6 +205,10 @@ export function simParamsAt(plan, age, overrides = {}) {
     // Brackets/deduction/FPL are IRS-inflation-indexed annually; "today" in the
     // model is TAX_YEAR, so the retirement date sits `yrs` index-years out.
     taxIndexYears: yrs,
+    // In-retirement cash/muni sleeves earn their own yields, not the stock
+    // return. CD interest is approximated at the after-tax accumulation rate.
+    cashReturn: plan.depositAfterTaxRate,
+    muniYield: plan.muniReturn,
     ...proj,
     brokerageLtcgRate: plan.brokerageLtcgRate,
     stateTaxRate: plan.effectiveStateTax,

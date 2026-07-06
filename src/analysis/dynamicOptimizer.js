@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 //  Dynamic multi-year Roth conversion optimizer (Maximize mode).
 //
-//  Upgrades the single-amount grid search (optimalConversion.js) to a
+//  Upgrades the previous single-amount grid search to a
 //  multi-year "fill to top of X% bracket each year" strategy. For each
 //  candidate bracket ceiling it runs the full (accurate) simulation —
 //  with conversions allowed across a window (retireAge → ~72) so the

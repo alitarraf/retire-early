@@ -14,10 +14,12 @@
 import { useState } from "react";
 import { RetireAtControl } from "../panels/RetireAtControl.jsx";
 import { EarlyPanel } from "../panels/EarlyPanel.jsx";
+import { RetiredPanel } from "../panels/RetiredPanel.jsx";
 import { MaximizeCenter } from "../panels/MaximizeCenter.jsx";
 import { AdvicePanel } from "../panels/AdvicePanel.jsx";
 import { DocsPanel } from "../panels/DocsPanel.jsx";
 import { INPUT_SECTIONS, FINE_TUNING_KEYS } from "../panels/InputsSidebar.jsx";
+import { ExpertToggle } from "../panels/inputs/atoms.jsx";
 
 const NAV = [
   { key: "you", label: "You" },
@@ -146,14 +148,25 @@ export function MobileShell(props) {
       {/* ── Hero (input tabs only) ────────────────────── */}
       {usesInputs && (
         <div style={{ flexShrink: 0 }}>
-          <RetireAtControl
-            value={plan.retireAge}
-            min={plan.currentAge}
-            max={80}
-            earliest={earliest}
-            onScrub={onScrubAge}
-            onCommit={onCommitAge}
-          />
+          {plan.alreadyRetired ? (
+            <div style={{ padding: "14px 18px", background: "#1a2e28" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#7ecfbb", marginBottom: 3 }}>
+                Retired
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
+                Planning from age {plan.currentAge} → {plan.lifeExpect}
+              </div>
+            </div>
+          ) : (
+            <RetireAtControl
+              value={plan.retireAge}
+              min={plan.currentAge}
+              max={80}
+              earliest={earliest}
+              onScrub={onScrubAge}
+              onCommit={onCommitAge}
+            />
+          )}
         </div>
       )}
 
@@ -291,7 +304,22 @@ function Results(props) {
     );
   }
 
-  // early
+  // early — retirees get the retiree dashboard instead of earliest-age framing
+  if (plan.alreadyRetired) {
+    return (
+      <RetiredPanel
+        embedded
+        plan={plan}
+        result={result}
+        mcResult={mcResult}
+        scenario={scenario}
+        totalAtRetirement={totalAtRetirement}
+        sustainable={sustainable}
+        dynamicOpt={dynamicOpt}
+        onApplyOptimized={applyOptimized}
+      />
+    );
+  }
   return (
     <EarlyPanel
       embedded
@@ -341,6 +369,7 @@ function SectionEditor({ section, ftSub, setFtSub, onDone, inputs, set, plan, le
             );
           })}
         </div>
+        <ExpertToggle />
         <div style={{ padding: "16px 16px 32px" }}>
           <Sub inputs={inputs} set={set} plan={plan} {...subExtra} />
         </div>

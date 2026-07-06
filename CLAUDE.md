@@ -29,24 +29,40 @@ components/ + App.jsx          ← React UI; calls analysis
 
 `simulate()` is the crown jewel: a pure, side-effect-free month-by-month drawdown that every analysis routine calls repeatedly with varied inputs. Its draw order is a tested invariant — never change it without updating the regression tests:
 
-1. Roth contributions → 2. Roth earnings (59.5+) → 3. Converted Roth (59.5+ AND 5-year lock) → 4. Munis → 5. Brokerage (LTCG on gain fraction) → 6. 401k (59.5+, effective bracket) → 7. CD/cash
+1. Roth contributions → 2. Roth earnings (59.5+) → 3. Converted Roth (5-yr elapsed, ANY age — principal only; tranche growth folds into Roth earnings and stays 59.5-gated) → 4. Munis → 5. HSA (qualified medical share only) → 6. Brokerage (LTCG on gain fraction) → 7. 401k (59.5+, effective bracket) → 8. CD/cash → 9. HSA non-qualified (last resort: ordinary tax, +20% penalty pre-65)
 
 `simulate()` returns `{ snaps, depleted, bridgeShortfall }`. `depleted` fires only when ALL funds including the unlocked 401k are exhausted; a locked-401k shortfall is counted in `bridgeShortfall` instead (Scenario B test).
+
+Accuracy model (all opt-in via params; defaults reproduce legacy behavior, `simParamsAt` opts the app in):
+- `taxIndexYears` — brackets/std deduction/FPL inflation-index from the retirement date onward (fixes bracket creep). SS provisional thresholds stay frozen (law).
+- `cashReturn` / `muniYield` — per-sleeve returns in retirement; fixed under a `returnSeries` (cash doesn't crash).
+- `autoLtcg` — yearly brokerage gain rate from real LTCG brackets stacked on trailing ordinary income + state + NIIT (plan default: on; `ltcgBracket` is the manual fallback).
+- `autoMedicare` + `preRetirementMagi` — base Part B + income-tested IRMAA with the 2-year MAGI lookback (plan default: off — users often carry premiums in `monthlyExpense`).
+- `hsaQualifiedFraction` — cap tax-free HSA draws at the medical share of spending.
+- `incomeStreams` / `expenseStreams` — pension/annuity/part-time income (ordinary streams feed drawBase + MAGI, so SS taxation/ACA/IRMAA respond) and ending costs (mortgage).
+- `survivorAge` / `survivorSpendFraction` — the widow's-tax transition: single filing for every subsequent lookup, larger-SS-only, householdSize−1, reduced spending.
+- Negative `oneTimeExpenses` amounts are windfalls banked into cash.
+- ACA is a sliding scale (Rev. Proc. 2025-25 applicable percentages) below the 400% FPL cliff; `monthlyAcaFullPremium` means the BENCHMARK silver premium.
 
 ### Analysis (`src/analysis/`)
 
 `plan.js` is the hub: `makePlan(rawInputs)` normalizes UI state into a plan object; `projectTo(plan, yrs)` grows per-account balances forward; `runAt(plan, age)` combines both and calls `simulate()`. Every other analysis file imports from `plan.js`, not directly from the engine.
 
-The five analysis routines are each independent binary/grid searches that call `runAt` in a loop:
-- `earliestRetireAge.js` — binary search for earliest safe exit age
+The analysis routines are each independent binary/grid searches that call `runAt` in a loop:
+- `earliestRetireAge.js` — search for earliest safe exit age
 - `sensitivity.js` — delta analysis for the Retire Early levers
 - `marginalValue.js` — value of +$1k/yr per account type (Maximize panel)
-- `optimalConversion.js` — best annual Roth conversion amount
-- `sustainableSpend.js` — max safe monthly spend at the configured retirement age
+- `dynamicOptimizer.js` — best Roth conversion bracket-fill strategy (estate objective)
+- `sustainableSpend.js` — max safe monthly spend at the configured retirement age; runs the FULL `simParamsAt` pipeline (rule 55, SEPP, ACA, Medicare, RMDs, streams all price in), requires zero `bridgeShortfall`, and zeroes guardrails inside its search
+- `retireByAge.js` — goal-seek: extra savings or reduced spending to hit a target age
+
+**Already-retired mode:** `alreadyRetired: true` makes `makePlan` pin `retireAge = currentAge` and zero all accumulation flows in the NORMALIZED plan only (raw inputs preserved). The first tab becomes `RetiredPanel` (money-lasts verdict + "this year's moves"); the earliest-age machinery is skipped.
 
 ### UI (`src/components/`, `src/App.jsx`)
 
-`App.jsx` holds all state via `useState`, derives a `plan` from it via `makePlan`, and passes results down as props. Two right-panel variants (`EarlyPanel`, `MaximizePanel`) swap based on a mode toggle.
+`App.jsx` holds all state via `useState`, derives a `plan` from it via `makePlan`, and passes results down as props. The center panel swaps by tab and life stage: `EarlyPanel` (planning), `RetiredPanel` (already retired), `MaximizeCenter`.
+
+The input sections live in `components/panels/inputs/` — `atoms.jsx` (layout atoms, stream/one-time editors, the Simple/Expert detail-level switch `useExpertMode`), `essentials.jsx`, `finetuning.jsx` — with `InputsSidebar.jsx` as a thin shell owning the section registry (`INPUT_SECTIONS`), captions, and summaries. The mobile shell renders the same registry. Expert mode (localStorage `retire-early.expertMode` + window event) gates the deeper layer: stream editors, survivor scenario, autoLtcg/autoMedicare, HSA medical share, account minutiae; simple mode collapses zero-balance accounts behind "+ Add account".
 
 **Never define components inside a render body.** All primitives are real top-level components in `ui.jsx` or their own files so React preserves input focus on every keystroke.
 
@@ -76,6 +92,20 @@ executes the `analysis/*` routines as tools; `api/chat.js` is a stateless proxy
 that injects `ANTHROPIC_API_KEY`. The whole feature is behind `isAskEnabled()`
 (env/localStorage). It's the permanent right column on desktop and a sheet on
 mobile.
+
+**Tool surface (14 tools).** Reads: `run_scenario`, `find_earliest_retirement`,
+`max_sustainable_spend`, `run_monte_carlo`, `optimize_roth_conversions`,
+`stress_or_history`, `run_analysis` (sensitivity / marginal_value /
+retire_by_age), `get_change_log`. Writes: `update_inputs` (every scalar
+DEFAULTS key — the whitelist and schema are DERIVED from DEFAULTS in
+`toolRegistry.js`, so new plan inputs are agent-writable automatically;
+arrays and scenario/retire-age fields excluded), `set_retire_age`,
+`set_scenario`, `apply_lever`, `set_view` (tab switching + MC trigger; never
+staged or logged), `revert_changes` (undo-all; always staged).
+`DANGEROUS_FIELDS` in `toolDispatch.js` (balances, ages, filing status,
+salary, alreadyRetired) always stage for confirmation. In retired mode the
+agent context leads with an ALREADY RETIRED line, `find_earliest_retirement`
+short-circuits, and `set_retire_age` refuses.
 
 **Ask Pro monetization (§10)** meters the agent: anonymous 3/day → signed-in-free
 5/day (Supabase magic-link) → Ask Pro unlimited ($7/mo, Stripe). All entitlement

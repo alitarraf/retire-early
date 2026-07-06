@@ -122,3 +122,13 @@ describe("dynamicOptimizer", () => {
     }
   });
 });
+
+// Phase 2 — the optimizer inherits the new engine features through runAt.
+describe("dynamicOptimizer under income-tested Medicare", () => {
+  it("returns a coherent recommendation with autoMedicare on (IRMAA priced in)", () => {
+    const plan = makePlan({ autoMedicare: true, k401Today: 800_000, retireAge: 60 });
+    const rec = dynamicOptimizer(plan);
+    // Whatever it recommends must not lose estate vs doing nothing.
+    expect(rec.estateWith).toBeGreaterThanOrEqual(rec.estateBase - 1);
+  });
+});

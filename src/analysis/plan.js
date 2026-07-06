@@ -59,7 +59,8 @@ export const DEFAULTS = {
 
   // Tax
   employmentBracket: 22,
-  ltcgBracket: 15,
+  ltcgBracket: 15, // manual LTCG rate; only used when autoLtcg is false
+  autoLtcg: true,  // derive the LTCG rate from real brackets (stacking + NIIT) each sim year
   stateKey: "Oregon",
   stateTaxEnabled: true,
 
@@ -80,16 +81,30 @@ export const DEFAULTS = {
   ssFra: 67,         // Full Retirement Age; 67 for born 1960+
   hsaBalance: 0,     // current HSA balance (grows to retirement)
   hsaAnnualContrib: 0, // annual HSA contribution until retirement
-  monthlyIrmaaSurcharge: 0, // IRMAA Medicare Part B/D surcharge at 65+
+  monthlyIrmaaSurcharge: 0, // flat IRMAA surcharge at 65+ (manual path; ignored when autoMedicare)
+  autoMedicare: false, // income-tested Part B + IRMAA (2-yr lookback); off by default because
+                       // many users already carry Medicare premiums inside monthlyExpense
+  hsaQualifiedFraction: 1, // share of spend that is qualified medical for HSA draws (1 = legacy)
   stateSsExemptRate: 0,     // 0 = SS fully taxable at state rate; 1 = fully exempt
 
   // Estate & legacy
   assumeStepUpBasis: true, // heirs inherit brokerage at market value (unrealized gains erased)
   legacyTarget: 0,         // desired estate at death, today's $; 0 = none (display-only gap)
 
+  // Life stage
+  alreadyRetired: false,   // true = plan from today: retireAge pinned to currentAge,
+                           // accumulation inputs ignored, retiree-focused results
+
   // Advanced inputs
   birthYear: 0,            // 0 = derive from currentAge; else authoritative for RMD start age
-  oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $ (weddings, repairs, …)
+  oneTimeExpenses: [],     // [{ age, amount }] one-off costs in today's $; NEGATIVE = windfall
+                           // (downsizing proceeds, inheritance) banked into cash
+  incomeStreams: [],       // [{ label, monthly, startAge, endAge, cola, taxType, survivorPct }]
+                           // pension/annuity/part-time/rental, monthly in today's $
+  expenseStreams: [],      // [{ label, monthly, startAge, endAge, inflate }] recurring costs
+                           // that end (mortgage P&I…), monthly in today's $
+  survivorAge: 0,          // primary's age when the spouse dies; 0 = not modeled
+  survivorSpendFraction: 0.75, // share of base spending that continues afterwards
   goGoMult: 1,             // phase spending multiplier, retire → slowGoAge
   slowGoMult: 1,           // phase spending multiplier, slowGoAge → noGoAge
   noGoMult: 1,             // phase spending multiplier, noGoAge+
@@ -107,6 +122,21 @@ export const DEFAULTS = {
 /** Normalize raw inputs into a plan with derived fields. */
 export function makePlan(raw) {
   const p = { ...DEFAULTS, ...raw };
+
+  // Already retired: planning starts NOW. Force the retirement age to today
+  // and zero all accumulation flows in the NORMALIZED plan only — the raw
+  // inputs are untouched, so toggling back restores them.
+  if (p.alreadyRetired) {
+    p.retireAge = p.currentAge;
+    p.salary = 0;
+    p.employerMatchPct = 0;
+    p.k401AnnualContrib = 0;
+    p.rothAnnualContrib = 0;
+    p.hsaAnnualContrib = 0;
+    p.cashMonthlyContrib = 0;
+    p.muniMonthlyContrib = 0;
+    p.brokerageMonthlyContrib = 0;
+  }
 
   const stateRate = STATE_TAXES.find((s) => s.name === p.stateKey)?.rate ?? 0;
   const effectiveStateTax = p.stateTaxEnabled ? stateRate : 0;
@@ -202,6 +232,13 @@ export function simParamsAt(plan, age, overrides = {}) {
       Math.pow(1 + plan.inflationRate / 100, yrs),
     inflationRate: plan.inflationRate,
     stockReturn: plan.stockReturn,
+    // Brackets/deduction/FPL are IRS-inflation-indexed annually; "today" in the
+    // model is TAX_YEAR, so the retirement date sits `yrs` index-years out.
+    taxIndexYears: yrs,
+    // In-retirement cash/muni sleeves earn their own yields, not the stock
+    // return. CD interest is approximated at the after-tax accumulation rate.
+    cashReturn: plan.depositAfterTaxRate,
+    muniYield: plan.muniReturn,
     ...proj,
     brokerageLtcgRate: plan.brokerageLtcgRate,
     stateTaxRate: plan.effectiveStateTax,
@@ -220,13 +257,37 @@ export function simParamsAt(plan, age, overrides = {}) {
     guardrailUpper: overrides.guardrailUpper ?? plan.guardrailUpper,
     guardrailLower: overrides.guardrailLower ?? plan.guardrailLower,
     monthlyIrmaaSurcharge: overrides.monthlyIrmaaSurcharge ?? plan.monthlyIrmaaSurcharge,
+    autoMedicare: plan.autoMedicare,
+    hsaQualifiedFraction: plan.hsaQualifiedFraction,
+    // IRMAA's 2-year lookback covers the final working years right after
+    // retirement; salary approximates pre-retirement MAGI.
+    preRetirementMagi: plan.salary,
     stateSsExemptRate: overrides.stateSsExemptRate ?? plan.stateSsExemptRate,
     assumeStepUpBasis: overrides.assumeStepUpBasis ?? plan.assumeStepUpBasis,
+    autoLtcg: plan.autoLtcg,
     // One-time expenses: entered in today's $; inflate to retire-date $ (same basis as monthlyExpense)
     // and keep only entries that land within the simulated window (retirement → life expectancy).
     oneTimeExpenses: (overrides.oneTimeExpenses ?? plan.oneTimeExpenses ?? [])
-      .filter((e) => e && e.amount > 0 && e.age >= age && e.age < plan.lifeExpect)
+      .filter((e) => e && e.amount !== 0 && e.age >= age && e.age < plan.lifeExpect)
       .map((e) => ({ age: e.age, amount: e.amount * Math.pow(1 + plan.inflationRate / 100, yrs) })),
+    // Streams: inflation-linked amounts (cola/inflate true) are entered in
+    // today's $ and scale to retire-date $ like monthlyExpense; fixed-nominal
+    // amounts (a mortgage payment, a non-COLA pension quote) pass through
+    // unchanged. Entries that end before retirement are dropped.
+    incomeStreams: (overrides.incomeStreams ?? plan.incomeStreams ?? [])
+      .filter((s) => s && s.monthly > 0 && (s.endAge == null || s.endAge > age))
+      .map((s) => ({
+        ...s,
+        monthly: s.cola === true ? s.monthly * Math.pow(1 + plan.inflationRate / 100, yrs) : s.monthly,
+      })),
+    expenseStreams: (overrides.expenseStreams ?? plan.expenseStreams ?? [])
+      .filter((s) => s && s.monthly > 0 && (s.endAge == null || s.endAge > age))
+      .map((s) => ({
+        ...s,
+        monthly: s.inflate === true ? s.monthly * Math.pow(1 + plan.inflationRate / 100, yrs) : s.monthly,
+      })),
+    survivorAge: overrides.survivorAge ?? plan.survivorAge,
+    survivorSpendFraction: overrides.survivorSpendFraction ?? plan.survivorSpendFraction,
     goGoMult: overrides.goGoMult ?? plan.goGoMult,
     slowGoMult: overrides.slowGoMult ?? plan.slowGoMult,
     noGoMult: overrides.noGoMult ?? plan.noGoMult,

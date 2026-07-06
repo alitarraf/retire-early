@@ -25,11 +25,23 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
   const { earliest, sustainable, mcSuccess, totalAtRetirement, survives, depletionAge } = results;
   const L = [];
   L.push("## Current plan (authoritative — use run_scenario for any what-if)");
-  L.push(`- Current age ${inputs.currentAge}, target retire age ${inputs.retireAge}, life expectancy ${inputs.lifeExpect}, household ${inputs.householdSize}.`);
+  if (plan.alreadyRetired) {
+    L.push(`- The user is ALREADY RETIRED (age ${inputs.currentAge}). Do not suggest retirement-age changes or earliest-retirement searches; focus on sustainable spend, Roth conversions, RMDs, Medicare/IRMAA, and sequence risk. Planning horizon: to ${inputs.lifeExpect}. Household ${inputs.householdSize}.`);
+  } else {
+    L.push(`- Current age ${inputs.currentAge}, target retire age ${inputs.retireAge}, life expectancy ${inputs.lifeExpect}, household ${inputs.householdSize}.`);
+  }
   L.push(`- Monthly spend (today's $): ${fmt(inputs.monthlyExpense)}; at retirement: ${fmt(Math.round(plan.monthlyAtRetirement))}.`);
   L.push(`- Accounts: 401k ${fmt(inputs.k401Today)}, Roth ${fmt(inputs.rothTotal)}, brokerage ${fmt(inputs.existingBrokerage)}, muni ${fmt(inputs.muniBonds)}, cash ${fmt(inputs.cashDeposit)}.`);
   L.push(`- Assumptions: ${inputs.stockReturn}% stock return, ${inputs.inflationRate}% inflation; SS at ${inputs.ssAge}.`);
   L.push(`- Scenario overlay: ${inputs.scenarioMode}.`);
+  if (results.tab) L.push(`- Dashboard tab the user is viewing: ${results.tab} (switchable via set_view).`);
+  if (plan.incomeStreams?.length) {
+    L.push(`- Income streams: ${plan.incomeStreams.map((s) => `${s.label ?? "stream"} ${fmt(s.monthly)}/mo from ${s.startAge ?? "now"}${s.endAge ? ` to ${s.endAge}` : ""}`).join("; ")}.`);
+  }
+  if (plan.expenseStreams?.length) {
+    L.push(`- Expense streams: ${plan.expenseStreams.map((s) => `${s.label ?? "cost"} ${fmt(s.monthly)}/mo${s.endAge ? ` until ${s.endAge}` : ""}`).join("; ")}.`);
+  }
+  if (plan.survivorAge > 0) L.push(`- Survivor scenario modeled: spouse dies at primary's age ${plan.survivorAge}; spending continues at ${Math.round(plan.survivorSpendFraction * 100)}%.`);
 
   L.push("");
   L.push("## Latest headline results");

@@ -73,8 +73,37 @@ export const CONTRIB_LIMITS = {
   hsaCatchup: 1000,     // additional catch-up at age 55+
 };
 
-// Long-term capital-gains rate options offered in the UI.
+// Long-term capital-gains rate options offered in the UI (manual override
+// when autoLtcg is off).
 export const LTCG_RATES = [0, 15, 20];
+
+// 2026 LTCG brackets (Rev. Proc. 2025-32). `upTo` is the top of the band of
+// TAXABLE income; gains stack on top of ordinary taxable income. These
+// thresholds ARE inflation-indexed annually (unlike NIIT).
+export const LTCG_BRACKETS = {
+  single: [
+    { upTo: 49450, rate: 0 },
+    { upTo: 545500, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+  mfj: [
+    { upTo: 98900, rate: 0 },
+    { upTo: 613700, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+  hoh: [
+    { upTo: 66200, rate: 0 },
+    { upTo: 579600, rate: 0.15 },
+    { upTo: Infinity, rate: 0.20 },
+  ],
+};
+
+// Net Investment Income Tax (IRC §1411): 3.8% on investment income above the
+// MAGI threshold. Thresholds are NOT inflation-indexed — fixed in law.
+export const NIIT = {
+  rate: 0.038,
+  threshold: { single: 200000, mfj: 250000, hoh: 200000 },
+};
 
 // Ordinary employment-bracket options offered in the UI.
 export const EMPLOYMENT_BRACKETS = [10, 12, 22, 24, 32, 35, 37];
@@ -109,7 +138,72 @@ export const ACA = {
   fplBase: 15650, // household of 1
   fplPerAdditionalPerson: 5500,
   cliffMultiple: 4.0, // 400% FPL cliff is back for 2026
+  // 2026 applicable-percentage table (Rev. Proc. 2025-25): the share of MAGI a
+  // household contributes toward the benchmark silver plan, linearly
+  // interpolated within each FPL band. Enhanced (ARPA/IRA) credits expired
+  // 12/31/2025; ≥400% FPL gets no credit (the cliff).
+  applicablePcts: [
+    { fplFrom: 0.00, fplTo: 1.33, pctFrom: 0.0210, pctTo: 0.0210 },
+    { fplFrom: 1.33, fplTo: 1.50, pctFrom: 0.0314, pctTo: 0.0419 },
+    { fplFrom: 1.50, fplTo: 2.00, pctFrom: 0.0419, pctTo: 0.0660 },
+    { fplFrom: 2.00, fplTo: 2.50, pctFrom: 0.0660, pctTo: 0.0844 },
+    { fplFrom: 2.50, fplTo: 3.00, pctFrom: 0.0844, pctTo: 0.0996 },
+    { fplFrom: 3.00, fplTo: 4.00, pctFrom: 0.0996, pctTo: 0.0996 },
+  ],
 };
+
+/** Applicable percentage for a MAGI/FPL ratio (linear within bands; cliff ≥ 4.0). */
+export function acaApplicablePct(fplRatio) {
+  if (fplRatio >= ACA.cliffMultiple) return null; // no credit — pay full premium
+  for (const b of ACA.applicablePcts) {
+    if (fplRatio < b.fplTo) {
+      const span = b.fplTo - b.fplFrom;
+      const t = span > 0 ? Math.max(0, fplRatio - b.fplFrom) / span : 0;
+      return b.pctFrom + (b.pctTo - b.pctFrom) * t;
+    }
+  }
+  return null;
+}
+
+// ── Medicare Part B / IRMAA (2026, CMS) ──
+// IRMAA is a hard cliff per tier, based on MAGI from TWO years prior.
+// Thresholds and surcharges below are 2026 figures; the engine indexes both
+// by the plan's inflation rate (approximation — real premium growth has
+// historically outpaced CPI; the top tier is frozen until 2028 by law).
+export const MEDICARE = {
+  partBBase: 202.90, // standard monthly Part B premium, per person
+  irmaa: {
+    single: [
+      { magiUpTo: 109000, partB: 0, partD: 0 },
+      { magiUpTo: 137000, partB: 81.20, partD: 14.50 },
+      { magiUpTo: 171000, partB: 202.90, partD: 37.50 },
+      { magiUpTo: 205000, partB: 324.60, partD: 60.40 },
+      { magiUpTo: 500000, partB: 446.30, partD: 83.30 },
+      { magiUpTo: Infinity, partB: 487.00, partD: 91.00 },
+    ],
+    mfj: [
+      { magiUpTo: 218000, partB: 0, partD: 0 },
+      { magiUpTo: 274000, partB: 81.20, partD: 14.50 },
+      { magiUpTo: 342000, partB: 202.90, partD: 37.50 },
+      { magiUpTo: 410000, partB: 324.60, partD: 60.40 },
+      { magiUpTo: 750000, partB: 446.30, partD: 83.30 },
+      { magiUpTo: Infinity, partB: 487.00, partD: 91.00 },
+    ],
+  },
+};
+
+/**
+ * Monthly IRMAA surcharge (Part B + Part D, per person) for a lookback MAGI.
+ * hoh uses the single scale (SSA has no separate hoh table).
+ */
+export function irmaaMonthlySurcharge(magi, filingStatus = "single", indexFactor = 1) {
+  const tiers = MEDICARE.irmaa[filingStatus] ?? MEDICARE.irmaa.single;
+  for (const t of tiers) {
+    if (magi <= t.magiUpTo * indexFactor) return (t.partB + t.partD) * indexFactor;
+  }
+  const top = tiers[tiers.length - 1];
+  return (top.partB + top.partD) * indexFactor;
+}
 
 // ── Social Security provisional income thresholds (IRC §86) ──
 // NOT inflation-adjusted — unchanged since 1983/1993 as enacted.

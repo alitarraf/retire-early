@@ -19,8 +19,12 @@ import { sustainableSpend } from "../analysis/sustainableSpend.js";
 import { dynamicOptimizer } from "../analysis/dynamicOptimizer.js";
 import { stressTest } from "../analysis/stressTest.js";
 import { historicalSequence } from "../analysis/historicalSequence.js";
+import { sensitivity } from "../analysis/sensitivity.js";
+import { marginalValues } from "../analysis/marginalValue.js";
+import { retireByAge } from "../analysis/retireByAge.js";
 import { monteCarlo } from "../engine/monteCarlo.js";
 import { HISTORICAL_SCENARIOS } from "../constants/historicalReturns.js";
+import { STATE_TAXES } from "../constants/brackets.js";
 
 // ── shared helpers ───────────────────────────────────────────
 
@@ -98,6 +102,70 @@ function ageOrDefault(args, plan) {
 
 // ── the registry ─────────────────────────────────────────────
 
+// ── update_inputs field surface ─────────────────────────────
+// Patchable fields derive from DEFAULTS so every new scalar plan input is
+// agent-writable automatically. Exclusions: retireAge (set_retire_age owns
+// it), scenario fields (set_scenario owns them), and array-valued inputs
+// (stream/one-time editors stay UI-only).
+const UPDATE_EXCLUDED = new Set([
+  "retireAge",
+  "scenarioMode",
+  "stressDropPct",
+  "stressYears",
+  "historicalScenario",
+  "historicalLens",
+  "oneTimeExpenses",
+  "incomeStreams",
+  "expenseStreams",
+]);
+export const UPDATE_PATCH_FIELDS = Object.keys(DEFAULTS).filter(
+  (k) => !UPDATE_EXCLUDED.has(k) && typeof DEFAULTS[k] !== "object",
+);
+const FILING_STATUSES = ["single", "mfj", "hoh"];
+// Curated descriptions for the fields the model reaches for most; the rest
+// get a generic line carrying their default value.
+const FIELD_DESC = {
+  monthlyExpense: "Monthly spending in today's dollars.",
+  currentAge: "The user's current age (always confirmed with the user).",
+  lifeExpect: "Planning horizon — the age money must last to.",
+  ssAge: "Social Security claiming age (62–70).",
+  ssBenefit: "Monthly SS benefit at the claiming age, today's $.",
+  salary: "Annual salary (drives employer match and pre-retirement MAGI).",
+  k401Today: "Current 401k balance (always confirmed with the user).",
+  rothTotal: "Current Roth IRA balance (always confirmed with the user).",
+  existingBrokerage: "Current taxable brokerage value (always confirmed).",
+  existingBrokerageBasis: "Brokerage cost basis (always confirmed).",
+  cashDeposit: "Cash/CD balance (always confirmed with the user).",
+  muniBonds: "Municipal bond balance (always confirmed with the user).",
+  hsaBalance: "HSA balance (always confirmed with the user).",
+  annualRothConversion: "Fixed annual Roth conversion amount.",
+  conversionCeiling: "Bracket-fill conversion ceiling (taxable-income top).",
+  conversionEndAge: "Age through which Roth conversions run.",
+  stockReturn: "Assumed annual stock return (%).",
+  inflationRate: "Assumed inflation rate (%).",
+  rule55: "Rule-of-55: penalty-free 401k access from retirement.",
+  annualSepp: "Annual 72(t) SEPP withdrawal amount.",
+  filingStatus: "Tax filing status (always confirmed with the user).",
+  stateKey: "State of residence — exact name from the app's state list.",
+  alreadyRetired: "Life stage: true = already retired (always confirmed).",
+  autoLtcg: "Derive the LTCG rate from real bracket stacking + NIIT instead of the flat ltcgBracket.",
+  autoMedicare: "Model income-tested Medicare Part B + IRMAA at 65+ automatically.",
+  survivorAge: "Primary's age when the spouse dies; 0 = not modeled.",
+  survivorSpendFraction: "Share of base spending that continues after the spouse's death.",
+  hsaQualifiedFraction: "Share of spending that is qualified medical for HSA draws (0–1).",
+  guardrailUpper: "Withdrawal-rate fraction above which spending cuts 10% (e.g. 0.055; 0 = off).",
+  guardrailLower: "Withdrawal-rate fraction below which spending rises 10% (0 = off).",
+  monthlyAcaFullPremium: "Benchmark silver ACA premium per month (pre-65 healthcare; 0 = not modeled).",
+};
+function fieldSchema(k) {
+  const v = DEFAULTS[k];
+  const type = typeof v === "boolean" ? "boolean" : typeof v === "string" ? "string" : "number";
+  const s = { type, description: FIELD_DESC[k] ?? `Plan input '${k}' (default ${JSON.stringify(v)}).` };
+  if (k === "filingStatus") s.enum = FILING_STATUSES;
+  return s;
+}
+const UPDATE_SCHEMA = Object.fromEntries(UPDATE_PATCH_FIELDS.map((k) => [k, fieldSchema(k)]));
+
 export const TOOL_REGISTRY = {
   // ── READ TOOLS ──────────────────────────────────────────────
   run_scenario: {
@@ -132,6 +200,12 @@ export const TOOL_REGISTRY = {
     schema: {},
     returnKeys: ["earliestAge", "targetAge"],
     handler(args, plan) {
+      if (plan.alreadyRetired) {
+        return {
+          alreadyRetired: true,
+          note: "The user is already retired — there is no earliest retirement age to find. Discuss sustainable spend, conversions, or RMDs instead.",
+        };
+      }
       const earliestAge = earliestRetireAge(plan);
       return { earliestAge, targetAge: plan.retireAge };
     },
@@ -173,7 +247,7 @@ export const TOOL_REGISTRY = {
   optimize_roth_conversions: {
     kind: "read",
     description:
-      "Search Roth conversion strategies and return the bracket-fill ceiling that maximizes the net estate, along with the estate gain vs no conversions. Call this for tax-efficiency / Roth conversion questions.",
+      "Search Roth conversion strategies and return the bracket-fill ceiling that maximizes the net estate, along with the estate gain vs no conversions. Call this for tax-efficiency / Roth conversion questions. To APPLY the recommendation to the user's plan, follow up with update_inputs { conversionCeiling, conversionEndAge, annualRothConversion: 0 }.",
     schema: {},
     returnKeys: ["type", "ceiling", "rate", "endAge", "estateBase", "estateWith", "gain", "totalConverted"],
     handler(args, plan) {
@@ -240,28 +314,32 @@ export const TOOL_REGISTRY = {
   update_inputs: {
     kind: "write",
     description:
-      "Apply a change to the user's actual plan inputs so the dashboard updates live. Use ONLY when the user asks to change their plan (not for what-ifs — use run_scenario for those). Pass a partial patch of the fields to change. Large or multi-field changes are staged for the user's confirmation before they take effect.",
-    schema: {
-      monthlyExpense: { type: "number", description: "New monthly spending in today's dollars." },
-      annualRothConversion: { type: "number", description: "New fixed annual Roth conversion amount." },
-      conversionCeiling: { type: "number", description: "New bracket-fill conversion ceiling." },
-      conversionEndAge: { type: "number", description: "New age through which conversions run." },
-      ssAge: { type: "number", description: "New Social Security claiming age." },
-      stockReturn: { type: "number", description: "New assumed annual stock return (%)." },
-      inflationRate: { type: "number", description: "New assumed inflation rate (%)." },
-    },
+      "Apply a change to the user's actual plan inputs so the dashboard updates live. Use ONLY when the user asks to change their plan (not for what-ifs — use run_scenario for those). Pass a partial patch of the fields to change. Account balances, ages, filing status, and other identity-level fields are ALWAYS staged for the user's confirmation; large or multi-field changes are staged too.",
+    schema: UPDATE_SCHEMA,
     returnKeys: ["status", "changes"],
     writeKind: "inputs",
-    // Allowed patch fields (must be real DEFAULTS keys — checked by the drift test).
-    patchFields: ["monthlyExpense", "annualRothConversion", "conversionCeiling", "conversionEndAge", "ssAge", "stockReturn", "inflationRate"],
+    // Allowed patch fields — derived from DEFAULTS so new plan inputs become
+    // agent-writable automatically (checked by the drift test).
+    patchFields: UPDATE_PATCH_FIELDS,
     buildProposal(args, plan) {
       const changes = [];
       const payload = {};
       for (const f of this.patchFields) {
-        if (args[f] != null && args[f] !== plan[f]) {
-          changes.push({ field: f, from: plan[f], to: args[f], scope: "input" });
-          payload[f] = args[f];
+        if (args[f] == null || args[f] === plan[f]) continue;
+        const want = typeof DEFAULTS[f];
+        if (typeof args[f] !== want) {
+          throw new Error(`'${f}' must be a ${want}, got ${typeof args[f]}.`);
         }
+        if (f === "filingStatus" && !FILING_STATUSES.includes(args[f])) {
+          throw new Error(`filingStatus must be one of: ${FILING_STATUSES.join(", ")}.`);
+        }
+        if (f === "stateKey" && !STATE_TAXES.some((s) => s.name === args[f])) {
+          throw new Error(
+            `Unknown state '${args[f]}'. Use an exact name from the app's list, e.g. "Oregon", "California", or "No state tax".`,
+          );
+        }
+        changes.push({ field: f, from: plan[f], to: args[f], scope: "input" });
+        payload[f] = args[f];
       }
       return { kind: "inputs", changes, payload };
     },
@@ -277,6 +355,11 @@ export const TOOL_REGISTRY = {
     returnKeys: ["status", "changes"],
     writeKind: "age",
     buildProposal(args, plan) {
+      if (plan.alreadyRetired) {
+        throw new Error(
+          "The user is already retired — the retirement age is pinned to their current age. Suggest adjusting spending, conversions, or scenario settings instead.",
+        );
+      }
       const to = args.age;
       const changes =
         to != null && to !== plan.retireAge
@@ -313,6 +396,114 @@ export const TOOL_REGISTRY = {
         }
       }
       return { kind: "scenario", changes, payload };
+    },
+  },
+
+  run_analysis: {
+    kind: "read",
+    description:
+      "Run one of the dashboard's deeper analyses: 'sensitivity' = which levers buy the most years of earlier retirement; 'marginal_value' = where the next $1k/yr of savings adds the most end-of-life estate; 'retire_by_age' = what it takes (extra monthly savings or lower spending) to retire at a target age. Returns compact rows.",
+    schema: {
+      type: {
+        type: "string",
+        enum: ["sensitivity", "marginal_value", "retire_by_age"],
+        description: "Which analysis to run.",
+      },
+      targetAge: { type: "number", description: "(retire_by_age) Target age; defaults to the plan's retire age." },
+    },
+    returnKeys: ["type", "rows"],
+    handler(args, plan) {
+      const type = args.type;
+      if (type === "sensitivity") {
+        if (plan.alreadyRetired) {
+          return { type, note: "The user is already retired — retirement-age levers do not apply. Discuss sustainable spend or conversions instead." };
+        }
+        const rows = sensitivity(plan)
+          .map((r) => ({ label: r.label, yearsEarlier: r.delta, newEarliestAge: r.newEarliest }))
+          .slice(0, 10);
+        return { type, rows };
+      }
+      if (type === "marginal_value") {
+        const rows = marginalValues(plan)
+          .map((r) => ({ label: r.label, estateGain: Math.round(r.gain) }))
+          .slice(0, 10);
+        return { type, rows };
+      }
+      if (type === "retire_by_age") {
+        if (plan.alreadyRetired) {
+          return { type, note: "The user is already retired — there is no future retirement age to plan for." };
+        }
+        const r = retireByAge(plan, args.targetAge ?? plan.retireAge);
+        return {
+          type,
+          targetAge: args.targetAge ?? plan.retireAge,
+          onTrack: r.onTrack,
+          feasible: r.feasible,
+          extraMonthlySavingsNeeded: Math.round(r.extraMonthly ?? 0),
+          orReduceSpendingToMonthly: Math.round(r.altSpendMonthlyToday ?? 0),
+        };
+      }
+      throw new Error("type must be one of: sensitivity, marginal_value, retire_by_age.");
+    },
+  },
+
+  set_view: {
+    kind: "write",
+    description:
+      "Switch the dashboard to a different tab so the user sees the panel you're discussing: 'early' (Retire Early / My Retirement), 'maximize' (optimizer + where-to-save), 'advice', or 'docs'. Optionally trigger the Maximize tab's on-demand Monte Carlo run. Never needs confirmation.",
+    schema: {
+      tab: { type: "string", enum: ["early", "maximize", "advice", "docs"], description: "Tab to show." },
+      runMonteCarlo: { type: "boolean", description: "Also run the Maximize tab's 500-path Monte Carlo." },
+    },
+    returnKeys: ["status", "changes"],
+    writeKind: "view",
+    buildProposal(args) {
+      const changes = args.tab
+        ? [{ field: "view", from: null, to: args.tab, scope: "view" }]
+        : [];
+      return { kind: "view", changes, payload: { tab: args.tab, runMonteCarlo: args.runMonteCarlo === true } };
+    },
+  },
+
+  apply_lever: {
+    kind: "write",
+    description:
+      "Apply one of the sensitivity levers (from run_analysis type='sensitivity') to the user's REAL plan by its exact label — e.g. after the user picks 'Spend −$1,000/mo'. Flows through the normal confirmation and undo machinery.",
+    schema: {
+      label: { type: "string", description: "Exact lever label as returned by run_analysis." },
+    },
+    returnKeys: ["status", "changes"],
+    writeKind: "inputs",
+    buildProposal(args, plan) {
+      if (plan.alreadyRetired) {
+        throw new Error("The user is already retired — retirement-age levers do not apply.");
+      }
+      const rows = sensitivity(plan);
+      const want = (args.label ?? "").trim().toLowerCase();
+      const row = rows.find((r) => r.label.toLowerCase() === want);
+      if (!row) {
+        throw new Error(`Unknown lever '${args.label}'. Valid levers: ${rows.map((r) => r.label).join("; ")}.`);
+      }
+      const changes = Object.entries(row.apply)
+        .filter(([f, v]) => v !== plan[f])
+        .map(([f, v]) => ({ field: f, from: plan[f], to: v, scope: "input" }));
+      return { kind: "inputs", changes, payload: row.apply };
+    },
+  },
+
+  revert_changes: {
+    kind: "write",
+    description:
+      "Undo ALL changes this conversation has made to the user's plan, restoring the snapshot taken before the first change. Use when the user asks to undo/revert everything. Always staged for confirmation.",
+    schema: {},
+    returnKeys: ["status", "changes"],
+    writeKind: "revert",
+    buildProposal() {
+      return {
+        kind: "revert",
+        changes: [{ field: "(all agent changes)", from: "current plan", to: "pre-conversation baseline", scope: "revert" }],
+        payload: null,
+      };
     },
   },
 };

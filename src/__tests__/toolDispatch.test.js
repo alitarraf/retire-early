@@ -190,3 +190,110 @@ describe("shouldStage helper", () => {
     expect(shouldStage([{ field: "retireAge", from: 55, to: 60 }], "graduated")).toBe(true);
   });
 });
+
+// ── Phase 5: tool parity — generalized writer, danger tiers, new tools ──
+import { sensitivity } from "../analysis/sensitivity.js";
+import { UPDATE_PATCH_FIELDS } from "../agent/toolRegistry.js";
+import { DANGEROUS_FIELDS } from "../agent/toolDispatch.js";
+
+describe("update_inputs: generalized field surface", () => {
+  it("patchFields cover (almost) all scalar DEFAULTS keys", () => {
+    expect(UPDATE_PATCH_FIELDS).toContain("k401Today");
+    expect(UPDATE_PATCH_FIELDS).toContain("rule55");
+    expect(UPDATE_PATCH_FIELDS).toContain("filingStatus");
+    expect(UPDATE_PATCH_FIELDS).toContain("alreadyRetired");
+    expect(UPDATE_PATCH_FIELDS).not.toContain("retireAge");        // set_retire_age owns it
+    expect(UPDATE_PATCH_FIELDS).not.toContain("scenarioMode");     // set_scenario owns it
+    expect(UPDATE_PATCH_FIELDS).not.toContain("oneTimeExpenses");  // arrays are UI-only
+  });
+
+  it("a single dangerous-field change is ALWAYS staged (balance edit)", () => {
+    let staged = null;
+    const r = dispatch("update_inputs", { k401Today: 500_000 }, { plan, stageConfirmation: (c) => (staged = c) });
+    expect(r.result.status).toBe("awaiting_confirmation");
+    expect(staged.changes[0].field).toBe("k401Today");
+  });
+
+  it("a small harmless tweak still applies directly", () => {
+    let applied = null;
+    const r = dispatch("update_inputs", { stockReturn: 9.5 }, { plan, actions: { applyInputs: (p) => (applied = p) } });
+    expect(r.result.status).toBe("applied");
+    expect(applied.stockReturn).toBe(9.5);
+  });
+
+  it("type mismatches and bad enums are rejected with a helpful error", () => {
+    expect(dispatch("update_inputs", { k401Today: "a lot" }, { plan }).isError).toBe(true);
+    expect(dispatch("update_inputs", { filingStatus: "married" }, { plan }).isError).toBe(true);
+    expect(dispatch("update_inputs", { stateKey: "Atlantis" }, { plan }).isError).toBe(true);
+  });
+
+  it("every DANGEROUS_FIELDS entry is a real patchable/DEFAULTS field", () => {
+    for (const f of DANGEROUS_FIELDS) expect(DEFAULTS, f).toHaveProperty(f);
+  });
+});
+
+describe("set_view", () => {
+  it("switches tabs immediately — never staged, not logged, no write budget", () => {
+    let tab = null;
+    let mc = false;
+    const r = dispatch(
+      "set_view",
+      { tab: "maximize", runMonteCarlo: true },
+      { plan, confirmMode: "always", actions: { setView: (t) => (tab = t), triggerMc: () => (mc = true) } },
+    );
+    expect(r.result.status).toBe("applied");
+    expect(tab).toBe("maximize");
+    expect(mc).toBe(true);
+    expect(r.changeLog ?? []).toHaveLength(0);
+    expect(r.writeCount ?? 0).toBe(0);
+  });
+});
+
+describe("apply_lever", () => {
+  it("applies a known lever's patch through the normal inputs flow", () => {
+    const rows = sensitivity(plan);
+    const label = rows[0].label;
+    let staged = null;
+    let applied = null;
+    const r = dispatch("apply_lever", { label }, {
+      plan,
+      stageConfirmation: (c) => (staged = c),
+      actions: { applyInputs: (p) => (applied = p) },
+    });
+    expect(r.isError).toBe(false);
+    // Either staged (multi-field/dangerous) or applied — but through the inputs kind.
+    expect(staged?.kind ?? "inputs").toBe("inputs");
+    expect(r.result.status === "applied" || r.result.status === "awaiting_confirmation").toBe(true);
+  });
+
+  it("unknown labels list the valid levers", () => {
+    const r = dispatch("apply_lever", { label: "make me rich" }, { plan });
+    expect(r.isError).toBe(true);
+    expect(r.result.error).toMatch(/Valid levers/);
+  });
+});
+
+describe("revert_changes", () => {
+  it("is always staged; confirming routes to undoAllAgentChanges", () => {
+    let staged = null;
+    const r = dispatch("revert_changes", {}, { plan, stageConfirmation: (c) => (staged = c) });
+    expect(r.result.status).toBe("awaiting_confirmation");
+    expect(staged.kind).toBe("revert");
+  });
+});
+
+describe("run_analysis parity with the panels", () => {
+  it("sensitivity rows match sensitivity(plan)", () => {
+    const r = dispatch("run_analysis", { type: "sensitivity" }, { plan });
+    const direct = sensitivity(plan);
+    expect(r.result.rows.length).toBe(Math.min(10, direct.length));
+    expect(r.result.rows[0].label).toBe(direct[0].label);
+    expect(r.result.rows[0].yearsEarlier).toBe(direct[0].delta);
+  });
+
+  it("retire_by_age returns the goal-seek shape", () => {
+    const r = dispatch("run_analysis", { type: "retire_by_age", targetAge: 52 }, { plan });
+    expect(r.result.targetAge).toBe(52);
+    expect(typeof r.result.feasible).toBe("boolean");
+  });
+});

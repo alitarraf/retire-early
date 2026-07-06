@@ -137,6 +137,88 @@ describe("Scenario C: Social Security affects longevity and inflates", () => {
   });
 });
 
+// ── Scenario F — Roth conversion ladder bridges pre-59.5 ──────
+// Converted PRINCIPAL is penalty-free once its tranche's 5 years elapse,
+// at ANY age (the whole point of a conversion ladder). Tranche growth
+// folds into Roth earnings and stays 59.5-gated.
+describe("Scenario F: conversion ladder bridges pre-59.5", () => {
+  const base = {
+    retireAge: 47,
+    lifeExpect: 85,
+    ssAge: 67,
+    ssBenefit: 2000,
+    monthlyExpense: 6000,
+    inflationRate: 0, // keep the bridge arithmetic legible
+    stockReturn: 5,
+    rothContributions: 150000, // ~2 years of bridge cash
+    rothEarnings: 0,
+    brokerage: 0,
+    brokerageBasis: 0,
+    brokerageLtcgRate: 15,
+    k401: 2_500_000, // locked until 59.5
+    cashDeposit: 300000, // pays conversion taxes + early bridge
+    muniBonds: 0,
+    stateTaxRate: 0,
+    filingStatus: "single",
+  };
+  const noLadder = simulate({ ...base, annualRothConversion: 0 });
+  const ladder = simulate({ ...base, annualRothConversion: 80000 });
+
+  it("without a ladder the locked 401k leaves a bridge shortfall", () => {
+    expect(noLadder.bridgeShortfall).toBeGreaterThan(0);
+  });
+
+  it("the ladder materially reduces the bridge shortfall", () => {
+    expect(ladder.bridgeShortfall).toBeLessThan(noLadder.bridgeShortfall * 0.7);
+  });
+
+  it("neither run hard-depletes (the 401k eventually unlocks)", () => {
+    expect(noLadder.depleted).toBeNull();
+    expect(ladder.depleted).toBeNull();
+  });
+});
+
+describe("Scenario F: tranche growth stays 59.5-gated", () => {
+  // Exactly one conversion (at 47, tranche unlocks at 52). Principal covers
+  // ~2 years of spend; growth on the tranche must NOT extend the bridge.
+  const oneConv = {
+    retireAge: 47,
+    lifeExpect: 70,
+    ssAge: 70,
+    ssBenefit: 0,
+    monthlyExpense: 4000,
+    inflationRate: 0,
+    stockReturn: 10, // big growth on the tranche while it waits
+    rothContributions: 0,
+    rothEarnings: 0,
+    brokerage: 0,
+    brokerageBasis: 0,
+    brokerageLtcgRate: 15,
+    k401: 2_000_000,
+    cashDeposit: 250_000, // taxes + bridge until the tranche unlocks
+    muniBonds: 0,
+    stateTaxRate: 0,
+    annualRothConversion: 100_000,
+    conversionEndAge: 48, // one tranche only
+    filingStatus: "single",
+  };
+  const res = simulate({ ...oneConv });
+  const noConv = simulate({ ...oneConv, annualRothConversion: 0 });
+
+  it("principal shortens the shortfall but locked growth cannot erase it", () => {
+    // 100k principal ≈ 2 years of spend; the remaining gap to 59.5 stays.
+    expect(res.bridgeShortfall).toBeGreaterThan(0);
+    expect(res.bridgeShortfall).toBeLessThan(noConv.bridgeShortfall);
+    // Principal (100k ≈ 25 months of spend, less the ~5 months of cd spent on
+    // conversion tax) shortens the bridge by ~20 months. If tranche GROWTH
+    // (~60k at 10% over 5y ≈ 15 months) were spendable too, the reduction
+    // would be ~35 months — so an upper bound of 30 discriminates.
+    const monthsSaved = noConv.bridgeShortfall - res.bridgeShortfall;
+    expect(monthsSaved).toBeGreaterThan(10);
+    expect(monthsSaved).toBeLessThan(30);
+  });
+});
+
 // ── Spouse SS (combined household pool) ───────────────────────
 describe("Spouse SS adds to the household stream", () => {
   const base = {

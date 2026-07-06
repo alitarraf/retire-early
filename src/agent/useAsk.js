@@ -37,7 +37,19 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
     if (baselineRef.current == null) baselineRef.current = actions.getInputs();
   }, [actions]);
 
-  // Write-tool actions (snapshot the baseline on first mutation).
+  // Undo all agent changes (§4.3) — restore the original-inputs baseline.
+  // Defined before writeActions: the revert_changes tool routes through it.
+  const undoAll = useCallback(() => {
+    if (baselineRef.current != null) actions.restoreInputs(baselineRef.current);
+    baselineRef.current = null;
+    setChangeLog((log) =>
+      log.map((e) => (e.status === "applied" || e.status === "awaiting_confirmation" ? { ...e, status: "reverted" } : e)),
+    );
+    setPending([]);
+  }, [actions]);
+
+  // Write-tool actions (snapshot the baseline on first mutation). View
+  // navigation deliberately takes no snapshot — it isn't a plan mutation.
   const writeActions = useMemo(
     () => ({
       applyInputs: (patch) => {
@@ -52,8 +64,11 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
         snapshotBaseline();
         actions.applyScenario(patch);
       },
+      setView: (tab) => actions.setView?.(tab),
+      triggerMc: () => actions.triggerMc?.(),
+      undoAllAgentChanges: undoAll,
     }),
-    [actions, snapshotBaseline],
+    [actions, snapshotBaseline, undoAll],
   );
 
   const send = useCallback(
@@ -146,6 +161,12 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
     (pendingId) => {
       const card = pending.find((p) => p.id === pendingId);
       if (!card) return;
+      if (card.kind === "revert") {
+        // undoAll restores the baseline, flips every applied/awaiting entry
+        // to reverted, and clears all pending cards (including this one).
+        undoAll();
+        return;
+      }
       snapshotBaseline();
       if (card.kind === "inputs") actions.applyInputs(card.payload);
       else if (card.kind === "age") actions.applyAge(card.payload);
@@ -153,7 +174,7 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
       setChangeLog((log) => card.changes.reduce((l, ch) => setChangeStatus(l, ch.id, "applied"), log));
       setPending((p) => p.filter((x) => x.id !== pendingId));
     },
-    [pending, actions, snapshotBaseline],
+    [pending, actions, snapshotBaseline, undoAll],
   );
 
   const reject = useCallback(
@@ -198,16 +219,6 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
       log.map((e) => (e.status === "awaiting_confirmation" ? { ...e, status: "rejected" } : e)),
     );
   }, [streaming]);
-
-  // Undo all agent changes (§4.3) — restore the original-inputs baseline.
-  const undoAll = useCallback(() => {
-    if (baselineRef.current != null) actions.restoreInputs(baselineRef.current);
-    baselineRef.current = null;
-    setChangeLog((log) =>
-      log.map((e) => (e.status === "applied" || e.status === "awaiting_confirmation" ? { ...e, status: "reverted" } : e)),
-    );
-    setPending([]);
-  }, [actions]);
 
   const appliedCount = changeLog.filter((e) => e.status === "applied").length;
   const hasChanges = appliedCount > 0 || pending.length > 0;

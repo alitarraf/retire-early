@@ -83,7 +83,7 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
       setDisplay((d) => [
         ...d,
         { id: userId, role: "user", text },
-        { id: assistantId, role: "assistant", text: "", trajectory: [], incomplete: false },
+        { id: assistantId, role: "assistant", text: "", trajectory: [], incomplete: false, _raw: "", actions: [] },
       ]);
       setStreaming(true);
 
@@ -103,8 +103,18 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
             setPending((p) => [...p, { id: uid(), ...card }]);
           },
           callbacks: {
+            // Accumulate the RAW stream, then split off the trailing action-chip
+            // comment (parseActions) so it's never shown as text and its chips
+            // ride along on the message.
             onText: (t) =>
-              setDisplay((d) => d.map((m) => (m.id === assistantId ? { ...m, text: m.text + t } : m))),
+              setDisplay((d) =>
+                d.map((m) => {
+                  if (m.id !== assistantId) return m;
+                  const raw = (m._raw ?? m.text ?? "") + t;
+                  const { text, actions } = parseActions(raw);
+                  return { ...m, _raw: raw, text, actions };
+                }),
+              ),
             onToolResult: (step) =>
               setDisplay((d) =>
                 d.map((m) => (m.id === assistantId ? { ...m, trajectory: [...m.trajectory, step] } : m)),
@@ -243,6 +253,37 @@ export function useAsk({ inputs, plan, results, actions, auth }) {
     undoAll,
     reset,
   };
+}
+
+// The model appends a "<!--actions: a | b | c-->" comment naming the 2–3 next
+// steps most relevant to what it just said (see systemPrompt.js). parseActions
+// splits raw assistant text into the visible prose + those chips.
+//
+// _raw accumulates across EVERY loop iteration of a turn (agentLoop streams
+// text, calls a tool, streams more), so a comment can land mid-string — before
+// a tool call — not only at the end. We therefore strip ALL closed comments
+// (the LAST one wins as the chips) rather than anchoring at $. MiniMarkdown
+// renders an unknown HTML comment verbatim, so a not-yet-closed marker must be
+// hidden the instant "<!--" appears; a truncated block (max_tokens cut before
+// "-->") thus yields no chips → the caller falls back to followUpChips.
+const ACTIONS_BLOCK = /\n*[ \t]*<!--\s*actions\s*:\s*([\s\S]*?)-->[ \t]*/gi;
+// A trailing, not-yet-closed "<!--", optionally partway through "actions:...".
+const ACTIONS_PARTIAL = /\n*[ \t]*<!--(?:\s*a(?:c(?:t(?:i(?:o(?:n(?:s(?:\s*:[\s\S]*)?)?)?)?)?)?)?)?$/i;
+
+export function parseActions(raw = "") {
+  let actions = [];
+  let text = raw.replace(ACTIONS_BLOCK, (_m, body) => {
+    actions = body
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 3);
+    return "\n"; // keep a paragraph break for a mid-text comment; trimmed if trailing
+  });
+  // Hide a trailing, still-open marker (mid-stream or a max_tokens-truncated block).
+  const partial = text.match(ACTIONS_PARTIAL);
+  if (partial) text = text.slice(0, partial.index);
+  return { text: text.replace(/\s+$/, ""), actions };
 }
 
 // Re-phrase an assistant-voiced option ("keeping your income low") as a user

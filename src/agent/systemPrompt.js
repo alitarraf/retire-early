@@ -51,5 +51,14 @@ export function buildSystemPrompt() {
     "- When the user seems overwhelmed, slow down and offer to break things into smaller steps.",
     "- You may propose a sequence of steps, but execute them as discrete tool calls.",
     "- End with a relevant follow-up question when it makes sense (e.g. \"Want me to run that with different assumptions?\").",
+    "",
+    "## Suggested next steps (action chips)",
+    "- At the VERY END of every reply, append ONE machine-readable line naming the 2–3 next steps most relevant to what you JUST discussed. It is hidden from the user and rendered as clickable buttons.",
+    "- Format it EXACTLY as an HTML comment on its own final line, with options separated by \" | \":",
+    "  <!--actions: Run a Monte Carlo simulation | Compare retiring at 50 vs 55 | Show how to lower my taxes-->",
+    "- Write each action in the USER'S voice as a short instruction they'd click to send back to you (\"Run a Monte Carlo\", not \"I could run a Monte Carlo\"). Keep each under ~8 words.",
+    "- Make them SPECIFIC to this conversation and to something you can actually do with a tool: run a scenario, find the earliest retirement age, run a Monte Carlo, optimize Roth conversions, run a stress test, or change an input. If you just OFFERED an action (\"want me to run a Monte Carlo?\"), that offer MUST appear as one of the chips.",
+    "- Prefer action phrasing; you may reference a figure the user gave or a tool returned, but do NOT invent new numbers in the chips.",
+    "- Only include steps that genuinely make sense next. If none do, OMIT the line entirely. Never mention this line in your prose, and never write \"<!--actions\" anywhere else.",
   ].join("\n");
 }

@@ -17,7 +17,7 @@ import { RetiredPanel } from "./components/panels/RetiredPanel.jsx";
 import { MaximizeCenter } from "./components/panels/MaximizeCenter.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
-import { QuickStart } from "./components/panels/QuickStart.jsx";
+import { Onboarding } from "./components/onboarding/Onboarding.jsx";
 import { MobileShell } from "./components/mobile/MobileShell.jsx";
 import { ChatDrawer } from "./components/panels/ChatDrawer.jsx";
 import { NavAuth } from "./components/panels/NavAuth.jsx";
@@ -325,7 +325,7 @@ export default function App() {
           applyOptimized={applyOptimized}
           onRunMc={() => setMaxMcOn(true)}
         />
-        {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+        {showQuickStart && <Onboarding initial={inputs} onApply={applyQuickStart} onSkip={dismissQuickStart} />}
         {askDrawer("sheet")}
       </>
     );
@@ -531,7 +531,7 @@ export default function App() {
         )}
       </div>
 
-      {showQuickStart && <QuickStart onApply={applyQuickStart} onSkip={dismissQuickStart} />}
+      {showQuickStart && <Onboarding initial={inputs} onApply={applyQuickStart} onSkip={dismissQuickStart} />}
     </div>
   );
 }

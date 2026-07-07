@@ -283,7 +283,9 @@ export function ChatDrawer({ inputs, plan, results, actions, ent, variant = "doc
         {(() => {
           const last = ask.display[ask.display.length - 1];
           if (ask.streaming || !last || last.role !== "assistant" || !last.text) return null;
-          const chips = followUpChips(last.text, results, inputs);
+          // Prefer the model's own suggested next steps (tied to what it just
+          // said); fall back to the heuristic when it omitted or truncated them.
+          const chips = (last.actions?.length ? last.actions : followUpChips(last.text, results, inputs)).slice(0, 3);
           if (!chips.length) return null;
           return (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 2, marginBottom: 6 }}>

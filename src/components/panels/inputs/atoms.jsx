@@ -201,19 +201,37 @@ export function useExpertMode() {
 
 export function ExpertToggle() {
   const expert = useExpertMode();
+  // The fields this reveals are scattered deep inside the accordion sections
+  // above, so the switch itself reads as "dead" without a caption. This line
+  // names what Expert exposes and changes instantly on toggle — the feedback.
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", background: "#f0f5f4" }}>
-      <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#9db4ae" }}>
-        Detail level
-      </span>
-      <Toggle
-        value={expert ? "expert" : "simple"}
-        onChange={(v) => setExpertMode(v === "expert")}
-        options={[
-          { value: "simple", label: "Simple" },
-          { value: "expert", label: "Expert" },
-        ]}
-      />
+    <div style={{ padding: "8px 16px", background: "#f0f5f4" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "#9db4ae" }}>
+          Detail level
+        </span>
+        <Toggle
+          value={expert ? "expert" : "simple"}
+          onChange={(v) => setExpertMode(v === "expert")}
+          options={[
+            { value: "simple", label: "Simple" },
+            { value: "expert", label: "Expert" },
+          ]}
+        />
+      </div>
+      <div style={{ fontSize: 10.5, color: "#7C9A92", lineHeight: 1.5, marginTop: 6 }}>
+        {expert ? (
+          <>
+            <strong style={{ color: "#3d8c78" }}>Advanced fields shown</strong> throughout the inputs —
+            income/expense streams, LTCG &amp; Medicare models, the survivor scenario, HSA detail, and every account.
+          </>
+        ) : (
+          <>
+            <strong style={{ color: "#4a5e58" }}>Just the essentials.</strong> Switch to Expert to add streams,
+            tax &amp; Medicare detail, a survivor scenario, and per-account options.
+          </>
+        )}
+      </div>
     </div>
   );
 }

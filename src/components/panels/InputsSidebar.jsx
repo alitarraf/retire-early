@@ -8,8 +8,8 @@
 // the layout atoms in ./inputs/atoms.jsx; this file owns the registry,
 // captions, summaries, and the desktop accordion. The mobile shell renders
 // the same bodies from INPUT_SECTIONS — one source of truth, two layouts.
-import { useState } from "react";
-import { AccSection, FineTuningHeader, GroupLabel, ExpertToggle } from "./inputs/atoms.jsx";
+import { useState, useEffect, useRef } from "react";
+import { AccSection, FineTuningHeader, GroupLabel, ExpertToggle, useExpertMode } from "./inputs/atoms.jsx";
 import { YouFields, MoneyFields, SpendingFields, AssumptionsFields } from "./inputs/essentials.jsx";
 import {
   TaxesFields, StrategyFields, HealthcareFields, EstateFields,
@@ -110,6 +110,16 @@ export function sectionSummary(key, inputs, plan) {
 export function InputsSidebar({ inputs, set, plan, levers = {}, defaultFineTuningOpen = false, defaultOpenSection = "you" }) {
   const [open, setOpen] = useState(defaultOpenSection);
   const [ftOpen, setFtOpen] = useState(defaultFineTuningOpen);
+
+  // Switching to Expert reveals fields buried in the (collapsed) Fine-tuning
+  // group, so pop it open on that transition for a visible cue. Only fires on
+  // the simple→expert edge — the user can still close it again while in Expert.
+  const expert = useExpertMode();
+  const prevExpert = useRef(expert);
+  useEffect(() => {
+    if (expert && !prevExpert.current) setFtOpen(true);
+    prevExpert.current = expert;
+  }, [expert]);
   // Owned here (not inside TaxesFields) so the 401k-withdrawal preview persists
   // across opening/closing sections — TaxesFields only mounts while Taxes is open.
   const [previewWithdrawal, setPreviewWithdrawal] = useState(50000);

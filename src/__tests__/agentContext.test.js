@@ -14,6 +14,19 @@ describe("context.js — compaction & change block", () => {
     expect(ctx).toMatch(/money lasts to/);
   });
 
+  it("reports allocation as not modeled when the opt-in is off (default)", () => {
+    const ctx = buildPlanContext(inputs, plan, {}, []);
+    expect(ctx).toMatch(/Allocation: not modeled/);
+    expect(ctx).toMatch(/set_allocation/);
+  });
+
+  it("reports the current mix when allocation is enabled", () => {
+    const on = makePlan({ ...DEFAULTS, allocationEnabled: true, riskProfile: "conservative" });
+    const ctx = buildPlanContext({ ...DEFAULTS, allocationEnabled: true }, on, {}, []);
+    expect(ctx).toMatch(/Allocation: conservative glide/);
+    expect(ctx).toMatch(/% equity/);
+  });
+
   it("change block reflects the structured change log (§4.4)", () => {
     let log = [];
     log = addChange(log, { field: "monthlyExpense", from: 10000, to: 8000, scope: "input", status: "applied" });

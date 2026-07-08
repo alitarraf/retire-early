@@ -8,6 +8,8 @@ import { NumInput, Select, Toggle } from "../ui.jsx";
 import { StreamEditor, OneTimeExpenses } from "../panels/inputs/atoms.jsx";
 import { fmtK } from "../../format.js";
 import { FILING_STATUS, FILING_STATUS_LABELS, STATE_TAXES } from "../../constants/brackets.js";
+import { allocationAt, RISK_PROFILE_KEYS, RISK_PROFILES } from "../../engine/allocation.js";
+import { GlideBand } from "../panels/AllocationCard.jsx";
 import { StepTitle, OptionCard, WizField, Guide, CtaRow, lbl, GREEN, MINT, MUTE } from "./parts.jsx";
 
 const filingOptions = Object.values(FILING_STATUS).map((v) => ({ value: v, label: FILING_STATUS_LABELS[v] }));
@@ -383,6 +385,61 @@ function AskPro({ nav }) {
   );
 }
 
+/* 6.5 — How your money is invested (teaching step, before the reveal) */
+const AllocSwatch = ({ color, opacity = 1 }) => (
+  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: 2, background: color, opacity, marginRight: 5 }} />
+);
+
+function Allocate({ vals, setMany, nav }) {
+  const on = !!vals.allocationEnabled;
+  const bandPlan = { ...vals, lifeExpect: vals.lifeExpect ?? 90, pinAllocation: vals.pinAllocation ?? false };
+  const mix = allocationAt(bandPlan, vals.currentAge ?? 40);
+  const pc = (f) => Math.round(f * 100);
+  return (
+    <div>
+      <StepTitle
+        title="How should your money be invested?"
+        sub="Your mix of stocks, bonds and cash — and how it eases from growth toward safety as you age."
+      />
+
+      {/* Signature: the same glide band you'll see on your results. */}
+      <div style={{ background: "#fff", border: "1px solid #e2e8e6", borderRadius: 12, padding: 14, marginBottom: 14, opacity: on ? 1 : 0.55 }}>
+        <GlideBand plan={bandPlan} />
+        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 11, color: MUTE, marginTop: 8 }}>
+          <span><AllocSwatch color={GREEN} />Stocks {pc(mix.equity)}%</span>
+          <span><AllocSwatch color={MINT} />Bonds {pc(mix.bond)}%</span>
+          <span><AllocSwatch color={MUTE} opacity={0.55} />Cash {pc(mix.cash)}%</span>
+          <span style={{ marginLeft: "auto" }}>today → age {bandPlan.lifeExpect}</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12.5, color: "#4a5e58", lineHeight: 1.6, marginBottom: 14 }}>
+        <div>More <strong style={{ color: GREEN }}>stocks</strong> → retire sooner, but a rougher ride.</div>
+        <div>More <strong style={{ color: "#3d8c78" }}>bonds</strong> → steadier, usually a bit later.</div>
+      </div>
+
+      <WizField label="Model a glide path?" hint="A target-date approach — heavier in stocks now, easing into bonds as you age.">
+        <Toggle
+          value={on ? "on" : "off"}
+          onChange={(v) => setMany({ allocationEnabled: v === "on" })}
+          options={[{ value: "off", label: "Keep it simple" }, { value: "on", label: "Model it" }]}
+        />
+      </WizField>
+      {on && (
+        <WizField label="Pick your risk profile">
+          <Toggle
+            value={vals.riskProfile}
+            onChange={(v) => setMany({ riskProfile: v, pinAllocation: false })}
+            options={RISK_PROFILE_KEYS.map((k) => ({ value: k, label: RISK_PROFILES[k].label }))}
+          />
+        </WizField>
+      )}
+      <Guide>Not sure? Moderate is a sensible default — you can change it anytime, and Reti shows how each choice moves your retirement age.</Guide>
+      <CtaRow primary="Continue →" onPrimary={() => nav.go(1)} />
+    </div>
+  );
+}
+
 export const STEPS = [
   { id: "welcome", Body: Welcome, bar: false, strip: false, back: false },
   { id: "stage", Body: Stage, bar: true, strip: false },
@@ -390,6 +447,7 @@ export const STEPS = [
   { id: "money", Body: Money, bar: true, strip: true },
   { id: "saving", Body: Saving, bar: true, strip: true },
   { id: "spendss", Body: SpendSS, bar: true, strip: true },
+  { id: "allocate", Body: Allocate, bar: true, strip: true },
   { id: "reveal", Body: Reveal, bar: false, strip: false, back: false },
   { id: "depth", Body: Depth, bar: false, strip: true },
   { id: "askpro", Body: AskPro, bar: false, strip: false },

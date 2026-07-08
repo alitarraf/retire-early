@@ -4,7 +4,8 @@
 //  Pure functions — the analysis routines build on these.
 // ─────────────────────────────────────────────────────────────
 
-import { fvAnnuity, splitRoth } from "../engine/accounts.js";
+import { fvAnnuity, growthFactors, splitRoth } from "../engine/accounts.js";
+import { blendedReturnAt, glideReturnSeries } from "../engine/allocation.js";
 import { simulate } from "../engine/simulate.js";
 import { ssClaimFactor } from "../engine/socialSecurity.js";
 import { STATE_TAXES, DEFAULT_FILING_STATUS, CONTRIB_LIMITS, RMD_BIRTH_YEAR_THRESHOLD, TAX_YEAR } from "../constants/brackets.js";
@@ -33,6 +34,17 @@ export const DEFAULTS = {
   stockReturn: 10.0,
   inflationRate: 3.0,
   cashDepositRate: 3.9,
+
+  // Asset allocation & risk glide path (opt-in; off = flat stockReturn everywhere).
+  // When on, the growth pool (401k/Roth/brokerage/HSA) earns a blended equity/bond/
+  // cash return whose equity share glides down with age per the risk profile.
+  allocationEnabled: false,
+  riskProfile: "moderate", // "conservative" | "moderate" | "aggressive" | "custom"
+  bondReturn: 4.5,         // nominal annual % on the bond slice of the blend
+  pinAllocation: false,    // expert: hold a fixed mix (no glide) using the pcts below
+  equityPct: 60,           // custom/pinned mix (percent; equity+bond+cash = 100)
+  bondPct: 35,
+  cashPct: 5,
 
   // 401k
   k401Today: 120000,
@@ -192,21 +204,31 @@ export function projectTo(plan, yrs, overrides = {}) {
   const brokContribAnnual = (plan.brokerageMonthlyContrib ?? 0) * 12;
   const cashContribAnnual = (plan.cashMonthlyContrib ?? 0) * 12;
   const muniContribAnnual = (plan.muniMonthlyContrib ?? 0) * 12;
+
+  // Growth-pool return (401k/Roth/brokerage/HSA). Legacy = flat stockReturn; with
+  // allocation on, each accumulation year earns the age-blended glide return.
+  // `eqRateAt(t)` is the blend during year t (1-based); age that year ≈ currentAge+(t-1).
+  const eqRateAt = plan.allocationEnabled
+    ? (t) => blendedReturnAt(plan, plan.currentAge + (t - 1))
+    : null;
+  const eqRate = eqRateAt ?? plan.stockReturn;              // scalar or per-year fn for fvAnnuity
+  const eqBalFactor = eqRateAt ? growthFactors(yrs, eqRateAt)[1] : Math.pow(1 + r, yrs);
+
   return {
     rothContributions:
-      plan.rothContribNow * Math.pow(1 + r, yrs) +
-      fvAnnuity(plan.rothAnnualContrib + rothExtra, yrs, plan.stockReturn),
-    rothEarnings: (plan.rothEarningsNow + plan.existingRothEarnings) * Math.pow(1 + r, yrs),
+      plan.rothContribNow * eqBalFactor +
+      fvAnnuity(plan.rothAnnualContrib + rothExtra, yrs, eqRate),
+    rothEarnings: (plan.rothEarningsNow + plan.existingRothEarnings) * eqBalFactor,
     // Brokerage contributions (user input + goal-seek override) are after-tax
     // dollars, so the contributed principal adds to both the value and the cost
     // basis (no phantom gain).
     brokerage:
-      plan.existingBrokerage * Math.pow(1 + r, yrs) +
-      fvAnnuity(brokContribAnnual + brokerageExtra, yrs, plan.stockReturn),
+      plan.existingBrokerage * eqBalFactor +
+      fvAnnuity(brokContribAnnual + brokerageExtra, yrs, eqRate),
     brokerageBasis: plan.existingBrokerageBasis + (brokContribAnnual + brokerageExtra) * yrs,
     k401:
-      plan.k401Today * Math.pow(1 + r, yrs) +
-      fvAnnuity(plan.total401kAnnual + k401Extra, yrs, plan.stockReturn),
+      plan.k401Today * eqBalFactor +
+      fvAnnuity(plan.total401kAnnual + k401Extra, yrs, eqRate),
     cashDeposit:
       plan.cashDeposit * Math.pow(1 + rC, yrs) +
       fvAnnuity(cashContribAnnual, yrs, plan.depositAfterTaxRate),
@@ -214,8 +236,8 @@ export function projectTo(plan, yrs, overrides = {}) {
       (plan.muniBonds + muniExtra) * Math.pow(1 + rM, yrs) +
       fvAnnuity(muniContribAnnual, yrs, plan.muniReturn),
     hsaBalance:
-      (plan.hsaBalance ?? 0) * Math.pow(1 + r, yrs) +
-      fvAnnuity(plan.hsaAnnualContrib ?? 0, yrs, plan.stockReturn),
+      (plan.hsaBalance ?? 0) * eqBalFactor +
+      fvAnnuity(plan.hsaAnnualContrib ?? 0, yrs, eqRate),
   };
 }
 
@@ -239,6 +261,12 @@ export function simParamsAt(plan, age, overrides = {}) {
     // return. CD interest is approximated at the after-tax accumulation rate.
     cashReturn: plan.depositAfterTaxRate,
     muniYield: plan.muniReturn,
+    // Allocation glide (opt-in): the equity growth pool follows the age-blended
+    // return each retirement year via simulate()'s returnSeries hook. Cash/muni
+    // sleeves keep their own yields. Off → no series, flat stockReturn (legacy).
+    ...(plan.allocationEnabled
+      ? { returnSeries: glideReturnSeries(plan, age, plan.lifeExpect - age) }
+      : {}),
     ...proj,
     brokerageLtcgRate: plan.brokerageLtcgRate,
     stateTaxRate: plan.effectiveStateTax,

@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, ScenarioCard, PhaseBreakdownCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { AllocationCard } from "./AllocationCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { rmdFactor } from "../../engine/rmd.js";
 import { fmt, fmtK } from "../../format.js";
@@ -120,7 +121,7 @@ function ThisYearCard({ plan, totalToday, dynamicOpt, onApplyOptimized }) {
   );
 }
 
-export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, embedded = false }) {
+export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, onPickRisk, embedded = false }) {
   const { snaps, depleted, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
@@ -211,6 +212,9 @@ export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetireme
           <Chip label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} warn={!survives} />
         </div>
       </div>
+
+      {/* ── Asset allocation (woven into the verdict) ── */}
+      <AllocationCard plan={plan} earliestByRisk={null} onPickRisk={onPickRisk} embedded={embedded} />
 
       {/* ── This year's moves ──────────────────────────── */}
       <ThisYearCard

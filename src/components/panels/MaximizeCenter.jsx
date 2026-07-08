@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, ScenarioCard, ProjectedBalancesCard, MarginalValueCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { AllocationCard } from "./AllocationCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
 import { cardTitleStyle } from "../../theme.js";
@@ -50,7 +51,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
+export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -154,6 +155,9 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
           <KpiChip label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} />
         </div>
       </div>
+
+      {/* ── Asset allocation (woven into the verdict) ── */}
+      <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
 
       {/* ── Optimal Roth conversion ──────────────────── */}
       <div

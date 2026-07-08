@@ -8,6 +8,7 @@ import {
   CONTRIB_LIMITS, FILING_STATUS, FILING_STATUS_LABELS, TAX_YEAR,
 } from "../../../constants/brackets.js";
 import { fmt, fmtK, pct } from "../../../format.js";
+import { RISK_PROFILE_KEYS, RISK_PROFILES } from "../../../engine/allocation.js";
 
 export function YouFields({ inputs, set, plan }) {
   const isMFJ = inputs.filingStatus === FILING_STATUS.MFJ;
@@ -351,7 +352,24 @@ export function SpendingFields({ inputs, set, plan }) {
 }
 
 export function AssumptionsFields({ inputs, set }) {
+  const expert = useExpertMode();
   const realReturn = Math.max(0, inputs.stockReturn - inputs.inflationRate);
+  const allocOn = inputs.allocationEnabled;
+  const custom = inputs.riskProfile === "custom" || inputs.pinAllocation;
+  const mixTotal = (inputs.equityPct ?? 0) + (inputs.bondPct ?? 0) + (inputs.cashPct ?? 0);
+  const setProfile = (key) => {
+    if (key === "custom") {
+      set("riskProfile")("custom");
+      set("pinAllocation")(true);
+    } else {
+      set("riskProfile")(key);
+      set("pinAllocation")(false);
+    }
+  };
+  const profileOptions = [
+    ...RISK_PROFILE_KEYS.map((k) => ({ value: k, label: RISK_PROFILES[k].label })),
+    ...(expert ? [{ value: "custom", label: "Custom" }] : []),
+  ];
   return (
     <>
       <Grid3>
@@ -372,6 +390,55 @@ export function AssumptionsFields({ inputs, set }) {
         </strong>
         <span style={{ color: "#9db4ae" }}> = {pct(inputs.stockReturn)} − {pct(inputs.inflationRate)}</span>
       </div>
+
+      <Divider />
+      <SubTitle>Asset allocation</SubTitle>
+      <Field label="Model a risk glide path" help="allocationEnabled">
+        <Toggle
+          value={!!allocOn}
+          onChange={set("allocationEnabled")}
+          options={[{ value: false, label: "Off" }, { value: true, label: "On" }]}
+        />
+      </Field>
+      {allocOn && (
+        <>
+          <div style={{ marginTop: 10 }}>
+            <Toggle value={inputs.riskProfile} onChange={setProfile} options={profileOptions} />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Grid2>
+              <Field label="Bond return" help="bondReturn">
+                <NumInput value={inputs.bondReturn} onChange={set("bondReturn")} suffix="%" step={0.1} width={62} />
+              </Field>
+            </Grid2>
+          </div>
+          {expert && custom && (
+            <div style={{ marginTop: 10 }}>
+              <Grid3>
+                <Field label="Stocks">
+                  <NumInput value={inputs.equityPct} onChange={set("equityPct")} suffix="%" step={1} width={58} />
+                </Field>
+                <Field label="Bonds">
+                  <NumInput value={inputs.bondPct} onChange={set("bondPct")} suffix="%" step={1} width={58} />
+                </Field>
+                <Field label="Cash">
+                  <NumInput value={inputs.cashPct} onChange={set("cashPct")} suffix="%" step={1} width={58} />
+                </Field>
+              </Grid3>
+              {mixTotal !== 100 && (
+                <div style={{ fontSize: 11, color: "#c0392b", marginTop: 4 }}>
+                  Mix should total 100% — it's {mixTotal}% now.
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: "#9db4ae", marginTop: 8 }}>
+            {custom
+              ? "A fixed mix, held for life — no automatic de-risking."
+              : "Stocks glide down into bonds as you age, like a target-date fund."}
+          </div>
+        </>
+      )}
     </>
   );
 }

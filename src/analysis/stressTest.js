@@ -20,8 +20,11 @@ import { simulate } from "../engine/simulate.js";
  */
 export function stressTest(simParams, { dropPct = 30, years = 3 } = {}) {
   const span = simParams.lifeExpect - simParams.retireAge;
-  const mean = simParams.stockReturn;
+  // Post-crash years revert to the mean — the per-year glide mean when an
+  // allocation series is present, else the flat stockReturn (legacy).
+  const base = simParams.returnSeries;
+  const meanAt = (i) => base?.[i] ?? simParams.stockReturn;
   const crash = -Math.abs(dropPct);
-  const returnSeries = Array.from({ length: span }, (_, i) => (i < years ? crash : mean));
+  const returnSeries = Array.from({ length: span }, (_, i) => (i < years ? crash : meanAt(i)));
   return simulate({ ...simParams, returnSeries });
 }

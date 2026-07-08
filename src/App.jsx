@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { DEFAULTS, makePlan, runMain, projectAtRetirement, simParamsAt } from "./analysis/plan.js";
 import { earliestRetireAge } from "./analysis/earliestRetireAge.js";
+import { profileEarliestAges } from "./analysis/allocationCompare.js";
 import { retireByAge } from "./analysis/retireByAge.js";
 import { sensitivity } from "./analysis/sensitivity.js";
 import { marginalValues } from "./analysis/marginalValue.js";
@@ -114,6 +115,13 @@ export default function App() {
 
   // Early-mode analysis (skipped when already retired — no age to search for)
   const earliest = useMemo(() => (retired ? null : earliestRetireAge(plan)), [plan, retired]);
+  // Earliest safe age at each risk profile (glide forced on) — feeds the
+  // AllocationCard's honest profile-vs-profile comparison. Keyed on `inputs`
+  // (not the dragAge-shifting livePlan) so a slider drag stays frozen.
+  const earliestByRisk = useMemo(() => (retired ? null : profileEarliestAges(inputs)), [inputs, retired]);
+  // Atomic risk pick from the card: enable modeling + set the profile + unpin.
+  const pickRisk = (key) =>
+    setInputs((prev) => ({ ...prev, allocationEnabled: true, riskProfile: key, pinAllocation: false }));
   const sensitivityRows = useMemo(
     () => (mode === "early" && !retired ? sensitivity(plan) : []),
     [plan, mode, retired],
@@ -307,6 +315,8 @@ export default function App() {
           set={set}
           plan={livePlan}
           earliest={earliest}
+          earliestByRisk={earliestByRisk}
+          onPickRisk={pickRisk}
           onScrubAge={onScrubAge}
           onCommitAge={onCommitAge}
           result={result}
@@ -492,12 +502,15 @@ export default function App() {
                   sustainable={sustainable}
                   dynamicOpt={dynamicOpt}
                   onApplyOptimized={applyOptimized}
+                  onPickRisk={pickRisk}
                 />
               ) : mode === "early" ? (
                 <EarlyPanel
                   plan={livePlan}
                   result={result}
                   earliest={earliest}
+                  earliestByRisk={earliestByRisk}
+                  onPickRisk={pickRisk}
                   mcResult={mcResult}
                   scenario={scenario}
                   totalAtRetirement={totalAtRetirement}
@@ -508,6 +521,8 @@ export default function App() {
                 <MaximizeCenter
                   plan={livePlan}
                   result={result}
+                  earliestByRisk={earliestByRisk}
+                  onPickRisk={pickRisk}
                   totalAtRetirement={totalAtRetirement}
                   sustainable={sustainable}
                   dynamicOpt={dynamicOpt}

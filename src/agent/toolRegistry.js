@@ -23,6 +23,7 @@ import { sensitivity } from "../analysis/sensitivity.js";
 import { marginalValues } from "../analysis/marginalValue.js";
 import { retireByAge } from "../analysis/retireByAge.js";
 import { monteCarlo } from "../engine/monteCarlo.js";
+import { RISK_PROFILE_KEYS } from "../engine/allocation.js";
 import { HISTORICAL_SCENARIOS } from "../constants/historicalReturns.js";
 import { STATE_TAXES } from "../constants/brackets.js";
 
@@ -105,8 +106,9 @@ function ageOrDefault(args, plan) {
 // ── update_inputs field surface ─────────────────────────────
 // Patchable fields derive from DEFAULTS so every new scalar plan input is
 // agent-writable automatically. Exclusions: retireAge (set_retire_age owns
-// it), scenario fields (set_scenario owns them), and array-valued inputs
-// (stream/one-time editors stay UI-only).
+// it), scenario fields (set_scenario owns them), allocation fields
+// (set_allocation owns them — enum + sum-to-100 validation), and array-valued
+// inputs (stream/one-time editors stay UI-only).
 const UPDATE_EXCLUDED = new Set([
   "retireAge",
   "scenarioMode",
@@ -114,6 +116,12 @@ const UPDATE_EXCLUDED = new Set([
   "stressYears",
   "historicalScenario",
   "historicalLens",
+  "allocationEnabled",
+  "riskProfile",
+  "pinAllocation",
+  "equityPct",
+  "bondPct",
+  "cashPct",
   "oneTimeExpenses",
   "incomeStreams",
   "expenseStreams",
@@ -122,6 +130,7 @@ export const UPDATE_PATCH_FIELDS = Object.keys(DEFAULTS).filter(
   (k) => !UPDATE_EXCLUDED.has(k) && typeof DEFAULTS[k] !== "object",
 );
 const FILING_STATUSES = ["single", "mfj", "hoh"];
+const ALLOCATION_CHOICES = [...RISK_PROFILE_KEYS, "custom"]; // named glide profiles + pinned custom mix
 // Curated descriptions for the fields the model reaches for most; the rest
 // get a generic line carrying their default value.
 const FIELD_DESC = {
@@ -142,6 +151,7 @@ const FIELD_DESC = {
   conversionCeiling: "Bracket-fill conversion ceiling (taxable-income top).",
   conversionEndAge: "Age through which Roth conversions run.",
   stockReturn: "Assumed annual stock return (%).",
+  bondReturn: "Assumed annual bond return (%) — the bond slice of the allocation glide.",
   inflationRate: "Assumed inflation rate (%).",
   rule55: "Rule-of-55: penalty-free 401k access from retirement.",
   annualSepp: "Annual 72(t) SEPP withdrawal amount.",
@@ -396,6 +406,66 @@ export const TOOL_REGISTRY = {
         }
       }
       return { kind: "scenario", changes, payload };
+    },
+  },
+
+  set_allocation: {
+    kind: "write",
+    description:
+      "Set the user's asset allocation / risk profile — the stock/bond/cash mix that drives portfolio growth. Turn allocation modeling on and choose a named risk profile ('conservative' | 'moderate' | 'aggressive'), whose equity share glides down with age like a target-date fund, OR pin a fixed 'custom' equity/bond/cash split. Use when the user asks how a more (or less) aggressive allocation, or a specific stock/bond split, changes when they can retire. Read tools (earliest retirement, scenarios, Monte Carlo) then reflect the new mix automatically.",
+    schema: {
+      enabled: { type: "boolean", description: "Turn allocation modeling on or off. Off = a flat stock return (legacy behavior)." },
+      riskProfile: {
+        type: "string",
+        enum: ALLOCATION_CHOICES,
+        description: "Named glide profile, or 'custom' to pin the equity/bond/cash mix below.",
+      },
+      equityPct: { type: "number", description: "(custom) Equity % of the mix; equity + bond + cash must total 100." },
+      bondPct: { type: "number", description: "(custom) Bond % of the mix." },
+      cashPct: { type: "number", description: "(custom) Cash % of the mix." },
+    },
+    returnKeys: ["status", "changes"],
+    writeKind: "inputs",
+    buildProposal(args, plan) {
+      const changes = [];
+      const payload = {};
+      const put = (f, v) => {
+        if (v != null && v !== plan[f]) {
+          changes.push({ field: f, from: plan[f], to: v, scope: "input" });
+          payload[f] = v;
+        }
+      };
+      if (args.riskProfile != null && !ALLOCATION_CHOICES.includes(args.riskProfile)) {
+        throw new Error(`riskProfile must be one of: ${ALLOCATION_CHOICES.join(", ")}.`);
+      }
+      const wantsCustom =
+        args.riskProfile === "custom" ||
+        args.equityPct != null || args.bondPct != null || args.cashPct != null;
+      if (wantsCustom) {
+        const eq = args.equityPct ?? plan.equityPct;
+        const bd = args.bondPct ?? plan.bondPct;
+        const csh = args.cashPct ?? plan.cashPct;
+        if (Math.abs(eq + bd + csh - 100) > 0.5) {
+          throw new Error(
+            `Custom allocation must total 100% (got equity ${eq} + bond ${bd} + cash ${csh} = ${eq + bd + csh}).`,
+          );
+        }
+        put("riskProfile", "custom");
+        put("pinAllocation", true);
+        put("equityPct", eq);
+        put("bondPct", bd);
+        put("cashPct", csh);
+      } else if (args.riskProfile != null) {
+        put("riskProfile", args.riskProfile);
+        put("pinAllocation", false);
+      }
+      // Explicit `enabled` wins; otherwise setting any allocation implies on.
+      const enable = args.enabled != null ? args.enabled : changes.length > 0 ? true : undefined;
+      put("allocationEnabled", enable);
+      if (changes.length === 0) {
+        throw new Error("Nothing to change — specify enabled, a riskProfile, or a custom equity/bond/cash mix.");
+      }
+      return { kind: "inputs", changes, payload };
     },
   },
 

@@ -297,3 +297,70 @@ describe("run_analysis parity with the panels", () => {
     expect(typeof r.result.feasible).toBe("boolean");
   });
 });
+
+describe("set_allocation", () => {
+  // confirmMode:"never" forces the apply path so we can inspect the payload
+  // (applyInputs receives the changed-fields patch, not the merged plan).
+  const run = (args, ctx = {}) => {
+    let applied = null;
+    const r = dispatch("set_allocation", args, {
+      plan,
+      confirmMode: "never",
+      actions: { applyInputs: (p) => (applied = p) },
+      ...ctx,
+    });
+    return { r, applied };
+  };
+
+  it("a named risk profile enables allocation and sets the glide", () => {
+    const { r, applied } = run({ riskProfile: "conservative" });
+    expect(r.isError).toBe(false);
+    expect(applied.allocationEnabled).toBe(true);
+    expect(applied.riskProfile).toBe("conservative");
+  });
+
+  it("rejects an unknown risk profile", () => {
+    const { r } = run({ riskProfile: "yolo" });
+    expect(r.isError).toBe(true);
+    expect(r.result.error).toMatch(/riskProfile must be one of/);
+  });
+
+  it("rejects a custom mix that does not total 100%", () => {
+    const { r } = run({ equityPct: 70, bondPct: 20, cashPct: 5 });
+    expect(r.isError).toBe(true);
+    expect(r.result.error).toMatch(/must total 100/);
+  });
+
+  it("pins a valid custom mix and marks it custom", () => {
+    const { r, applied } = run({ equityPct: 50, bondPct: 30, cashPct: 20 });
+    expect(r.isError).toBe(false);
+    expect(applied.riskProfile).toBe("custom");
+    expect(applied.pinAllocation).toBe(true);
+    expect(applied.equityPct).toBe(50);
+    expect(applied.allocationEnabled).toBe(true);
+  });
+
+  it("enabled:false turns allocation off", () => {
+    const onPlan = makePlan({ ...DEFAULTS, allocationEnabled: true });
+    let applied = null;
+    const r = dispatch("set_allocation", { enabled: false }, {
+      plan: onPlan,
+      confirmMode: "never",
+      actions: { applyInputs: (p) => (applied = p) },
+    });
+    expect(r.isError).toBe(false);
+    expect(applied.allocationEnabled).toBe(false);
+  });
+
+  it("errors when nothing would change", () => {
+    const { r } = run({});
+    expect(r.isError).toBe(true);
+    expect(r.result.error).toMatch(/Nothing to change/);
+  });
+
+  it("allocation fields are excluded from update_inputs (single-owner)", () => {
+    for (const f of ["allocationEnabled", "riskProfile", "pinAllocation", "equityPct", "bondPct", "cashPct"]) {
+      expect(UPDATE_PATCH_FIELDS).not.toContain(f);
+    }
+  });
+});

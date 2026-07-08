@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, ScenarioCard, PhaseBreakdownCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { AllocationCard } from "./AllocationCard.jsx";
 import { DetailsToggle, InfoDot } from "../ui.jsx";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
 import { fmt, fmtK } from "../../format.js";
@@ -147,7 +148,7 @@ function TargetAgeCard({ plan, retireBy }) {
 
 // ─── Main export ─────────────────────────────────────────────
 
-export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy, embedded = false }) {
+export function EarlyPanel({ plan, result, earliest, earliestByRisk, onPickRisk, mcResult, scenario, totalAtRetirement, sustainable, retireBy, embedded = false }) {
   const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -278,6 +279,9 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
           <KpiChip label={`Estate at ${plan.lifeExpect}`} value={fmt(endVal)} warn={!survives} />
         </div>
       </div>
+
+      {/* ── Asset allocation (woven into the verdict) ── */}
+      <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
 
       {/* ── Retire-by-target-age goal-seek ───────────── */}
       <TargetAgeCard plan={plan} retireBy={retireBy} />

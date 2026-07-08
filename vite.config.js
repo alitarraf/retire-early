@@ -71,6 +71,11 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), askDevProxy(env.ANTHROPIC_API_KEY)],
     server: {
       host: true,
+      // Allow access from any device on the private Tailscale tailnet
+      // (e.g. http://alipc-1:5173 from a phone). This dev server is never
+      // exposed to the public internet, so disabling the DNS-rebinding host
+      // check is safe here and lets the tailnet MagicDNS names through.
+      allowedHosts: true,
       hmr: { host: "localhost" },
       watch: { usePolling: true, interval: 300 },
     },

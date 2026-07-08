@@ -11,7 +11,7 @@ import { InputsSidebar } from "../components/panels/InputsSidebar.jsx";
 import { earliestRetireAge } from "../analysis/earliestRetireAge.js";
 import { retireByAge } from "../analysis/retireByAge.js";
 import { AdvicePanel } from "../components/panels/AdvicePanel.jsx";
-import { QuickStart } from "../components/panels/QuickStart.jsx";
+import { Onboarding } from "../components/onboarding/Onboarding.jsx";
 import { InfoDot } from "../components/ui.jsx";
 import { DEFAULTS, makePlan, runMain, simParamsAt, projectAtRetirement } from "../analysis/plan.js";
 import { marginalValues } from "../analysis/marginalValue.js";
@@ -352,10 +352,10 @@ describe("render smoke tests", () => {
     noNaN(html);
   });
 
-  it("QuickStart renders the onboarding form", () => {
-    const html = renderToString(<QuickStart onApply={() => {}} onSkip={() => {}} />);
+  it("Onboarding renders its welcome step", () => {
+    const html = renderToString(<Onboarding initial={DEFAULTS} onApply={() => {}} onSkip={() => {}} />);
     expect(html).toContain("Start here");
-    expect(html).toContain("See my plan");
+    expect(html).toContain("Build my plan");
     noNaN(html);
   });
 

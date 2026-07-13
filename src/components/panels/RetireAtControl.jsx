@@ -11,7 +11,6 @@ import { neutral } from "../../theme.js";
 
 const MILESTONES = [
   { age: 55, name: "Rule of 55 — penalty-free 401k" },
-  { age: 59.5, name: "59½ — penalty-free retirement accounts" },
   { age: 62, name: "Earliest Social Security" },
   { age: 65, name: "Medicare eligibility" },
   { age: 67, name: "Full Retirement Age" },

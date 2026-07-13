@@ -1,6 +1,6 @@
 // Headless render smoke test for AllocationCard. `npm run build` only compiles
-// JSX — it never executes a render, so a runtime throw in GlideBand's stacked-
-// area math, a NaN, or a bad prop shape would ship unseen. renderToStaticMarkup
+// JSX — it never executes a render, so a runtime throw in MixMilestones' stacked-
+// column math, a NaN, or a bad prop shape would ship unseen. renderToStaticMarkup
 // runs the full render in node and throws on any of those. Covers every caption
 // branch + the retired/off/custom states. (Interaction — clicking a profile row —
 // still needs the browser pass; this locks in that the render path is crash-free.)
@@ -14,7 +14,7 @@ import { makePlan, DEFAULTS } from "../analysis/plan.js";
 const render = (props) => renderToStaticMarkup(<AllocationCard {...props} />);
 
 describe("AllocationCard render", () => {
-  it("planning mode: renders the profile comparison + glide band + 'you' marker", () => {
+  it("planning mode: renders the profile comparison + milestone columns + 'you' marker", () => {
     const plan = makePlan({ ...DEFAULTS, allocationEnabled: true, riskProfile: "moderate" });
     const html = render({
       plan,
@@ -24,7 +24,9 @@ describe("AllocationCard render", () => {
     expect(html).toContain("When can you retire?");
     expect(html).toContain("age 48");
     expect(html).toContain("← you");
-    expect(html).toContain("<polygon"); // the glide band drew
+    expect(html).toContain("Today"); // milestone columns drew
+    expect(html).toContain("At 75");
+    expect(html).toContain("then holds"); // glide-floor summary line
     expect(html).toContain("More stocks buys ~3 earlier years");
   });
 
@@ -33,7 +35,7 @@ describe("AllocationCard render", () => {
     const html = render({ plan, earliestByRisk: null, onPickRisk: () => {} });
     expect(html).toContain("Your mix today");
     expect(html).not.toContain("When can you retire?");
-    expect(html).toContain("<polygon");
+    expect(html).toContain("Today"); // milestone columns still draw
   });
 
   it("off state: reports 'not modeled' and the flat return", () => {
@@ -43,7 +45,7 @@ describe("AllocationCard render", () => {
     expect(html).toContain(`flat ${plan.stockReturn}%`);
   });
 
-  it("custom pinned mix: labels the mix and renders flat bands without crashing", () => {
+  it("custom pinned mix: labels the mix and collapses to a single fixed column", () => {
     const plan = makePlan({
       ...DEFAULTS,
       allocationEnabled: true,
@@ -55,7 +57,9 @@ describe("AllocationCard render", () => {
     });
     const html = render({ plan, earliestByRisk: { conservative: 55, moderate: 55, aggressive: 55 }, onPickRisk: () => {} });
     expect(html).toContain("custom mix");
-    expect(html).toContain("<polygon");
+    expect(html).toContain("Your mix"); // single pinned column, not milestones
+    expect(html).toContain("Holds fixed at 50% stocks");
+    expect(html).not.toContain("At 75");
   });
 
   it("caption edge — risk unlocks: safe profile null but aggressive real", () => {
@@ -83,11 +87,12 @@ describe("onboarding Allocate step render", () => {
     expect(ids.indexOf("allocate")).toBe(ids.indexOf("reveal") - 1);
   });
 
-  it("renders the teaching band + profile picker when enabled", () => {
+  it("renders the teaching milestones + profile picker when enabled", () => {
     const vals = { ...DEFAULTS, allocationEnabled: true, riskProfile: "moderate" };
     const html = renderToStaticMarkup(<Allocate vals={vals} {...stub} />);
     expect(html).toContain("How should your money be invested?");
-    expect(html).toContain("<polygon");
+    expect(html).toContain("Today"); // milestone columns drew
+    expect(html).toContain("At 75");
     expect(html).toContain("Aggressive"); // profile picker present
   });
 

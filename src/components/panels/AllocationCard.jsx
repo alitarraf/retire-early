@@ -15,7 +15,7 @@
 //  three verdict panels (EarlyPanel / MaximizeCenter / RetiredPanel).
 // ─────────────────────────────────────────────────────────────
 
-import { allocationAt, blendedReturnAt, RISK_PROFILES, RISK_PROFILE_KEYS } from "../../engine/allocation.js";
+import { allocationAt, blendedReturnAt, RISK_PROFILES, RISK_PROFILE_KEYS, GLIDE_END_AGE } from "../../engine/allocation.js";
 
 const GREEN = "#1a2e28"; // equity
 const MINT = "#7ecfbb"; // bond
@@ -44,48 +44,84 @@ const eyebrowStyle = {
 
 const pct = (f) => `${Math.round(f * 100)}%`;
 
-// ── Signature: the glide band ────────────────────────────────
-// Stacked area across age: equity (bottom, green) → bond (mint) →
-// cash (top, mute). A pinned custom mix renders as flat bands.
-// Exported so the onboarding teaching step shows the SAME signature
-// the verdict card uses (one visual language across the product).
-export function GlideBand({ plan }) {
-  const W = 300;
-  const H = 60;
-  const start = Math.round(plan.currentAge ?? 40);
-  const end = Math.max(start + 1, Math.min(Math.round(plan.lifeExpect ?? 90), 95));
-  const ages = [];
-  for (let a = start; a <= end; a++) ages.push(a);
-  const x = (i) => (i / (ages.length - 1)) * W;
-  const y = (frac) => H * (1 - frac);
+// ── Signature: the mix at the moments that matter ────────────
+// A few labeled stacked columns (Today → at retirement → at the glide
+// floor) instead of a continuous band: each answers "how much" with a
+// real percentage, the ages answer "when", and the summary line names
+// where the de-risking stops. A pinned custom mix collapses to a
+// single "Your mix" column. Exported so the onboarding teaching step
+// shows the SAME signature the verdict card uses (one visual language
+// across the product).
+export function MixMilestones({ plan }) {
+  const cur = Math.round(plan.currentAge ?? 40);
+  const ret = Math.round(plan.retireAge ?? cur);
+  const pinned = plan.riskProfile === "custom" || plan.pinAllocation;
 
-  const splits = ages.map((a) => allocationAt(plan, a));
-  // Cumulative upper edges for stacking (equity, equity+bond).
-  const eqTop = splits.map((s) => s.equity);
-  const bdTop = splits.map((s) => s.equity + s.bond);
+  const stops = pinned
+    ? [{ age: cur, label: "Your mix" }]
+    : [
+        { age: cur, label: "Today" },
+        { age: ret, label: `Retire · ${ret}` },
+        { age: GLIDE_END_AGE, label: `At ${GLIDE_END_AGE}` },
+      ].filter((m, i, arr) => i === 0 || m.age > arr[i - 1].age);
 
-  const areaBetween = (lowEdge, highEdge) => {
-    // highEdge across left→right, then lowEdge right→left.
-    const top = ages.map((_, i) => `${x(i)},${y(highEdge[i])}`);
-    const bot = ages.map((_, i) => `${x(ages.length - 1 - i)},${y(lowEdge[ages.length - 1 - i])}`);
-    return `${top.join(" ")} ${bot.join(" ")}`;
-  };
-  const zero = ages.map(() => 0);
-  const one = ages.map(() => 1);
+  const cols = stops.map((m) => ({ ...m, split: allocationAt(plan, m.age) }));
+  const first = cols[0].split;
+  const last = cols[cols.length - 1].split;
+
+  const BAR_H = 108;
+  const segs = (s) => [
+    { key: "cash", frac: s.cash, bg: MUTE, fg: INK, opacity: 0.55 },
+    { key: "bond", frac: s.bond, bg: MINT, fg: INK, opacity: 1 },
+    { key: "equity", frac: s.equity, bg: GREEN, fg: "#dceee8", opacity: 1 },
+  ];
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      width="100%"
-      height={H}
-      style={{ display: "block", borderRadius: 8, marginTop: 4 }}
-      aria-hidden="true"
-    >
-      <polygon points={areaBetween(zero, eqTop)} fill={GREEN} />
-      <polygon points={areaBetween(eqTop, bdTop)} fill={MINT} />
-      <polygon points={areaBetween(bdTop, one)} fill={MUTE} opacity={0.55} />
-    </svg>
+    <div style={{ marginTop: 4 }}>
+      <div style={{ display: "flex", gap: 18, justifyContent: "flex-start" }}>
+        {cols.map((c) => (
+          <div key={c.label} style={{ width: 72, textAlign: "center" }}>
+            <div style={{ height: BAR_H, display: "flex", flexDirection: "column", borderRadius: 8, overflow: "hidden" }}>
+              {segs(c.split).map((g) => (
+                <div
+                  key={g.key}
+                  style={{
+                    height: `${g.frac * 100}%`,
+                    background: g.bg,
+                    opacity: g.opacity,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: g.fg,
+                  }}
+                >
+                  {/* Label only segments tall enough to hold the number. */}
+                  {g.frac * BAR_H >= 13 ? pct(g.frac) : ""}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10.5, color: "#4a5e58", fontWeight: 600, marginTop: 6, whiteSpace: "nowrap" }}>
+              {c.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11.5, color: "#4a5e58", marginTop: 8 }}>
+        {pinned ? (
+          <>Holds fixed at {pct(first.equity)} stocks — no glide.</>
+        ) : first.equity === last.equity ? (
+          <>Holds at {pct(first.equity)} stocks — the glide floor from age {GLIDE_END_AGE} on.</>
+        ) : (
+          <>
+            Stocks {pct(first.equity)} → <strong style={{ color: INK }}>{pct(last.equity)}</strong> by age{" "}
+            {GLIDE_END_AGE}, then holds.
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -172,13 +208,13 @@ export function AllocationCard({ plan, earliestByRisk = null, onPickRisk, embedd
         </div>
       )}
 
-      <GlideBand plan={plan} />
+      <MixMilestones plan={plan} />
 
-      {/* Legend + blended return */}
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, color: "#4a5e58", marginTop: 8 }}>
-        <span><Swatch color={GREEN} />Stocks {pct(split.equity)}</span>
-        <span><Swatch color={MINT} />Bonds {pct(split.bond)}</span>
-        <span><Swatch color={MUTE} opacity={0.55} />Cash {pct(split.cash)}</span>
+      {/* Color key + blended return (the columns carry the numbers). */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, color: "#4a5e58", marginTop: 10 }}>
+        <span><Swatch color={GREEN} />Stocks</span>
+        <span><Swatch color={MINT} />Bonds</span>
+        <span><Swatch color={MUTE} opacity={0.55} />Cash</span>
         <span style={{ marginLeft: "auto", color: FAINT }}>
           blended{" "}
           <strong style={{ color: "#3d8c78", fontFamily: "'JetBrains Mono', monospace" }}>{blended.toFixed(1)}%</strong>

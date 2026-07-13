@@ -36,6 +36,31 @@ components/ + App.jsx    React UI
 
 ---
 
+## Session: 2026-07-13 — Connected charts: Asset-mix lens + mix-at-milestones
+
+**PRD:** `docs/PRD_ConnectedCharts_July2026.md` (Threads 3+2 of the
+`UX_InputsAndAllocation_July2026.md` brief; Thread 1 — onboarding-style editable
+inputs — still open, needs its own PRD + spike).
+
+- **Asset-mix lens on `PortfolioChartCard`** (display-only slice): view toggle is
+  now Projection · Asset mix · Outcome range; the lens exists only when
+  `allocationEnabled`. Growth pool (401k/Roth/brokerage/HSA) split by
+  `allocationAt(plan, age)`; munis → bonds, CD → cash; GREEN/MINT palette matches
+  the AllocationCard so choosing a profile visibly re-shapes the projection.
+  `StackedChart` gained `series`/`colors` props (defaults unchanged).
+- **`MixMilestones` replaces `GlideBand`** (deleted): 3 labeled stacked columns
+  (Today · Retire·N · At 75) + "Stocks 82% → 45% by 75, then holds" summary;
+  pinned custom mix collapses to one "holds fixed" column. Shared by the verdict
+  card and the onboarding Allocate step, same as before.
+- Verified headlessly (dev server + puppeteer; recipe persisted to
+  `.claude/skills/verify/SKILL.md`): lens off/on, tooltip, legend-hide, zoom,
+  profile switch reshaping the chart, wizard walk to the Allocate step. 456 tests
+  green.
+- Noticed (not fixed): `retire-early.inputs` localStorage `data` is used verbatim,
+  not merged over DEFAULTS — a partial object renders NaN/undefined in the sidebar.
+  Real app paths always write full objects, but plan-sync/migration should keep
+  that invariant in mind.
+
 ## Session: 2026-06-19 (cont. 2) — Reti persona + sign-in visibility + account-scoped plan sync
 
 Branch `historical-sequence`. Gave the Ask agent a consistent persona, made sign-in

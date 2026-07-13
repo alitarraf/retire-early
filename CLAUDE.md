@@ -93,14 +93,17 @@ that injects `ANTHROPIC_API_KEY`. The whole feature is behind `isAskEnabled()`
 (env/localStorage). It's the permanent right column on desktop and a sheet on
 mobile.
 
-**Tool surface (14 tools).** Reads: `run_scenario`, `find_earliest_retirement`,
+**Tool surface (15 tools).** Reads: `run_scenario`, `find_earliest_retirement`,
 `max_sustainable_spend`, `run_monte_carlo`, `optimize_roth_conversions`,
 `stress_or_history`, `run_analysis` (sensitivity / marginal_value /
 retire_by_age), `get_change_log`. Writes: `update_inputs` (every scalar
 DEFAULTS key — the whitelist and schema are DERIVED from DEFAULTS in
 `toolRegistry.js`, so new plan inputs are agent-writable automatically;
-arrays and scenario/retire-age fields excluded), `set_retire_age`,
-`set_scenario`, `apply_lever`, `set_view` (tab switching + MC trigger; never
+arrays, scenario/retire-age, and allocation fields excluded), `set_retire_age`,
+`set_scenario`, `set_allocation` (risk profile / stock-bond-cash mix — a named
+age glide or a pinned custom mix; enum + sum-to-100 validated; owns the
+`allocation*`/`riskProfile`/`pinAllocation`/`equity|bond|cashPct` fields),
+`apply_lever`, `set_view` (tab switching + MC trigger; never
 staged or logged), `revert_changes` (undo-all; always staged).
 `DANGEROUS_FIELDS` in `toolDispatch.js` (balances, ages, filing status,
 salary, alreadyRetired) always stage for confirmation. In retired mode the

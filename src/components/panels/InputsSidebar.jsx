@@ -24,7 +24,7 @@ const CAPTIONS = {
   you: "Filing status sets your federal tax brackets and standard deduction. Retire age and life expectancy frame the entire projection.",
   money: "Balances compound at the stock return to your retire date. Employer match is added on top. Munis and HSA draw tax-free; brokerage gains are taxed only above cost basis.",
   spending: "Monthly expenses are inflated to your retire date. Social Security adjusts for when you claim vs. your Full Retirement Age — earlier = smaller benefit.",
-  assumptions: `Real return = stock − inflation. S&P 500 long-run: ~10% nominal, ~3% CPI, ~7% real. This is the biggest lever on your projections.`,
+  assumptions: `Real return = stock − inflation. S&P 500 long-run: ~10% nominal, ~3% CPI, ~7% real — the biggest lever on your projections. Turn on a risk glide path to model a stock/bond/cash mix that de-risks with age instead of one flat return.`,
   tax: "Employment bracket applies only to interest while working. Retirement withdrawals use real brackets on the actual draw — typically far lower than your working rate.",
   strategy: "Roth conversions during the bridge fill low brackets cheaply; converted principal is spendable 5 years later at any age. Rule of 55 unlocks your 401k penalty-free if you left that employer at 55+. Guardrails auto-adjust spending.",
   healthcare: "Enter the ACA benchmark premium only if your monthly expenses don't already include health insurance. Below 400% FPL you pay a sliding share of income; at 65 Medicare replaces ACA.",
@@ -76,8 +76,15 @@ export function sectionSummary(key, inputs, plan) {
       const streams = (inputs.incomeStreams?.length ?? 0) + (inputs.expenseStreams?.length ?? 0);
       return `${fmtK(inputs.monthlyExpense)}/mo · SS ${fmtK(plan.ssBenefit)}@${inputs.ssAge}${streams > 0 ? ` · ${streams} stream${streams === 1 ? "" : "s"}` : ""}`;
     }
-    case "assumptions":
-      return `Stock ${inputs.stockReturn}% · CPI ${inputs.inflationRate}% · CD ${inputs.cashDepositRate}%`;
+    case "assumptions": {
+      const base = `Stock ${inputs.stockReturn}% · CPI ${inputs.inflationRate}% · CD ${inputs.cashDepositRate}%`;
+      if (!inputs.allocationEnabled) return base;
+      const alloc =
+        inputs.riskProfile === "custom" || inputs.pinAllocation
+          ? `${inputs.equityPct}/${inputs.bondPct}/${inputs.cashPct} mix`
+          : `${inputs.riskProfile} glide`;
+      return `${base} · ${alloc}`;
+    }
     case "tax":
       return `${inputs.employmentBracket}% / LTCG ${inputs.autoLtcg ? "auto" : `${inputs.ltcgBracket}%`} / state ${plan.effectiveStateTax > 0 ? plan.effectiveStateTax + "%" : "none"}`;
     case "strategy":

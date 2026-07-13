@@ -70,7 +70,9 @@ export function monteCarlo(simParams, { n = 1000, stockReturnStd = 12, seed = nu
   const rng = seed !== null ? lcg : Math.random;
 
   const years = simParams.lifeExpect - simParams.retireAge;
-  const mean = simParams.stockReturn;
+  // Per-year mean: the allocation glide series when present, else flat stockReturn.
+  const base = simParams.returnSeries;
+  const meanAt = (i) => base?.[i] ?? simParams.stockReturn;
   const depletionAges = [];
   const endTotals = [];
   // Per-year total-portfolio value for every run, for the percentile fan chart.
@@ -81,7 +83,7 @@ export function monteCarlo(simParams, { n = 1000, stockReturnStd = 12, seed = nu
   let successes = 0;
 
   for (let i = 0; i < n; i++) {
-    const returnSeries = Array.from({ length: years }, () => mean + stockReturnStd * stdNormal(rng));
+    const returnSeries = Array.from({ length: years }, (_, y) => meanAt(y) + stockReturnStd * stdNormal(rng));
     const result = simulate({ ...simParams, returnSeries });
     depletionAges.push(result.depleted);
     endTotals.push(result.snaps.at(-1)?.total ?? 0);

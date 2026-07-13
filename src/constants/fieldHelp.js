@@ -208,6 +208,17 @@ export const FIELD_HELP = {
     label: "CD rate",
     context: "Rate on cash savings during accumulation (pre-retirement), taxed at your employment bracket.",
   },
+  allocationEnabled: {
+    label: "Risk glide path",
+    context:
+      "Model your portfolio as a stock/bond/cash mix that de-risks with age (like a target-date fund), instead of one flat stock return. Blends each sleeve's return year by year. Off = the legacy flat stock return.",
+    typical: "Turning this on is more realistic and usually lands your safe retirement age slightly later than assuming 100% stocks forever.",
+  },
+  bondReturn: {
+    label: "Bond return",
+    context: "Assumed annual return on the bond slice of your allocation glide.",
+    typical: "~4–5% nominal for intermediate high-grade bonds.",
+  },
 
   // ── Taxes ───────────────────────────────────────────────────
   employmentBracket: {

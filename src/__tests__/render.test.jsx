@@ -244,6 +244,34 @@ describe("render smoke tests", () => {
     noNaN(html);
   });
 
+  it("PortfolioChartCard offers the Asset-mix lens only when the glide is modeled", () => {
+    const off = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
+    const offHtml = renderToString(
+      <PortfolioChartCard snaps={runMain(off).snaps} ssAge={off.ssAge} plan={off} mcResult={null} />,
+    );
+    expect(offHtml).not.toContain("Asset mix");
+
+    const on = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55, allocationEnabled: true, riskProfile: "moderate" });
+    const onHtml = renderToString(
+      <PortfolioChartCard snaps={runMain(on).snaps} ssAge={on.ssAge} plan={on} mcResult={null} />,
+    );
+    expect(onHtml).toContain("Asset mix");
+    noNaN(onHtml);
+  });
+
+  it("PortfolioChartCard Asset-mix view stacks stocks/bonds/cash with the mapping caption", () => {
+    const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55, allocationEnabled: true, riskProfile: "moderate" });
+    const html = renderToString(
+      <PortfolioChartCard snaps={runMain(plan).snaps} ssAge={plan.ssAge} plan={plan} mcResult={null} initialView="instruments" />,
+    );
+    expect(html).toContain("Stocks"); // instrument legend
+    expect(html).toContain("Bonds");
+    expect(html).not.toContain("Brokerage"); // account legend replaced by the lens
+    expect(html).toContain("munis count as bonds, CDs as cash"); // honesty caption
+    expect(html).toContain("Moderate glide");
+    noNaN(html);
+  });
+
   it("PortfolioChartCard hides the Outcome-range option when no MC and no onRunMc", () => {
     const plan = makePlan({ ...DEFAULTS, currentAge: 50, retireAge: 55 });
     const result = runMain(plan);

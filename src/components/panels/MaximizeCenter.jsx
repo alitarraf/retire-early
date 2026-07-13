@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, ScenarioCard, ProjectedBalancesCard, MarginalValueCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { AllocationCard } from "./AllocationCard.jsx";
 import { DetailsToggle } from "../ui.jsx";
 import { fmt, fmtK, pct } from "../../format.js";
 import { cardTitleStyle } from "../../theme.js";
@@ -50,7 +51,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
+export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -272,17 +273,16 @@ export function MaximizeCenter({ plan, result, totalAtRetirement, sustainable, d
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
-      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
-          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Balances, next $1k, Monte Carlo, tax, scenario & legacy"
+          caption="Asset allocation, balances, next $1k, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
           <ProjectedBalancesCard plan={plan} atRetirement={atRetirement} />
           <MarginalValueCard plan={plan} marginalRows={marginalRows} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />

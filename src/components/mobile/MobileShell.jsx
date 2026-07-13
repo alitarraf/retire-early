@@ -239,7 +239,7 @@ export function MobileShell(props) {
 // ── Results body for the active tab ──────────────────────────
 function Results(props) {
   const {
-    mode, plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy,
+    mode, plan, result, earliest, earliestByRisk, onPickRisk, mcResult, scenario, totalAtRetirement, sustainable, retireBy,
     sensitivityRows, applyLever, appliedLevers, undoLevers,
     atRetirement, marginalRows, dynamicOpt, applyOptimized, onRunMc,
     inputs,
@@ -291,6 +291,8 @@ function Results(props) {
         embedded
         plan={plan}
         result={result}
+        earliestByRisk={earliestByRisk}
+        onPickRisk={onPickRisk}
         totalAtRetirement={totalAtRetirement}
         sustainable={sustainable}
         dynamicOpt={dynamicOpt}
@@ -309,6 +311,7 @@ function Results(props) {
     return (
       <RetiredPanel
         embedded
+        onPickRisk={onPickRisk}
         plan={plan}
         result={result}
         mcResult={mcResult}
@@ -326,6 +329,8 @@ function Results(props) {
       plan={plan}
       result={result}
       earliest={earliest}
+      earliestByRisk={earliestByRisk}
+      onPickRisk={onPickRisk}
       mcResult={mcResult}
       scenario={scenario}
       totalAtRetirement={totalAtRetirement}

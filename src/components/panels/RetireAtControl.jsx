@@ -11,7 +11,6 @@ import { neutral } from "../../theme.js";
 
 const MILESTONES = [
   { age: 55, name: "Rule of 55 — penalty-free 401k" },
-  { age: 59.5, name: "59½ — penalty-free retirement accounts" },
   { age: 62, name: "Earliest Social Security" },
   { age: 65, name: "Medicare eligibility" },
   { age: 67, name: "Full Retirement Age" },
@@ -40,6 +39,21 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
       ticks.push({ age: m.age, kind: "milestone", clickable: Number.isInteger(m.age), name: m.name });
     }
   }
+
+  // The marks must stay to scale (they sit under a native linear slider, so
+  // the thumb lands exactly above its tick), but the labels can't: milestone
+  // ages cluster (55·57·59½·62) and their numbers collide. So labels dodge
+  // onto a second, lower row — ruler-style short/long stems — whenever the
+  // gap to the previous same-row label is too tight to set both numbers.
+  const LABEL_MIN_GAP = 8.5; // percent of track ≈ one "59½" label + breathing room
+  ticks.sort((a, b) => a.age - b.age);
+  const lastAt = [-Infinity, -Infinity]; // last label position per row
+  for (const t of ticks) {
+    const p = pct(t.age);
+    t.row = p - lastAt[0] >= LABEL_MIN_GAP ? 0 : p - lastAt[1] >= LABEL_MIN_GAP ? 1 : 0;
+    lastAt[t.row] = p;
+  }
+  const twoRows = ticks.some((t) => t.row === 1);
 
   const stepBtn = {
     width: STEP_W,
@@ -155,8 +169,9 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
           </button>
         </div>
 
-        {/* Milestone ticks — inset to align under the slider track */}
-        <div style={{ position: "relative", height: 20, margin: `6px ${STEP_W + STEP_GAP}px 0` }}>
+        {/* Milestone ticks — inset to align under the slider track. Marks are
+            always to scale; labels on row 1 hang from longer stems. */}
+        <div style={{ position: "relative", height: twoRows ? 33 : 20, margin: `6px ${STEP_W + STEP_GAP}px 0` }}>
           {ticks.map((t) => {
             const isEarliest = t.kind === "earliest";
             const active = t.age === value;
@@ -170,18 +185,39 @@ export function RetireAtControl({ value, min, max = 80, earliest = null, onScrub
                 style={{ position: "absolute", left: `${pct(t.age)}%`, transform: "translateX(-50%)", textAlign: "center", whiteSpace: "nowrap" }}
                 title={isEarliest ? "Earliest age your plan supports" : t.name}
               >
-                <div
-                  style={{
-                    width: isEarliest ? 0 : 2,
-                    height: isEarliest ? 0 : 6,
-                    margin: "0 auto 2px",
-                    background: isEarliest ? "transparent" : markColor,
-                    borderRadius: 1,
-                    borderLeft: isEarliest ? "4px solid transparent" : "none",
-                    borderRight: isEarliest ? "4px solid transparent" : "none",
-                    borderTop: isEarliest ? `6px solid ${markColor}` : "none",
-                  }}
-                />
+                {isEarliest ? (
+                  <>
+                    <div
+                      style={{
+                        width: 0,
+                        height: 0,
+                        margin: "0 auto",
+                        borderLeft: "4px solid transparent",
+                        borderRight: "4px solid transparent",
+                        borderTop: `6px solid ${markColor}`,
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: 2,
+                        height: t.row === 1 ? 11 : 0,
+                        margin: "0 auto 2px",
+                        background: markColor,
+                        borderRadius: 1,
+                      }}
+                    />
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      width: 2,
+                      height: t.row === 1 ? 17 : 6,
+                      margin: "0 auto 2px",
+                      background: markColor,
+                      borderRadius: 1,
+                    }}
+                  />
+                )}
                 {clickable ? (
                   <button
                     type="button"

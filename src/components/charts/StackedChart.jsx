@@ -18,8 +18,10 @@ export const GEO = { W: 460, H: 160, YPAD: 36, TOP: 18 };
 export const barWidthFor = (n) => Math.max(2, (GEO.W - GEO.YPAD) / Math.max(1, n) - 1);
 export const colCenterX = (i, n) => GEO.YPAD + i * (barWidthFor(n) + 1) + barWidthFor(n) / 2;
 
-// Stack order, bottom → top (a tested visual invariant). Legend renders the
-// reverse (top series first) so the swatches read top-to-bottom like the bars.
+// Default stack order, bottom → top (a tested visual invariant). Legend renders
+// the reverse (top series first) so the swatches read top-to-bottom like the
+// bars. Callers can swap in a different lens via the `series`/`colors` props
+// (the PortfolioChartCard's "Asset mix" view stacks stocks/bonds/cash instead).
 const STACK = [
   ["cd", "CD"],
   ["k401", "401k"],
@@ -48,6 +50,8 @@ export function StackedChart({
   scenarioLabel = "Scenario",
   mcBands = null,
   view = null,
+  series = STACK,
+  colors = STACK_COLORS,
   hidden = EMPTY,
   onToggleHidden = null,
   hover = null,
@@ -60,9 +64,8 @@ export function StackedChart({
   const hasScenario = !isFan && Array.isArray(scenarioSnaps) && scenarioSnaps.length > 0;
   const hasBands = Array.isArray(mcBands) && mcBands.length > 0;
 
-  const colors = STACK_COLORS;
   const visVal = (s, key) => (hidden.has(key) ? 0 : s[key] ?? 0);
-  const visTotal = (s) => STACK.reduce((sum, [key]) => sum + visVal(s, key), 0);
+  const visTotal = (s) => series.reduce((sum, [key]) => sum + visVal(s, key), 0);
 
   // Scale anchor: the deterministic bars (visible series only), scenario line, and
   // the MC *median* — i.e. the central outcome, not the extreme upper tail. The
@@ -131,7 +134,7 @@ export function StackedChart({
           snaps.map((s, i) => {
             const x = xAt(i);
             let yOff = 0;
-            return STACK.map(([key]) => {
+            return series.map(([key]) => {
               if (hidden.has(key)) return null;
               const val = s[key] ?? 0;
               const h = (val / maxVal) * plotH;
@@ -301,7 +304,7 @@ export function StackedChart({
                 </text>
               </g>
             ))
-          : STACK.slice()
+          : series.slice()
               .reverse()
               .map(([key, label], i) => {
                 const off = hidden.has(key);

@@ -146,10 +146,9 @@ export const Collapsible = ({ title, hint, children, defaultOpen = false, open: 
   );
 };
 
-// Flat inline disclosure (Option A): a borderless hairline-rule row, not a
-// button-box. Used to reveal secondary cards that already carry their own
-// elevation, so the revealed content flows as more of the same column rather
-// than nesting inside a bordered shell.
+// Prominent card-style disclosure under the portfolio chart. It was a flat
+// hairline rule once, but users couldn't find it — so it now carries the same
+// elevation as the cards it reveals and reads as an obvious button.
 export const DetailsToggle = ({ open, onToggle, caption }) => (
   <button
     type="button"
@@ -158,31 +157,43 @@ export const DetailsToggle = ({ open, onToggle, caption }) => (
     style={{
       display: "flex",
       alignItems: "center",
-      gap: 12,
+      gap: 14,
       width: "100%",
-      background: "transparent",
-      border: "none",
+      background: "#fff",
+      border: "1px solid #cfe0db",
+      borderRadius: 14,
       cursor: "pointer",
-      padding: "4px 0",
+      padding: "14px 20px",
+      boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+      textAlign: "left",
     }}
   >
-    <span style={{ fontSize: 12, fontWeight: 700, color: "#3d8c78", whiteSpace: "nowrap" }}>
-      {open ? "Hide details" : "Show details"}
-    </span>
-    <span style={{ flex: 1, height: 1, background: "#dde7e3" }} />
-    {caption && (
-      <span style={{ fontSize: 11, color: "#9db4ae", whiteSpace: "nowrap" }}>{caption}</span>
-    )}
     <span
+      aria-hidden="true"
       style={{
-        fontSize: 12,
-        color: "#7C9A92",
-        display: "inline-block",
+        width: 26,
+        height: 26,
+        borderRadius: "50%",
+        background: "#e7f4ef",
+        color: "#3d8c78",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        flex: "0 0 auto",
         transform: open ? "rotate(180deg)" : "none",
         transition: "transform 0.2s",
       }}
     >
       ▾
+    </span>
+    <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#1a2e28", whiteSpace: "nowrap" }}>
+        {open ? "Hide details" : "Show details"}
+      </span>
+      {caption && (
+        <span style={{ fontSize: 11, color: "#7C9A92", lineHeight: 1.4 }}>{caption}</span>
+      )}
     </span>
   </button>
 );

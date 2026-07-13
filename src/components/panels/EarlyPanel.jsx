@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { PortfolioChartCard } from "./PortfolioChartCard.jsx";
 import { TaxTransparency, LegacyGap, ScenarioCard, PhaseBreakdownCard } from "./ResultsExtras.jsx";
 import { MonteCarloCard } from "./MonteCarloCard.jsx";
+import { AllocationCard } from "./AllocationCard.jsx";
 import { DetailsToggle, InfoDot } from "../ui.jsx";
 import { FIELD_HELP } from "../../constants/fieldHelp.js";
 import { fmt, fmtK } from "../../format.js";
@@ -147,7 +148,7 @@ function TargetAgeCard({ plan, retireBy }) {
 
 // ─── Main export ─────────────────────────────────────────────
 
-export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAtRetirement, sustainable, retireBy, embedded = false }) {
+export function EarlyPanel({ plan, result, earliest, earliestByRisk, onPickRisk, mcResult, scenario, totalAtRetirement, sustainable, retireBy, embedded = false }) {
   const { snaps, depleted, bridgeShortfall, estateGainTax = 0 } = result;
   const survives = depleted === null;
   const onTrack = earliest !== null && earliest <= plan.retireAge;
@@ -296,17 +297,16 @@ export function EarlyPanel({ plan, result, earliest, mcResult, scenario, totalAt
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
-      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
-          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Phases, Monte Carlo, tax, scenario & legacy"
+          caption="Asset allocation, phases, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
           <PhaseBreakdownCard plan={plan} result={result} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />

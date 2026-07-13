@@ -16,6 +16,7 @@
 
 import { fmt } from "../format.js";
 import { renderChangeLogForContext } from "./changeLog.js";
+import { allocationAt } from "../engine/allocation.js";
 
 // Keep this many of the most recent turns verbatim (a turn = one message).
 export const VERBATIM_MESSAGES = 12; // ~6 user/assistant exchanges
@@ -33,6 +34,19 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
   L.push(`- Monthly spend (today's $): ${fmt(inputs.monthlyExpense)}; at retirement: ${fmt(Math.round(plan.monthlyAtRetirement))}.`);
   L.push(`- Accounts: 401k ${fmt(inputs.k401Today)}, Roth ${fmt(inputs.rothTotal)}, brokerage ${fmt(inputs.existingBrokerage)}, muni ${fmt(inputs.muniBonds)}, cash ${fmt(inputs.cashDeposit)}.`);
   L.push(`- Assumptions: ${inputs.stockReturn}% stock return, ${inputs.inflationRate}% inflation; SS at ${inputs.ssAge}.`);
+  if (plan.allocationEnabled) {
+    const a = allocationAt(plan, plan.currentAge);
+    const pct = (x) => Math.round(x * 100);
+    const mode =
+      plan.riskProfile === "custom" || plan.pinAllocation
+        ? "fixed custom mix (pinned, no glide)"
+        : `${plan.riskProfile} glide (equity share falls with age)`;
+    L.push(
+      `- Allocation: ${mode} — currently ${pct(a.equity)}% equity / ${pct(a.bond)}% bond / ${pct(a.cash)}% cash; bond return ${plan.bondReturn}%. Change with set_allocation.`,
+    );
+  } else {
+    L.push(`- Allocation: not modeled (flat ${inputs.stockReturn}% growth). Enable it and pick a risk profile with set_allocation.`);
+  }
   L.push(`- Scenario overlay: ${inputs.scenarioMode}.`);
   if (results.tab) L.push(`- Dashboard tab the user is viewing: ${results.tab} (switchable via set_view).`);
   if (plan.incomeStreams?.length) {

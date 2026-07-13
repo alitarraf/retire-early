@@ -10,6 +10,7 @@
 // panels, since they share this card).
 import { useState } from "react";
 import { StackedChart, GEO, colCenterX, STACK_COLORS } from "../charts/StackedChart.jsx";
+import { allocationAt, RISK_PROFILES } from "../../engine/allocation.js";
 import { Toggle, RangeSlider } from "../ui.jsx";
 import { pct, fmt } from "../../format.js";
 import { cardTitleStyle } from "../../theme.js";
@@ -27,6 +28,32 @@ const labelStyle = cardTitleStyle;
 
 const SERIES_LABEL = { roth: "Roth", muni: "Munis", hsa: "HSA", brokerage: "Brokerage", k401: "401k", cd: "CD" };
 const TOOLTIP_ROWS = ["roth", "muni", "hsa", "brokerage", "k401", "cd"];
+
+// ── "Asset mix" lens (Thread 3, PRD_ConnectedCharts_July2026) ──────────────
+// Display-only: the engine blends one return for the growth pool, so the lens
+// applies the SAME age-based split the numbers already use. Growth accounts
+// (401k / Roth / brokerage / HSA) split by allocationAt; munis are bonds,
+// CDs are cash. Palette mirrors AllocationCard (stocks dark, at the bottom)
+// so the projection and the allocation card read as one system.
+const MIX_SERIES = [
+  ["stocks", "Stocks"],
+  ["bonds", "Bonds"],
+  ["cash", "Cash"],
+];
+const MIX_COLORS = { stocks: "#1a2e28", bonds: "#7ecfbb", cash: "#c8d8d4" };
+const MIX_TOOLTIP_ROWS = ["cash", "bonds", "stocks"]; // top of stack first
+
+function toMixSnap(plan, s) {
+  const growth = (s.k401 ?? 0) + (s.roth ?? 0) + (s.brokerage ?? 0) + (s.hsa ?? 0);
+  const a = allocationAt(plan, s.age);
+  return {
+    age: s.age,
+    total: s.total,
+    stocks: growth * a.equity,
+    bonds: growth * a.bond + (s.muni ?? 0),
+    cash: growth * a.cash + (s.cd ?? 0),
+  };
+}
 
 function FanExplainCard({ mcResult, plan, runs }) {
   const successPct = Math.round(mcResult.successRate * 100);
@@ -55,7 +82,7 @@ function FanExplainCard({ mcResult, plan, runs }) {
 // Tooltip card, absolutely positioned over the SVG. Tracks the hovered column
 // horizontally (same column math as the chart) and flips left of the cursor
 // near the right edge so it never overflows the card.
-function HoverTip({ snap, band, isFan, hidden, n, index }) {
+function HoverTip({ snap, band, isFan, isMix = false, hidden, n, index }) {
   const leftPct = (colCenterX(index, n) / GEO.W) * 100;
   const flip = leftPct > 55;
   const rows = isFan
@@ -64,7 +91,13 @@ function HoverTip({ snap, band, isFan, hidden, n, index }) {
         ["Median", band?.p50, "#3a5a99"],
         ["10th pct", band?.p10, "#5b7db1"],
       ]
-    : TOOLTIP_ROWS.filter((k) => !hidden.has(k)).map((k) => [SERIES_LABEL[k], snap[k] ?? 0, STACK_COLORS[k]]);
+    : isMix
+      ? MIX_TOOLTIP_ROWS.filter((k) => !hidden.has(k)).map((k) => [
+          MIX_SERIES.find(([key]) => key === k)[1],
+          snap[k] ?? 0,
+          MIX_COLORS[k],
+        ])
+      : TOOLTIP_ROWS.filter((k) => !hidden.has(k)).map((k) => [SERIES_LABEL[k], snap[k] ?? 0, STACK_COLORS[k]]);
   const total = isFan ? band?.p50 : rows.reduce((s, [, v]) => s + v, 0);
 
   return (
@@ -119,7 +152,11 @@ export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, s
   const [win, setWin] = useState(null); // { lo, hi } age window, or null = all
 
   const canRange = !!(mcResult || onRunMc);
+  // The lens only exists when the glide is modeled; a mix view under the flat
+  // stockReturn would contradict the numbers, so the option simply isn't there.
+  const canMix = !!plan?.allocationEnabled;
   const showFan = chartView === "range" && canRange;
+  const showMix = chartView === "instruments" && canMix && !showFan;
   const selectView = (v) => {
     setChartView(v);
     setHover(null);
@@ -133,6 +170,7 @@ export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, s
     });
 
   const options = [{ value: "projection", label: "Projection" }];
+  if (canMix) options.push({ value: "instruments", label: "Asset mix" });
   if (canRange) options.push({ value: "range", label: "Outcome range" });
 
   // Zoom: slice the bars and every age-keyed overlay to the same window so they
@@ -205,8 +243,12 @@ export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, s
     <div style={cardStyle}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div style={labelStyle}>Portfolio over time</div>
-        {canRange && (
-          <Toggle value={showFan ? "range" : "projection"} onChange={selectView} options={options} />
+        {(canRange || canMix) && (
+          <Toggle
+            value={showFan ? "range" : showMix ? "instruments" : "projection"}
+            onChange={selectView}
+            options={options}
+          />
         )}
       </div>
 
@@ -244,8 +286,10 @@ export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, s
         <>
           <div style={{ position: "relative" }}>
             <StackedChart
-              snaps={vSnaps}
+              snaps={showMix ? vSnaps.map((s) => toMixSnap(plan, s)) : vSnaps}
               ssAge={ssAge}
+              series={showMix ? MIX_SERIES : undefined}
+              colors={showMix ? MIX_COLORS : undefined}
               scenarioSnaps={vScenario}
               scenarioColor={scenarioColor}
               scenarioLabel={scenarioLabel}
@@ -256,10 +300,26 @@ export function PortfolioChartCard({ snaps, ssAge, plan, scenarioSnaps = null, s
               onHover={setHover}
             />
             {tipIndex != null && (
-              <HoverTip snap={vSnaps[tipIndex]} isFan={false} hidden={hidden} n={vSnaps.length} index={tipIndex} />
+              <HoverTip
+                snap={showMix ? toMixSnap(plan, vSnaps[tipIndex]) : vSnaps[tipIndex]}
+                isFan={false}
+                isMix={showMix}
+                hidden={hidden}
+                n={vSnaps.length}
+                index={tipIndex}
+              />
             )}
           </div>
           {renderControls(true)}
+          {showMix && (
+            <div style={{ fontSize: 11, color: "#7C9A92", lineHeight: 1.5, marginTop: 10 }}>
+              What you hold, not where it sits: your 401k, Roth, brokerage and HSA follow{" "}
+              {plan.pinAllocation || plan.riskProfile === "custom"
+                ? "your fixed custom mix"
+                : `the ${RISK_PROFILES[plan.riskProfile]?.label ?? "Moderate"} glide, so the mix shifts as you age`}
+              ; munis count as bonds, CDs as cash.
+            </div>
+          )}
         </>
       )}
     </div>

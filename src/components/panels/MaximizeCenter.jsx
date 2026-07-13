@@ -156,9 +156,6 @@ export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, total
         </div>
       </div>
 
-      {/* ── Asset allocation (woven into the verdict) ── */}
-      <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
-
       {/* ── Optimal Roth conversion ──────────────────── */}
       <div
         style={{
@@ -276,17 +273,16 @@ export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, total
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
-      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
-          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Balances, next $1k, Monte Carlo, tax, scenario & legacy"
+          caption="Asset allocation, balances, next $1k, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
           <ProjectedBalancesCard plan={plan} atRetirement={atRetirement} />
           <MarginalValueCard plan={plan} marginalRows={marginalRows} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />

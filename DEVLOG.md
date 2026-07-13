@@ -56,6 +56,11 @@ inputs — still open, needs its own PRD + spike).
   `.claude/skills/verify/SKILL.md`): lens off/on, tooltip, legend-hide, zoom,
   profile switch reshaping the chart, wizard walk to the Allocate step. 456 tests
   green.
+- **Follow-up (same day, user feedback):** center column simplified — AllocationCard
+  moved into the "Show details" section (first card) on all three panels, so the
+  spine is verdict → Retire-by-age → Portfolio chart. `DetailsToggle` restyled from
+  the flat hairline rule into a prominent white card button (chevron badge +
+  caption) under the chart — users couldn't find the old one.
 - Noticed (not fixed): `retire-early.inputs` localStorage `data` is used verbatim,
   not merged over DEFAULTS — a partial object renders NaN/undefined in the sidebar.
   Real app paths always write full objects, but plan-sync/migration should keep

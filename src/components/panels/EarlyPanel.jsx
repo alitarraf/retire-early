@@ -280,9 +280,6 @@ export function EarlyPanel({ plan, result, earliest, earliestByRisk, onPickRisk,
         </div>
       </div>
 
-      {/* ── Asset allocation (woven into the verdict) ── */}
-      <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
-
       {/* ── Retire-by-target-age goal-seek ───────────── */}
       <TargetAgeCard plan={plan} retireBy={retireBy} />
 
@@ -300,17 +297,16 @@ export function EarlyPanel({ plan, result, earliest, earliestByRisk, onPickRisk,
       />
 
       {/* ── Secondary detail (below the chart; auto-opens) ── */}
-      {/* Flat flow: the disclosure is a hairline rule, and the cards below carry
-          their own elevation, so they continue the same column as the chart. */}
       <div style={{ margin: "12px 14px 0" }}>
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Phases, Monte Carlo, tax, scenario & legacy"
+          caption="Asset allocation, phases, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
           <PhaseBreakdownCard plan={plan} result={result} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />

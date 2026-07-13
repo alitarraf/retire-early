@@ -213,9 +213,6 @@ export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetireme
         </div>
       </div>
 
-      {/* ── Asset allocation (woven into the verdict) ── */}
-      <AllocationCard plan={plan} earliestByRisk={null} onPickRisk={onPickRisk} embedded={embedded} />
-
       {/* ── This year's moves ──────────────────────────── */}
       <ThisYearCard
         plan={plan}
@@ -242,11 +239,12 @@ export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetireme
         <DetailsToggle
           open={detailsOpen}
           onToggle={setDetailsOpen}
-          caption="Phases, Monte Carlo, tax, scenario & legacy"
+          caption="Asset allocation, phases, Monte Carlo, tax, scenario & legacy"
         />
       </div>
       {detailsOpen && (
         <>
+          <AllocationCard plan={plan} earliestByRisk={null} onPickRisk={onPickRisk} embedded={embedded} />
           <PhaseBreakdownCard plan={plan} result={result} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />

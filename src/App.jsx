@@ -16,6 +16,7 @@ import { RetireAtControl } from "./components/panels/RetireAtControl.jsx";
 import { EarlyPanel } from "./components/panels/EarlyPanel.jsx";
 import { RetiredPanel } from "./components/panels/RetiredPanel.jsx";
 import { MaximizeCenter } from "./components/panels/MaximizeCenter.jsx";
+import { InvestPanel } from "./components/panels/InvestPanel.jsx";
 import { DocsPanel } from "./components/panels/DocsPanel.jsx";
 import { AdvicePanel } from "./components/panels/AdvicePanel.jsx";
 import { Onboarding } from "./components/onboarding/Onboarding.jsx";
@@ -31,6 +32,7 @@ import { useIsMobile } from "./useIsMobile.js";
 const TABS = [
   { key: "early", label: "Retire Early" },
   { key: "maximize", label: "Maximize" },
+  { key: "invest", label: "Invest" },
   { key: "advice", label: "Get advice" },
   { key: "docs", label: "How it works" },
 ];
@@ -466,7 +468,11 @@ export default function App() {
           </div>
         </div>
 
-        {mode === "docs" ? (
+        {mode === "invest" ? (
+          <div style={{ gridColumn: 2, minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+            <InvestPanel inputs={inputs} set={set} plan={plan} funding={funding} />
+          </div>
+        ) : mode === "docs" ? (
           <div style={{ gridColumn: 2, background: "#f0f5f4", overflowY: "auto", padding: "28px 36px" }}>
             <DocsPanel />
           </div>

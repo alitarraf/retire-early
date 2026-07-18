@@ -329,6 +329,21 @@ function Depth({ vals, set, setMany, nav }) {
         <StreamEditor value={vals.expenseStreams} onChange={set("expenseStreams")} kind="expense" defaultStartAge={startAge} />
       </DepthCard>
 
+      <DepthCard emoji="🛡️" title="Annuities — is one worth it?" open={open === "ann"} onToggle={() => toggle("ann")}>
+        <Guide>Compare a <strong>lifetime-income annuity</strong> or a <strong>fixed annuity (MYGA)</strong> — a tax-deferred CD — against just investing. Your plan shows the after-tax verdict (usually a portfolio, or tax-free munis, wins).</Guide>
+        <WizField label="Into an income annuity /yr">
+          <NumInput value={vals.annuityContribAnnual} onChange={set("annuityContribAnnual")} prefix="$" step={500} width={100} />
+        </WizField>
+        <WizField label="Or a lump into a MYGA">
+          <NumInput value={vals.mygaCapital} onChange={set("mygaCapital")} prefix="$" step={1000} width={110} />
+        </WizField>
+        {vals.mygaCapital > 0 && (
+          <WizField label="MYGA guaranteed rate">
+            <NumInput value={vals.mygaRate} onChange={set("mygaRate")} suffix="%" step={0.1} width={70} />
+          </WizField>
+        )}
+      </DepthCard>
+
       <DepthCard emoji="🧾" title="Taxes & Roth conversions" open={open === "tax"} onToggle={() => toggle("tax")}>
         <WizField label="Roth conversion per year" hint="Converting in low-income years can save six figures in lifetime tax.">
           <NumInput value={vals.annualRothConversion} onChange={set("annualRothConversion")} prefix="$" step={5000} width={120} />

@@ -81,7 +81,6 @@ export function TaxesFields({ inputs, set, plan, previewWithdrawal: pwProp, setP
 }
 
 export function StrategyFields({ inputs, set, plan }) {
-  const expert = useExpertMode();
   return (
     <>
       <SubTitle>Roth conversion ladder</SubTitle>
@@ -153,11 +152,18 @@ export function StrategyFields({ inputs, set, plan }) {
           />
         </Field>
       </Grid2>
+    </>
+  );
+}
 
-      <Divider />
-      <SubTitle>Annuities — should you?</SubTitle>
-      <div style={{ fontSize: 10, color: "#9db4ae", margin: "-4px 0 8px", lineHeight: 1.5 }}>
-        Two "what if" comparisons — the Funding Order card weighs each against simply investing the money.
+// Annuities — its own section (a comparison, not accounts the sim draws down). Two
+// "what if" types; the Funding Order card (Show details) shows the verdict.
+export function AnnuitiesFields({ inputs, set }) {
+  const expert = useExpertMode();
+  return (
+    <>
+      <div style={{ fontSize: 11, color: "#4a5e58", margin: "0 0 10px", lineHeight: 1.5 }}>
+        Two "what if" comparisons — the <strong>Funding Order</strong> card (in <em>Show details</em>) weighs each against simply investing the money. Leave amounts at 0 to skip.
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: "#1a2e28", margin: "4px 0 6px" }}>1 · Lifetime income annuity</div>

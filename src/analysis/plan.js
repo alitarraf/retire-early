@@ -227,6 +227,7 @@ export function projectTo(plan, yrs, overrides = {}) {
   const hsaExtra = overrides.hsaAnnual ?? 0;
   const cashExtra = overrides.cashAnnual ?? 0;
   const treasuryExtra = overrides.treasuryAnnual ?? 0;
+  const mygaExtra = overrides.mygaAnnual ?? 0;
   // Ongoing user contributions (entered as $/mo, annualized here).
   const brokContribAnnual = (plan.brokerageMonthlyContrib ?? 0) * 12;
   const cashContribAnnual = (plan.cashMonthlyContrib ?? 0) * 12;
@@ -268,6 +269,12 @@ export function projectTo(plan, yrs, overrides = {}) {
     treasuryBalance:
       (plan.treasuryBalance ?? 0) * Math.pow(1 + rT, yrs) +
       fvAnnuity(treasuryExtra, yrs, plan.treasuryAfterTaxRate ?? 0),
+    // MYGA grows tax-deferred at its guaranteed rate; basis (principal) is tracked
+    // so only the gain is taxed at draw. Value = grown; basis = dollars put in.
+    mygaBalance:
+      (plan.mygaCapital ?? 0) * Math.pow(1 + (plan.mygaRate ?? 0) / 100, yrs) +
+      fvAnnuity(mygaExtra, yrs, plan.mygaRate ?? 0),
+    mygaBasis: (plan.mygaCapital ?? 0) + mygaExtra * yrs,
   };
 }
 
@@ -292,6 +299,7 @@ export function simParamsAt(plan, age, overrides = {}) {
     cashReturn: plan.depositAfterTaxRate,
     muniYield: plan.muniReturn,
     treasuryReturn: plan.treasuryAfterTaxRate, // state-exempt after-tax yield; draws are tax-free (baked in)
+    mygaGrowthRate: plan.mygaRate, // MYGA grows tax-deferred at its guaranteed rate
     // Allocation glide (opt-in): the equity growth pool follows the age-blended
     // return each retirement year via simulate()'s returnSeries hook. Cash/muni
     // sleeves keep their own yields. Off → no series, flat stockReturn (legacy).

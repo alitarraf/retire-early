@@ -109,6 +109,9 @@ export function simulate({
   muniYield = null,          // annual % yield on munis in retirement; null = grow at stockReturn (legacy)
   treasuryBalance = 0,       // held Treasuries at retirement; grows at treasuryReturn, draws tax-free
   treasuryReturn = null,     // state-exempt AFTER-tax yield on Treasuries; null = grow at stockReturn
+  mygaBalance = 0,           // fixed annuity (MYGA) value at retirement; grows tax-deferred
+  mygaBasis = 0,             // MYGA principal (basis) — tax-free at draw; only the gain is taxed
+  mygaGrowthRate = null,     // MYGA guaranteed rate; null = grow at stockReturn
   autoLtcg = false,          // true: derive the brokerage gain rate each year from real LTCG brackets
                              // (stacked on trailing ordinary income) + state + NIIT, instead of the
                              // flat user-picked brokerageLtcgRate
@@ -132,6 +135,7 @@ export function simulate({
   const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
   const mnMr = muniYield == null ? null : muniYield / 100 / 12;
   const trMr = treasuryReturn == null ? null : treasuryReturn / 100 / 12;
+  const myMr = mygaGrowthRate == null ? null : mygaGrowthRate / 100 / 12;
   const mi = inflationRate / 100 / 12;
   // 72(t): SEPP must continue for 5 years OR until 59.5, whichever is LONGER.
   const seppEnd = annualSepp > 0 ? Math.max(retireAge + 5, 59.5) : Infinity;
@@ -145,6 +149,8 @@ export function simulate({
   let cd = cashDeposit;
   let mn = muniBonds;
   let tr = treasuryBalance; // Treasuries: grow at trMr, draws tax-free (tax baked into the rate)
+  let my = mygaBalance; // MYGA value; grows tax-deferred at myMr
+  let myB = mygaBasis;  // MYGA basis (principal); only (my − myB) is taxable
   let hsa = hsaBalance; // HSA: grows at mr, draws are tax-free
   let spend = monthlyExpense;
   let depleted = null;
@@ -345,6 +351,7 @@ export function simulate({
     cd = Math.max(0, cd) * (1 + (cdMr ?? mr));
     mn = Math.max(0, mn) * (1 + (mnMr ?? mr));
     tr = Math.max(0, tr) * (1 + (trMr ?? mr));
+    my = Math.max(0, my) * (1 + (myMr ?? mr)); // MYGA value grows; basis (myB) unchanged
     hsa = Math.max(0, hsa) * (1 + mr);
     for (const t of tranches) if (t.amt > 0) t.amt *= 1 + mr;
     // Unlock tranches that have cleared the 5y lock: converted PRINCIPAL is
@@ -497,6 +504,29 @@ export function simulate({
       if (trackMagi) magiYearAccum += draw;
     }
     if (need > 0 && cd > 0) { const d = Math.min(need, cd); cd -= d; need -= d; }
+    // MYGA (fixed annuity): tax-deferred, drawn LIFO like a non-qualified annuity —
+    // the GAIN comes out first (ordinary income + 10% penalty before 59½, via the
+    // gross-up), then the BASIS comes out tax-free.
+    if (need > 0 && my > 0) {
+      const gainAvail = Math.max(0, my - myB);
+      if (need > 0 && gainAvail > 0) {
+        const flatFrac = stateTaxRate / 100 + (age < 59.5 ? 0.10 : 0);
+        const gross = grossUpMonthly(need, drawBase, fsNow, flatFrac, taxIdx);
+        const draw = Math.min(gross, gainAvail);
+        my -= draw; // all gain — basis (myB) unchanged
+        const d = draw * 12;
+        const fedRate = d > 0
+          ? (federalTax(drawBase + d, fsNow, taxIdx) - federalTax(drawBase, fsNow, taxIdx)) / d
+          : 0;
+        need -= draw * (1 - fedRate - flatFrac);
+        yearOrdAccum += draw;
+        if (trackMagi) magiYearAccum += draw;
+      }
+      if (need > 0 && myB > 0) {
+        const draw = Math.min(need, myB, my); // return of basis — tax-free
+        my -= draw; myB -= draw; need -= draw;
+      }
+    }
     // HSA (non-qualified) — last resort, only reachable when
     // hsaQualifiedFraction < 1 capped the medical draw above. Taxed as
     // ordinary income; +20% penalty before 65 (IRC §223(f)(4)). The penalty
@@ -517,7 +547,7 @@ export function simulate({
 
     // Depletion / bridge-shortfall accounting.
     const lockedK = k401Accessible ? 0 : k;
-    const accessible = rc + re + rv + mn + tr + hsa + bk + cd + (k401Accessible ? k : 0);
+    const accessible = rc + re + rv + mn + tr + my + hsa + bk + cd + (k401Accessible ? k : 0);
     if (need > 0.5 && accessible < 0.5 && lockedK < 0.5 && !depleted) depleted = age;
     if (need > 0.5 && age < 59.5 && lockedK > 0.5) bridgeShortfall++;
 
@@ -556,7 +586,7 @@ export function simulate({
     // Using gross spending would inflate WR for plans with significant SS income.
     if (m % 12 === 11 && (guardrailUpper > 0 || guardrailLower > 0)) {
       const pendingGuard = tranches.reduce((s, t) => s + t.amt, 0);
-      const total = rc + re + rv + pendingGuard + bk + hsa + k + cd + mn + tr;
+      const total = rc + re + rv + pendingGuard + bk + hsa + k + cd + mn + tr + my;
       if (total > 0) {
         const netDraw = Math.max(0, effSpend - grossSS) * 12; // annualized portfolio-only draw
         const wr = netDraw / total;
@@ -587,8 +617,9 @@ export function simulate({
         cd: Math.max(0, cd),
         muni: Math.max(0, mn),
         treasury: Math.max(0, tr),
+        myga: Math.max(0, my),
         hsa: Math.max(0, hsa),
-        total: Math.max(0, rc + re + rv + pendingConv + bk + hsa + k + cd + mn + tr),
+        total: Math.max(0, rc + re + rv + pendingConv + bk + hsa + k + cd + mn + tr + my),
       });
     }
   }

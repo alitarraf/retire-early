@@ -25,6 +25,7 @@ export const colCenterX = (i, n) => GEO.YPAD + i * (barWidthFor(n) + 1) + barWid
 const STACK = [
   ["cd", "CD"],
   ["treasury", "Treasuries"],
+  ["myga", "MYGA"],
   ["k401", "401k"],
   ["brokerage", "Brokerage"],
   ["hsa", "HSA"],
@@ -40,6 +41,7 @@ export const STACK_COLORS = {
   k401: "#1a2e28",
   cd: "#c8d8d4",
   treasury: "#9db4ae",
+  myga: "#b8c9c3",
 };
 
 const EMPTY = new Set();

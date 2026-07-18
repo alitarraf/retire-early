@@ -176,6 +176,7 @@ const PROJ_ROWS = [
   { key: "hsaBalance",        label: "HSA",                 color: "#5aada0", note: "Tax-free for medical" },
   { key: "muniBonds",         label: "Munis",               color: "#a8d5c8", note: null },
   { key: "treasuryBalance",   label: "Treasuries",          color: "#9db4ae", note: "State-tax-free" },
+  { key: "mygaBalance",       label: "MYGA",                color: "#b8c9c3", note: "Tax-deferred" },
   { key: "brokerage",         label: "Brokerage",           color: "#4a8c7a", note: null },
   { key: "cashDeposit",       label: "CD / cash",           color: "#9db4ae", note: null },
 ];

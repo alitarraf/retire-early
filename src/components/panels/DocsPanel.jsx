@@ -161,6 +161,7 @@ export function DocsPanel() {
           ["Taxable brokerage", "Flexible / bridge", "Only gains taxed (long-term cap-gains); step-up at death", "No limit", "Fully accessible"],
           ["Cash / CDs / HYSA", "Emergency / short-term", "Interest taxed as ordinary income", "No limit", "Fully liquid"],
           ["Municipal bonds", "Tax-free income", "Interest federally tax-free (often state-free too)", "No limit", "Liquid"],
+          ["Deferred annuity", "Guaranteed lifetime income", "Tax-deferred; gains taxed as ordinary income, no step-up", "No IRS cap (non-qualified)", "Surrender charges + 10% penalty"],
         ]}
       />
 

@@ -80,6 +80,21 @@ risk mix. Phase 1 shipped; Phase 2 (529/Trump/annuity/dependents) next.
   toggle. **483 green**, build clean (render smokes lock both new UI surfaces).
 - Remaining: annuity accumulation (→ income stream), custodial-Roth routing tier.
 
+**Phase 2b (same day) — annuity comparison + onboarding + recommend-even-if-unchecked + slider fix:**
+- **Slider fix first:** the retire-age slider janked because `recommendedFunding`/`marginalValues`
+  were always-on App memos (ran on every commit even with details collapsed). Moved both into their
+  cards (mount only when "Show details" is open) → slider snappy. (commit a09363a)
+- **Deferred annuity** — a "should I?" comparison (not a baked-in sleeve, no `simulate` change):
+  `deferredAnnuityStream` (grow → annuitize → ordinary-income stream); `recommendedFunding` attaches
+  `rec.annuity` comparing sustainable spend annuity-vs-invest (reuses the `incomeStreams` override).
+  Honest: portfolio usually wins; annuity = longevity hedge. `AnnuityBlock` card + `StrategyFields`
+  inputs + docs row.
+- **Recommend-even-if-unchecked:** funding order ranks every account held or not (HSA un-gated);
+  `needsOpen` flag → "· open one" + HDHP caveat.
+- **Onboarding:** "Saving for kids' education" depth card (numDependents + educationAnnualContrib).
+  Decision: keep calm core-accounts money step, no checkbox wall.
+- **487 green**, build clean.
+
 ## Session: 2026-07-13 — Connected charts: Asset-mix lens + mix-at-milestones
 
 **PRD:** `docs/PRD_ConnectedCharts_July2026.md` (Threads 3+2 of the

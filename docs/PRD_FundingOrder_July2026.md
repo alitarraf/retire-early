@@ -134,11 +134,31 @@ Account**.
 - **Tests:** `fundingOrder.test.js` (kids split, conservation, cost≥0), render smokes for the card
   block + the docs tables. **483 green, build clean.**
 
-### Annuity accumulation — NOT YET BUILT (follow-up)
-- Convert accumulation contributions into a **future income stream** on the existing `incomeStreams`
-  plumbing; honest non-qualified tax (ordinary income on gains, no step-up) + pre-59½ penalty gate.
-- Custodial Roth IRA is documented in the comparison table but not yet a routing tier (needs a
-  child-earned-income input).
+### Deferred annuity — BUILT ✅ (a "should I?" comparison, not a baked-in sleeve)
+- **Inputs:** `annuityContribAnnual` + `annuityStartAge` (+ expert `annuityRate`/`annuityPayoutRate`)
+  in `StrategyFields`; `fieldHelp`; auto agent-writable.
+- **Model (no `simulate` draw-order change):** `deferredAnnuityStream(plan)` grows the yearly
+  contribution at the guaranteed rate to the start age, annuitizes at the payout rate → a fixed
+  nominal, **ordinary-income** income stream (the honest least-favorable treatment). `recommendedFunding`
+  attaches `rec.annuity` comparing **sustainable spend with the annuity stream vs. the same money in
+  the user's best account** (reuses the tested `incomeStreams` override path). Verdict is honest —
+  the portfolio usually wins; the annuity's edge is longevity (income you can't outlive).
+- **UI:** `AnnuityBlock` in `FundingOrderCard` (guaranteed income + annuity-vs-invest verdict). Docs:
+  annuity row in the retirement table. Tests: stream math, portfolio-usually-wins, render.
+
+### Recommend-even-if-unchecked — BUILT ✅
+Per the user's onboarding question: the funding order now ranks **every** account whether held or
+not (HSA no longer gated on `hasHsa`); un-held accounts carry a `needsOpen` flag → the card shows
+"· open one" and an HDHP-eligibility caveat for the HSA. Naming a better account the user hasn't
+opened is the point.
+
+### Onboarding — BUILT ✅
+A "Saving for kids' education" card added to the optional depth step (sets `numDependents` +
+`educationAnnualContrib`). Design decision (user): keep the calm core-accounts-+-expand money step;
+**no per-instrument checkbox wall**; teach the full best-practice order and flag what to open.
+
+### Remaining
+- Custodial Roth IRA as a routing tier (documented in the table; needs a child-earned-income input).
 
 ## Consistency with the Maximize "next $1k/yr" card (marginalValue.js)
 

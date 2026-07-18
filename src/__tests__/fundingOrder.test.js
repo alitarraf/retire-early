@@ -11,6 +11,7 @@ import {
   fundingContribOverrides,
   currentSplit,
   kidsFundingSplit,
+  deferredAnnuityStream,
 } from "../analysis/fundingOrder.js";
 import { makePlan, DEFAULTS } from "../analysis/plan.js";
 import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
@@ -103,9 +104,15 @@ describe("recommendedFunding: structure & rules", () => {
     expect(rec.tiers[0].amount).toBeLessThanOrEqual(Math.round(0.2 * rec.budget));
   });
 
-  it("skips the HSA tier when the user has no HSA", () => {
+  it("still recommends the HSA when the user has none, flagged needs-opening", () => {
+    // The whole value is naming a better account they haven't opened.
     const rec = recommendedFunding(earlySaver({ hsaBalance: 0, hsaAnnualContrib: 0 }));
-    expect(rec.tiers.some((t) => t.key === "hsa")).toBe(false);
+    const hsa = rec.tiers.find((t) => t.key === "hsa");
+    expect(hsa).toBeTruthy();
+    expect(hsa.needsOpen).toBe(true);
+    expect(hsa.reason).toContain("open one");
+    // ...and a held HSA is not flagged.
+    expect(recommendedFunding(earlySaver()).tiers.find((t) => t.key === "hsa").needsOpen).toBe(false);
   });
 
   it("returns unavailable (no sims) when retired or not saving", () => {
@@ -163,5 +170,28 @@ describe("kidsFundingSplit: education waterfall (Phase 2)", () => {
 
   it("no kids block when there are no dependents", () => {
     expect(recommendedFunding(earlySaver()).kids).toBeNull();
+  });
+});
+
+describe("deferred annuity comparison (Phase 2b)", () => {
+  it("deferredAnnuityStream grows the contribution then annuitizes into ordinary-income", () => {
+    const s = deferredAnnuityStream(makePlan({ ...DEFAULTS, currentAge: 45, annuityContribAnnual: 10000, annuityStartAge: 65, annuityRate: 4.5, annuityPayoutRate: 6 }));
+    expect(s.taxType).toBe("ordinary");
+    expect(s.cola).toBe(false);
+    expect(s.startAge).toBe(65);
+    expect(s.monthly).toBeGreaterThan(0);
+  });
+
+  it("recommendedFunding attaches an annuity comparison; the portfolio usually wins", () => {
+    const rec = recommendedFunding(earlySaver({ annuityContribAnnual: 10000, annuityStartAge: 65 }));
+    expect(rec.annuity).toBeTruthy();
+    expect(rec.annuity.income).toBeGreaterThan(0);
+    expect(rec.annuity.sPortfolio).toBeGreaterThan(0);
+    // delta = annuity − portfolio; investing the money supports at least as much spend here.
+    expect(rec.annuity.delta).toBeLessThanOrEqual(0);
+  });
+
+  it("no annuity comparison when the contribution is zero", () => {
+    expect(recommendedFunding(earlySaver()).annuity).toBeNull();
   });
 });

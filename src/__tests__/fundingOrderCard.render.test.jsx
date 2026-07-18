@@ -61,4 +61,16 @@ describe("FundingOrderCard render", () => {
     expect(html).toContain("529 Plan");
     expect(html).toContain("children"); // "Kids' education · 2 children" (apostrophe → &#x27;)
   });
+
+  it("annuity comparison block renders guaranteed income + the honest verdict", () => {
+    const plan = makePlan({
+      ...DEFAULTS, currentAge: 45, retireAge: 55, salary: 200000, employerMatchPct: 0,
+      monthlyExpense: 6000, k401AnnualContrib: 0, rothAnnualContrib: 0, brokerageMonthlyContrib: 2000,
+      annuityContribAnnual: 10000, annuityStartAge: 65,
+    });
+    const html = render(plan);
+    expect(html).toContain("Deferred annuity");
+    expect(html).toContain("guaranteed income");
+    expect(html).toContain("longevity hedge");
+  });
 });

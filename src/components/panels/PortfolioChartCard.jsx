@@ -26,8 +26,8 @@ const cardStyle = {
 
 const labelStyle = cardTitleStyle;
 
-const SERIES_LABEL = { roth: "Roth", muni: "Munis", hsa: "HSA", brokerage: "Brokerage", k401: "401k", cd: "CD" };
-const TOOLTIP_ROWS = ["roth", "muni", "hsa", "brokerage", "k401", "cd"];
+const SERIES_LABEL = { roth: "Roth", muni: "Munis", hsa: "HSA", brokerage: "Brokerage", k401: "401k", cd: "CD", treasury: "Treasuries" };
+const TOOLTIP_ROWS = ["roth", "muni", "hsa", "brokerage", "k401", "cd", "treasury"];
 
 // ── "Asset mix" lens (Thread 3, PRD_ConnectedCharts_July2026) ──────────────
 // Display-only: the engine blends one return for the growth pool, so the lens
@@ -50,7 +50,7 @@ function toMixSnap(plan, s) {
     age: s.age,
     total: s.total,
     stocks: growth * a.equity,
-    bonds: growth * a.bond + (s.muni ?? 0),
+    bonds: growth * a.bond + (s.muni ?? 0) + (s.treasury ?? 0),
     cash: growth * a.cash + (s.cd ?? 0),
   };
 }

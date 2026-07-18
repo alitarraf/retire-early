@@ -24,6 +24,7 @@ export const colCenterX = (i, n) => GEO.YPAD + i * (barWidthFor(n) + 1) + barWid
 // (the PortfolioChartCard's "Asset mix" view stacks stocks/bonds/cash instead).
 const STACK = [
   ["cd", "CD"],
+  ["treasury", "Treasuries"],
   ["k401", "401k"],
   ["brokerage", "Brokerage"],
   ["hsa", "HSA"],
@@ -38,6 +39,7 @@ export const STACK_COLORS = {
   brokerage: "#a8d5c8",
   k401: "#1a2e28",
   cd: "#c8d8d4",
+  treasury: "#9db4ae",
 };
 
 const EMPTY = new Set();

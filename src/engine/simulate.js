@@ -107,6 +107,8 @@ export function simulate({
                              // null = legacy behavior: frozen at TAX_YEAR figures for the whole sim.
   cashReturn = null,         // annual % yield on CD/cash in retirement; null = grow at stockReturn (legacy)
   muniYield = null,          // annual % yield on munis in retirement; null = grow at stockReturn (legacy)
+  treasuryBalance = 0,       // held Treasuries at retirement; grows at treasuryReturn, draws tax-free
+  treasuryReturn = null,     // state-exempt AFTER-tax yield on Treasuries; null = grow at stockReturn
   autoLtcg = false,          // true: derive the brokerage gain rate each year from real LTCG brackets
                              // (stacked on trailing ordinary income) + state + NIIT, instead of the
                              // flat user-picked brokerageLtcgRate
@@ -129,6 +131,7 @@ export function simulate({
   let mr = stockReturn / 100 / 12; // updated per year when returnSeries is provided
   const cdMr = cashReturn == null ? null : cashReturn / 100 / 12;
   const mnMr = muniYield == null ? null : muniYield / 100 / 12;
+  const trMr = treasuryReturn == null ? null : treasuryReturn / 100 / 12;
   const mi = inflationRate / 100 / 12;
   // 72(t): SEPP must continue for 5 years OR until 59.5, whichever is LONGER.
   const seppEnd = annualSepp > 0 ? Math.max(retireAge + 5, 59.5) : Infinity;
@@ -141,6 +144,7 @@ export function simulate({
   let k = k401;
   let cd = cashDeposit;
   let mn = muniBonds;
+  let tr = treasuryBalance; // Treasuries: grow at trMr, draws tax-free (tax baked into the rate)
   let hsa = hsaBalance; // HSA: grows at mr, draws are tax-free
   let spend = monthlyExpense;
   let depleted = null;
@@ -340,6 +344,7 @@ export function simulate({
     // crash with equities, which is what makes a cash buffer worth modeling.
     cd = Math.max(0, cd) * (1 + (cdMr ?? mr));
     mn = Math.max(0, mn) * (1 + (mnMr ?? mr));
+    tr = Math.max(0, tr) * (1 + (trMr ?? mr));
     hsa = Math.max(0, hsa) * (1 + mr);
     for (const t of tranches) if (t.amt > 0) t.amt *= 1 + mr;
     // Unlock tranches that have cleared the 5y lock: converted PRINCIPAL is
@@ -451,6 +456,9 @@ export function simulate({
     if (need > 0 && age >= 59.5 && re > 0) { const d = Math.min(need, re); re -= d; need -= d; }
     if (need > 0 && rv > 0) { const d = Math.min(need, rv); rv -= d; need -= d; }
     if (need > 0 && mn > 0) { const d = Math.min(need, mn); mn -= d; need -= d; }
+    // Treasuries: tax-free draw (interest is state-exempt + already taxed via the
+    // after-tax growth rate), accessible any time — a bridge asset like munis/cash.
+    if (need > 0 && tr > 0) { const d = Math.min(need, tr); tr -= d; need -= d; }
     // HSA (qualified): tax-free draw for the medical share of spending,
     // capped at hsaQualifiedFraction of this month's expenses (default 1 =
     // legacy "all spend is medical" assumption). Non-qualified HSA draws are
@@ -509,7 +517,7 @@ export function simulate({
 
     // Depletion / bridge-shortfall accounting.
     const lockedK = k401Accessible ? 0 : k;
-    const accessible = rc + re + rv + mn + hsa + bk + cd + (k401Accessible ? k : 0);
+    const accessible = rc + re + rv + mn + tr + hsa + bk + cd + (k401Accessible ? k : 0);
     if (need > 0.5 && accessible < 0.5 && lockedK < 0.5 && !depleted) depleted = age;
     if (need > 0.5 && age < 59.5 && lockedK > 0.5) bridgeShortfall++;
 
@@ -548,7 +556,7 @@ export function simulate({
     // Using gross spending would inflate WR for plans with significant SS income.
     if (m % 12 === 11 && (guardrailUpper > 0 || guardrailLower > 0)) {
       const pendingGuard = tranches.reduce((s, t) => s + t.amt, 0);
-      const total = rc + re + rv + pendingGuard + bk + hsa + k + cd + mn;
+      const total = rc + re + rv + pendingGuard + bk + hsa + k + cd + mn + tr;
       if (total > 0) {
         const netDraw = Math.max(0, effSpend - grossSS) * 12; // annualized portfolio-only draw
         const wr = netDraw / total;
@@ -578,8 +586,9 @@ export function simulate({
         k401: Math.max(0, k),
         cd: Math.max(0, cd),
         muni: Math.max(0, mn),
+        treasury: Math.max(0, tr),
         hsa: Math.max(0, hsa),
-        total: Math.max(0, rc + re + rv + pendingConv + bk + hsa + k + cd + mn),
+        total: Math.max(0, rc + re + rv + pendingConv + bk + hsa + k + cd + mn + tr),
       });
     }
   }

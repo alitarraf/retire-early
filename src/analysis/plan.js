@@ -175,6 +175,8 @@ export function makePlan(raw) {
   const accumulationOrdinaryRate = Math.min(90, p.employmentBracket + effectiveStateTax);
   const brokerageLtcgRate = p.ltcgBracket + effectiveStateTax;
   const depositAfterTaxRate = p.cashDepositRate * (1 - accumulationOrdinaryRate / 100);
+  // Treasuries are state-tax-EXEMPT → taxed at the federal-only bracket, not fed+state.
+  const treasuryAfterTaxRate = (p.treasuryRate ?? 0) * (1 - p.employmentBracket / 100);
   const annualEmployerMatch = (p.salary * p.employerMatchPct) / 100;
   const total401kAnnual = p.k401AnnualContrib + annualEmployerMatch;
   // birthYear (if explicitly supplied) is authoritative for the RMD start age; otherwise derive it.
@@ -197,6 +199,7 @@ export function makePlan(raw) {
     accumulationOrdinaryRate,
     brokerageLtcgRate,
     depositAfterTaxRate,
+    treasuryAfterTaxRate,
     annualEmployerMatch,
     total401kAnnual,
     rothContribNow,
@@ -216,12 +219,14 @@ export function projectTo(plan, yrs, overrides = {}) {
   const r = plan.stockReturn / 100;
   const rC = plan.depositAfterTaxRate / 100;
   const rM = plan.muniReturn / 100;
+  const rT = (plan.treasuryAfterTaxRate ?? 0) / 100;
   const k401Extra = overrides.k401Annual ?? 0;
   const rothExtra = overrides.rothAnnual ?? 0;
   const muniExtra = overrides.muniAdd ?? 0;
   const brokerageExtra = overrides.brokerageAnnual ?? 0;
   const hsaExtra = overrides.hsaAnnual ?? 0;
   const cashExtra = overrides.cashAnnual ?? 0;
+  const treasuryExtra = overrides.treasuryAnnual ?? 0;
   // Ongoing user contributions (entered as $/mo, annualized here).
   const brokContribAnnual = (plan.brokerageMonthlyContrib ?? 0) * 12;
   const cashContribAnnual = (plan.cashMonthlyContrib ?? 0) * 12;
@@ -260,6 +265,9 @@ export function projectTo(plan, yrs, overrides = {}) {
     hsaBalance:
       (plan.hsaBalance ?? 0) * eqBalFactor +
       fvAnnuity((plan.hsaAnnualContrib ?? 0) + hsaExtra, yrs, eqRate),
+    treasuryBalance:
+      (plan.treasuryBalance ?? 0) * Math.pow(1 + rT, yrs) +
+      fvAnnuity(treasuryExtra, yrs, plan.treasuryAfterTaxRate ?? 0),
   };
 }
 
@@ -283,6 +291,7 @@ export function simParamsAt(plan, age, overrides = {}) {
     // return. CD interest is approximated at the after-tax accumulation rate.
     cashReturn: plan.depositAfterTaxRate,
     muniYield: plan.muniReturn,
+    treasuryReturn: plan.treasuryAfterTaxRate, // state-exempt after-tax yield; draws are tax-free (baked in)
     // Allocation glide (opt-in): the equity growth pool follows the age-blended
     // return each retirement year via simulate()'s returnSeries hook. Cash/muni
     // sleeves keep their own yields. Off → no series, flat stockReturn (legacy).

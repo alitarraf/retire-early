@@ -76,6 +76,16 @@ export const FIELD_HELP = {
     context:
       "Used for the ACA Federal Poverty Level calculation — it affects whether you owe the full ACA premium or qualify for subsidies.",
   },
+  numDependents: {
+    label: "Kids saving for",
+    context:
+      "Number of children you're saving education money for. Sizes the Coverdell ESA ($2k/child) and 530A Trump ($5k/child) caps in the Funding Order tool. Separate from household size.",
+  },
+  educationAnnualContrib: {
+    label: "Kids' education savings /yr",
+    context:
+      "Dollars per year you set aside for kids' education. It's diverted from your own retirement savings, so the Funding Order tool shows both the tax-smart split (Coverdell → 530A Trump → 529) and what it costs your own safe spending.",
+  },
   spouseSsAge: {
     label: "Spouse SS at",
     context: "The age your spouse claims Social Security. Their benefit is added to the household pool at that age.",

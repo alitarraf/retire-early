@@ -65,12 +65,27 @@ export const FED_BRACKETS = {
 };
 
 // 2026 contribution limits (under age-50 base, no catch-up).
+// Catch-ups per IRS Notice 2025-67; verify against final IRS pubs each tax year.
 export const CONTRIB_LIMITS = {
   k401: 24500,
+  k401Catchup50: 8000,   // additional elective-deferral catch-up at age 50+ (→ $32,500)
+  k401Catchup60: 11250,  // SECURE 2.0 super catch-up, ages 60–63 (REPLACES the 50+ amount → $35,750)
   rothIra: 7500,
-  hsaIndividual: 4300,  // 2026 HSA limit (self-only)
-  hsaFamily: 8550,      // 2026 HSA limit (family)
-  hsaCatchup: 1000,     // additional catch-up at age 55+
+  rothIraCatchup50: 1100, // additional IRA catch-up at age 50+ (→ $8,600; no 60–63 super catch-up for IRAs)
+  hsaIndividual: 4300,   // 2026 HSA limit (self-only)
+  hsaFamily: 8550,       // 2026 HSA limit (family)
+  hsaCatchup: 1000,      // additional catch-up at age 55+
+};
+
+// 2026 education & children's-account limits (Phase 2). Verify against final IRS
+// pubs each tax year — several of these are new/unsettled.
+export const KIDS_LIMITS = {
+  coverdellEsa: 2000,     // Coverdell ESA, per beneficiary/yr (statutory, not inflation-indexed)
+  trumpAccount: 5000,     // Trump account (IRC §530A), per child/yr, 2026–27 (indexed $100 from 2028)
+  trumpSeed: 1000,        // one-time federal seed, per child born 2025–2028 (doesn't count vs the cap)
+  trumpEmployer: 2500,    // optional employer contribution/yr, per employee (counts toward the $5k)
+  trumpStartYear: 2026,   // §530A contributions cannot be made before Jul 4, 2026
+  giftAnnualExclusion: 19000, // 529 has no federal cap; gift-tax annual exclusion (per donor/beneficiary; superfund = 5×)
 };
 
 // Long-term capital-gains rate options offered in the UI (manual override

@@ -93,7 +93,7 @@ that injects `ANTHROPIC_API_KEY`. The whole feature is behind `isAskEnabled()`
 (env/localStorage). It's the permanent right column on desktop and a sheet on
 mobile.
 
-**Tool surface (15 tools).** Reads: `run_scenario`, `find_earliest_retirement`,
+**Tool surface (16 tools).** Reads: `run_scenario`, `find_earliest_retirement`,
 `max_sustainable_spend`, `run_monte_carlo`, `optimize_roth_conversions`,
 `stress_or_history`, `run_analysis` (sensitivity / marginal_value /
 retire_by_age), `get_change_log`. Writes: `update_inputs` (every scalar
@@ -103,6 +103,11 @@ arrays, scenario/retire-age, and allocation fields excluded), `set_retire_age`,
 `set_scenario`, `set_allocation` (risk profile / stock-bond-cash mix — a named
 age glide or a pinned custom mix; enum + sum-to-100 validated; owns the
 `allocation*`/`riskProfile`/`pinAllocation`/`equity|bond|cashPct` fields),
+`route_savings` (funding-order waterfall — re-routes the SAME annual savings
+across accounts in tax-optimal order: emergency cash → 401k match → HSA → Roth →
+max 401k → brokerage overflow, each to its IRS cap; writes the per-account
+contribution inputs; the ACCOUNT-LOCATION axis, distinct from `set_allocation`'s
+stock/bond/cash mix — `analysis/fundingOrder.js`, `docs/PRD_FundingOrder_July2026.md`),
 `apply_lever`, `set_view` (tab switching + MC trigger; never
 staged or logged), `revert_changes` (undo-all; always staged).
 `DANGEROUS_FIELDS` in `toolDispatch.js` (balances, ages, filing status,

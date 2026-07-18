@@ -5,6 +5,7 @@ import { profileEarliestAges } from "./analysis/allocationCompare.js";
 import { retireByAge } from "./analysis/retireByAge.js";
 import { sensitivity } from "./analysis/sensitivity.js";
 import { marginalValues } from "./analysis/marginalValue.js";
+import { recommendedFunding, fundingContribOverrides } from "./analysis/fundingOrder.js";
 import { dynamicOptimizer } from "./analysis/dynamicOptimizer.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
 import { monteCarlo } from "./engine/monteCarlo.js";
@@ -122,6 +123,17 @@ export default function App() {
   // Atomic risk pick from the card: enable modeling + set the profile + unpin.
   const pickRisk = (key) =>
     setInputs((prev) => ({ ...prev, allocationEnabled: true, riskProfile: key, pinAllocation: false }));
+
+  // Funding order (account-location axis): engine-derived order for re-routing
+  // the SAME savings — each account ranked by its marginal effect on sustainable
+  // spend (bridge-aware: a locked 401k sinks for early retirees). Runs a handful
+  // of drawdown searches, so it's memoized on `plan` (frozen during a slider drag)
+  // like earliestByRisk. Apply writes the split onto the contribution inputs and
+  // the projection chart + verdict re-shape.
+  const fundingRec = useMemo(() => recommendedFunding(plan), [plan]);
+  const applyFunding = () =>
+    setInputs((prev) => ({ ...prev, ...fundingContribOverrides(recommendedFunding(makePlan(prev))) }));
+  const funding = { rec: fundingRec, onApply: applyFunding };
   const sensitivityRows = useMemo(
     () => (mode === "early" && !retired ? sensitivity(plan) : []),
     [plan, mode, retired],
@@ -317,6 +329,7 @@ export default function App() {
           earliest={earliest}
           earliestByRisk={earliestByRisk}
           onPickRisk={pickRisk}
+          funding={funding}
           onScrubAge={onScrubAge}
           onCommitAge={onCommitAge}
           result={result}
@@ -503,6 +516,7 @@ export default function App() {
                   dynamicOpt={dynamicOpt}
                   onApplyOptimized={applyOptimized}
                   onPickRisk={pickRisk}
+                  funding={funding}
                 />
               ) : mode === "early" ? (
                 <EarlyPanel
@@ -511,6 +525,7 @@ export default function App() {
                   earliest={earliest}
                   earliestByRisk={earliestByRisk}
                   onPickRisk={pickRisk}
+                  funding={funding}
                   mcResult={mcResult}
                   scenario={scenario}
                   totalAtRetirement={totalAtRetirement}
@@ -532,6 +547,7 @@ export default function App() {
                   onRunMc={() => setMaxMcOn(true)}
                   atRetirement={liveAtRetirement}
                   marginalRows={marginalRows}
+                  funding={funding}
                 />
               )}
             </div>

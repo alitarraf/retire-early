@@ -32,9 +32,53 @@ components/ + App.jsx    React UI
 - **Tests are the gate.** Invariants A–E in `simulate.test.js` + others. When adding engine params, use **identity defaults** (off = byte-identical output) and re-run the full suite after every engine edit.
 - Tax year is 2026, MFJ default. Annual update = single-file edit in `constants/brackets.js`.
 
-**Test suite: 319 passing, 32 files** (194 before the Ask chat; +51 for Ask Pro §10; +8 for plan sync). Ask agent + Ask Pro architecture is in `CLAUDE.md` (api/_lib shared logic, RLS-enabled tables, lazy supabase chunk, metered-dev note). Test §10 + plan sync on **`netlify dev` :8888**, not Vite :5173.
+**Test suite: 475 passing, 43 files** (grown through Ask chat, Ask Pro §10, plan sync, allocation, connected charts, funding order). Ask agent + Ask Pro architecture is in `CLAUDE.md` (api/_lib shared logic, RLS-enabled tables, lazy supabase chunk, metered-dev note). Test §10 + plan sync on **`netlify dev` :8888**, not Vite :5173.
 
 ---
+
+## Session: 2026-07-17 — Funding Order (account-location axis) + Maximize card unification
+
+**PRD:** `docs/PRD_FundingOrder_July2026.md`. New feature: **where should this year's savings
+go?** — the account-location axis (which tax bucket), distinct from the existing asset-allocation
+risk mix. Phase 1 shipped; Phase 2 (529/Trump/annuity/dependents) next.
+
+- **`src/analysis/fundingOrder.js` (new)** — `recommendedFunding(plan)`. **Engine-derived, NOT a
+  fixed waterfall.** A measured finding drove this: the textbook "max your tax-advantaged accounts"
+  order makes the verdict *worse* here (earliest 54→55, spend −2–4%) because it's a FIRE app —
+  routing accessible brokerage into the **401k locked to 59½** starves the pre-59½ **bridge**, and
+  `projectTo` grows taxable brokerage at the full stock return (no accumulation tax drag) + step-up
+  basis. So the order ranks accounts by their **marginal effect on sustainable spend** (bridge-aware
+  for free: a locked 401k scores ~0 for early retirees). Emergency buffer + employer match kept as
+  labeled rules the deterministic sim can't price. Verified: a badly-allocated early retiree jumps
+  earliest **59→54**, safe spend **+$14k/mo**; already-good plans stay flat (earliest never regresses).
+- **Engine seams (inert by default → invariants A–E byte-identical):** `projectTo` gained
+  `hsaAnnual`/`cashAnnual` contribution overrides; `sustainableSpend` gained an `overrides`
+  pass-through (for the marginal probes). New 2026 catch-up constants in `brackets.js` (IRS Notice
+  2025-67: 401k +$8k/+$11,250, IRA +$1,100).
+- **`components/panels/FundingOrderCard.jsx` (new)** — "the cascade" viz below `AllocationCard` in
+  all 3 panels + `MobileShell`: priority rows + capacity bars + % + tax-character color. `rec`
+  memoized in App (runs sims). **Apply** re-routes contribution inputs (budget-conserving); copy is
+  honest (names the match/lock, hides Apply when nothing changes).
+- **RETI:** `route_savings` write tool (16 tools), context + systemPrompt lines. `CLAUDE.md` updated.
+- **Maximize "next $1k/yr" card unified** — was ranked by estate, could contradict Funding Order.
+  Now `marginalValues(plan, {objective})` takes a lens; `MarginalValueCard` has a **"While alive"
+  (sustainable spend) / "Leave behind" (estate)** toggle. Spend lens shares Funding Order's objective
+  so they agree. RETI `run_analysis → marginal_value` returns `monthlySpendGain`.
+- **Tests:** +`fundingOrder.test.js` (16) +`fundingOrderCard.render.test.jsx` (3). **475 green**,
+  build clean, browser-verified (bad/good/retired personas, Apply moves hero 59→54).
+
+**Phase 2a (same day) — kids' education accounts + account-comparison docs:**
+- Decisions: education savings **diverted from retirement** (honest cost), entered as **$/yr**,
+  kids' accounts first (annuity is the remaining follow-up), account named **530A Trump Account**.
+- `KIDS_LIMITS` (brackets.js): Coverdell $2k/child, 530A Trump $5k/child + $1k seed + $2.5k employer
+  (§530A, eff. Jul 4 2026), 529 gift-exclusion. New inputs `numDependents` + `educationAnnualContrib`
+  (sidebar + fieldHelp; auto agent-writable). `kidsFundingSplit` (ESA → 530A Trump → 529, fixed
+  best-practice order — engine can't rank the child's own accounts); `recommendedFunding` attaches
+  `rec.kids` with the **opportunity cost** (safe spend forgone). `KidsBlock` in `FundingOrderCard`.
+- **Docs:** `DocsPanel` "Account types compared" — two tables (retirement/savings + kids/education)
+  per the user's spec columns + a 530A Trump caveat. Marginal-value doc updated for the spend/estate
+  toggle. **483 green**, build clean (render smokes lock both new UI surfaces).
+- Remaining: annuity accumulation (→ income stream), custodial-Roth routing tier.
 
 ## Session: 2026-07-13 — Connected charts: Asset-mix lens + mix-at-milestones
 

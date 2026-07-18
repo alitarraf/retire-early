@@ -43,6 +43,30 @@ const DrawStep = ({ n, label, detail }) => (
     </div>
   </div>
 );
+// Wide comparison table — scrolls horizontally on narrow screens (never overflows
+// the page). First column is a bold row-header; header row is the dark eyebrow.
+const CompareTable = ({ cols, rows }) => (
+  <div style={{ overflowX: "auto", margin: "8px 0 18px", border: "1px solid #e2e8e6", borderRadius: 10 }}>
+    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 620, fontSize: 11.5 }}>
+      <thead>
+        <tr>
+          {cols.map((c, i) => (
+            <th key={i} style={{ textAlign: "left", padding: "9px 12px", background: "#1a2e28", color: "#7ecfbb", fontWeight: 700, fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", position: i === 0 ? "sticky" : undefined, left: i === 0 ? 0 : undefined, whiteSpace: "nowrap" }}>{c}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, ri) => (
+          <tr key={ri} style={{ background: ri % 2 ? "#f7faf9" : "#fff" }}>
+            {r.map((cell, ci) => (
+              <td key={ci} style={{ padding: "9px 12px", borderTop: "1px solid #e2e8e6", color: ci === 0 ? "#1a2e28" : "#4a5e58", fontWeight: ci === 0 ? 700 : 400, lineHeight: 1.5, verticalAlign: "top", position: ci === 0 ? "sticky" : undefined, left: ci === 0 ? 0 : undefined, background: ci === 0 ? (ri % 2 ? "#f7faf9" : "#fff") : undefined, whiteSpace: ci === 0 ? "nowrap" : "normal" }}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
 
 export function DocsPanel() {
   return (
@@ -118,6 +142,45 @@ export function DocsPanel() {
         </div>
       ))}
 
+      {/* ── Account types compared ── */}
+      <H2>Account types compared</H2>
+      <P>
+        Every account is taxed differently, and that difference is the whole game. The simulation models the six
+        <strong> retirement &amp; savings</strong> accounts below directly. The <strong>kids' &amp; education</strong> accounts
+        feed the <strong>Funding Order</strong> tool — they're a goal you fund <em>out of</em> the same savings, so the tool
+        shows what they cost your own retirement.
+      </P>
+
+      <H3>Retirement &amp; savings accounts (2026)</H3>
+      <CompareTable
+        cols={["Account", "Primary goal", "Tax treatment", "2026 annual limit", "Access before 59½"]}
+        rows={[
+          ["401(k) / Traditional", "Retirement", "Pre-tax now; withdrawals taxed as ordinary income", "$24,500 (+$8,000 at 50; +$11,250 at 60–63)", "Locked (Rule 55 / SEPP exceptions)"],
+          ["Roth IRA", "Retirement", "After-tax; growth & qualified withdrawals 100% tax-free", "$7,000 (+$1,100 at 50)", "Contributions anytime; earnings at 59½"],
+          ["HSA", "Medical → retirement", "Triple tax-free: deduct, grow, spend on medical", "$4,300 self / $8,550 family (+$1,000 at 55)", "Medical anytime; else 65+ (or penalty)"],
+          ["Taxable brokerage", "Flexible / bridge", "Only gains taxed (long-term cap-gains); step-up at death", "No limit", "Fully accessible"],
+          ["Cash / CDs / HYSA", "Emergency / short-term", "Interest taxed as ordinary income", "No limit", "Fully liquid"],
+          ["Municipal bonds", "Tax-free income", "Interest federally tax-free (often state-free too)", "No limit", "Liquid"],
+        ]}
+      />
+
+      <H3>Kids' &amp; education accounts</H3>
+      <CompareTable
+        cols={["Account", "Primary goal", "Tax status", "Annual limit", "Child income required?", "Government match?", "Employer match?"]}
+        rows={[
+          ["529 Savings Plan", "Education costs", "100% tax-free (for school)", "None (up to ~$19k/yr gift-tax exclusion; superfund 5×)", "No", "No", "No"],
+          ["Coverdell ESA", "Education costs", "100% tax-free (for school)", "Strict $2,000/child max", "No", "No", "No"],
+          ["530A Trump Account", "Child's long-term (retirement-style)", "Tax-deferred — growth taxed as income later", "Strict $5,000/child max (combined)", "No", "Yes — $1,000 pilot seed (kids born 2025–2028)", "Yes — up to $2,500/yr"],
+          ["Custodial Roth IRA", "Child's long-term retirement", "100% tax-free (at retirement)", "$7,000 or 100% of child's earned income", "Yes — needs W-2 / verified wages", "No", "No"],
+        ]}
+      />
+      <Callout>
+        The <strong>530A Trump Account</strong> (IRC §530A) is new: contributions start <strong>July 4, 2026</strong>, funds
+        are <strong>locked until the child turns 18</strong>, then convert to Traditional-IRA rules. Growth is taxed as
+        ordinary income at withdrawal — the least favorable treatment here — so it's a weaker vehicle than a Custodial Roth
+        <em> if</em> the child has earned income, but it needs none and can collect the seed + employer money.
+      </Callout>
+
       {/* ── Outputs ── */}
       <H2>Reading the results — Retire Early tab</H2>
 
@@ -163,7 +226,7 @@ export function DocsPanel() {
       <P>Binary search for the highest monthly expense where money still lasts to life expectancy. This is the maximum you could safely spend if you retired at your configured age.</P>
 
       <H3>Marginal value of $1,000/yr</H3>
-      <P>For each account type, adds $1,000/yr to contributions and measures the increase in estate value at death. Accounts with higher marginal value are where your next savings dollar goes furthest — accounting for taxes, growth, and draw order.</P>
+      <P>For each account, adds $1,000/yr to contributions and measures how much it moves your result. A toggle picks the lens: <strong>While alive</strong> ranks accounts by the extra sustainable monthly spending they buy (bridge-aware — a 401k locked until 59½ scores low if you retire early); <strong>Leave behind</strong> ranks by the extra estate at death. The two can differ, which is the point of offering both.</P>
 
       <H3>Dynamic Roth conversion optimizer</H3>
       <P>Instead of a single fixed annual amount, the optimizer evaluates a multi-year <strong>"fill to the top of the X% bracket each year"</strong> strategy across a window (your retire age through ~72, capturing both the bridge and the years before RMDs begin). For each candidate bracket (10/12/22/24%) it runs the full simulation and keeps the one that maximizes your net estate at life expectancy.</P>

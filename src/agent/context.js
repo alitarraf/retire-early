@@ -52,6 +52,8 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
     const budget = annualSavingsBudget(plan);
     if (budget > 0)
       L.push(`- Funding order: saving ~${fmt(Math.round(budget))}/yr across accounts. Re-route the SAME budget tax-optimally (match → HSA → Roth → 401k → brokerage overflow) with route_savings.`);
+    if ((plan.numDependents ?? 0) > 0 && (plan.educationAnnualContrib ?? 0) > 0)
+      L.push(`- Kids' education: setting aside ${fmt(plan.educationAnnualContrib)}/yr for ${plan.numDependents} child(ren), diverted from retirement (Funding Order card splits it Coverdell ESA → 530A Trump → 529 and prices the retirement cost). Set numDependents / educationAnnualContrib via update_inputs.`);
   }
   L.push(`- Scenario overlay: ${inputs.scenarioMode}.`);
   if (results.tab) L.push(`- Dashboard tab the user is viewing: ${results.tab} (switchable via set_view).`);

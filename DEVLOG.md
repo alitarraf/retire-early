@@ -67,6 +67,19 @@ risk mix. Phase 1 shipped; Phase 2 (529/Trump/annuity/dependents) next.
 - **Tests:** +`fundingOrder.test.js` (16) +`fundingOrderCard.render.test.jsx` (3). **475 green**,
   build clean, browser-verified (bad/good/retired personas, Apply moves hero 59→54).
 
+**Phase 2a (same day) — kids' education accounts + account-comparison docs:**
+- Decisions: education savings **diverted from retirement** (honest cost), entered as **$/yr**,
+  kids' accounts first (annuity is the remaining follow-up), account named **530A Trump Account**.
+- `KIDS_LIMITS` (brackets.js): Coverdell $2k/child, 530A Trump $5k/child + $1k seed + $2.5k employer
+  (§530A, eff. Jul 4 2026), 529 gift-exclusion. New inputs `numDependents` + `educationAnnualContrib`
+  (sidebar + fieldHelp; auto agent-writable). `kidsFundingSplit` (ESA → 530A Trump → 529, fixed
+  best-practice order — engine can't rank the child's own accounts); `recommendedFunding` attaches
+  `rec.kids` with the **opportunity cost** (safe spend forgone). `KidsBlock` in `FundingOrderCard`.
+- **Docs:** `DocsPanel` "Account types compared" — two tables (retirement/savings + kids/education)
+  per the user's spec columns + a 530A Trump caveat. Marginal-value doc updated for the spend/estate
+  toggle. **483 green**, build clean (render smokes lock both new UI surfaces).
+- Remaining: annuity accumulation (→ income stream), custodial-Roth routing tier.
+
 ## Session: 2026-07-13 — Connected charts: Asset-mix lens + mix-at-milestones
 
 **PRD:** `docs/PRD_ConnectedCharts_July2026.md` (Threads 3+2 of the

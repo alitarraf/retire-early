@@ -20,6 +20,8 @@ export const DEFAULTS = {
   ssAge: 67,
   lifeExpect: 85,
   householdSize: 2,
+  numDependents: 0,        // children you're saving for (drives ESA/Trump/529 sizing, Phase 2)
+  educationAnnualContrib: 0, // $/yr you set aside for kids' education (diverted from retirement)
 
   // Spouse (combined household pool — only timeline/SS tracked)
   hasSpouse: true,

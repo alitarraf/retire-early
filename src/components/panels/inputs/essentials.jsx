@@ -48,6 +48,9 @@ export function YouFields({ inputs, set, plan }) {
         <Field label="Household" help="householdSize">
           <NumInput value={inputs.householdSize} onChange={set("householdSize")} min={1} max={10} width={78} />
         </Field>
+        <Field label="Kids saving for" help="numDependents">
+          <NumInput value={inputs.numDependents} onChange={set("numDependents")} min={0} max={10} width={78} />
+        </Field>
       </Grid2>
       {isMFJ && (
         <>
@@ -269,6 +272,18 @@ export function MoneyFields({ inputs, set, plan }) {
               </Field>
             )}
           </Grid2>
+        </>
+      )}
+      {inputs.numDependents > 0 && (
+        <>
+          <Divider />
+          <SubTitle>Kids' education</SubTitle>
+          <Field label={`Saving /yr for ${inputs.numDependents} ${inputs.numDependents === 1 ? "child" : "kids"}`} help="educationAnnualContrib">
+            <NumInput value={inputs.educationAnnualContrib} onChange={set("educationAnnualContrib")} prefix="$" step={500} width={110} />
+          </Field>
+          <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 4 }}>
+            Diverted from your retirement — the Funding Order card splits it (ESA → 530A Trump → 529) and shows the cost.
+          </div>
         </>
       )}
       <AddAccountRow hidden={hiddenAccounts} onAdd={reveal} />

@@ -162,8 +162,48 @@ export function FundingOrderCard({ plan, rec, onApply, embedded = false }) {
       <div style={{ fontSize: 11, color: FAINT, marginTop: 10, lineHeight: 1.5 }}>
         Ranked by how much each account lifts your safe spending, from your plan — not a fixed rule.
         The model scores the drawdown only (it doesn't credit the upfront deduction on pre-tax
-        401(k) beyond the match, so that can rank higher for you in a high bracket). Education
-        accounts (529, Trump), annuities and dependents come next.
+        401(k) beyond the match, so that can rank higher for you in a high bracket).
+      </div>
+
+      {rec.kids && rec.kids.tiers.length > 0 && <KidsBlock kids={rec.kids} plan={plan} />}
+    </div>
+  );
+}
+
+// Kids' education: a diverted goal shown with its own tax-optimal split + the
+// honest retirement cost (safe spend forgone). Fixed order — the engine can't
+// rank the child's own accounts.
+function KidsBlock({ kids, plan }) {
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #dbe6e2" }}>
+      <div style={{ fontSize: 11, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>
+        Kids' education · {kids.dependents} {kids.dependents === 1 ? "child" : "children"}
+      </div>
+      <div style={{ fontSize: 12, color: "#4a5e58", marginBottom: 8 }}>
+        Your <strong style={{ color: INK, fontFamily: mono }}>{fmtK(kids.contrib)}/yr</strong> for education, in tax-smart order:
+      </div>
+      {kids.tiers.map((t, i) => {
+        const share = kids.contrib > 0 ? t.amount / kids.contrib : 0;
+        return (
+          <div key={t.key} style={{ display: "grid", gridTemplateColumns: "16px 1fr 46px", gap: 10, alignItems: "center", padding: "4px 0" }}>
+            <div style={{ fontSize: 13, color: FAINT, fontFamily: mono }}>{roundMarks[i] ?? i + 1}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+              <span style={{ color: INK, fontWeight: 600 }}>{t.label}</span>
+              <span style={{ color: FAINT }}>
+                {t.reason}
+                <span style={{ fontFamily: mono, marginLeft: 6 }}>{fmtK(t.amount)}{t.cap ? (t.filled ? " · full" : ` / ${fmtK(t.cap)}`) : ""}</span>
+              </span>
+            </div>
+            <div style={{ textAlign: "right", fontSize: 13, fontWeight: 700, color: INK, fontFamily: mono }}>{Math.round(share * 100)}%</div>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 11.5, color: "#4a5e58", marginTop: 8, lineHeight: 1.5 }}>
+        {kids.cost > 60 ? (
+          <>This is money the kids get, not you — it costs your own retirement about <strong style={{ color: "#c97c1a", fontFamily: mono }}>−{fmt(kids.cost)}/mo</strong> of safe spending.</>
+        ) : (
+          <>At this plan it barely dents your own retirement spending.</>
+        )}
       </div>
     </div>
   );

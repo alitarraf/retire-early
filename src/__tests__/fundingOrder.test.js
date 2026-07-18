@@ -10,9 +10,10 @@ import {
   annualSavingsBudget,
   fundingContribOverrides,
   currentSplit,
+  kidsFundingSplit,
 } from "../analysis/fundingOrder.js";
 import { makePlan, DEFAULTS } from "../analysis/plan.js";
-import { CONTRIB_LIMITS } from "../constants/brackets.js";
+import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
 
 // Early retiree, HSA engaged, employer match on, cash already above the buffer.
 const earlySaver = (over = {}) =>
@@ -134,5 +135,33 @@ describe("fundingContribOverrides & currentSplit", () => {
   it("currentSplit shares sum to 1", () => {
     const cs = currentSplit(earlySaver());
     expect(cs.rows.reduce((s, r) => s + r.share, 0)).toBeCloseTo(1, 6);
+  });
+});
+
+describe("kidsFundingSplit: education waterfall (Phase 2)", () => {
+  it("is empty without dependents or an education contribution", () => {
+    expect(kidsFundingSplit(makePlan({ ...DEFAULTS, numDependents: 0, educationAnnualContrib: 5000 })).tiers).toEqual([]);
+    expect(kidsFundingSplit(makePlan({ ...DEFAULTS, numDependents: 2, educationAnnualContrib: 0 })).tiers).toEqual([]);
+  });
+
+  it("fills Coverdell ESA → 530A Trump → 529, sized by dependents, conserving the contribution", () => {
+    const k = kidsFundingSplit(makePlan({ ...DEFAULTS, numDependents: 2, educationAnnualContrib: 15000 }));
+    expect(k.tiers.map((t) => t.label)).toEqual(["Coverdell ESA", "530A Trump Account", "529 Plan"]);
+    expect(k.tiers.find((t) => t.key === "esa").amount).toBe(KIDS_LIMITS.coverdellEsa * 2); // $4,000, full
+    expect(k.tiers.find((t) => t.key === "trump").amount).toBe(KIDS_LIMITS.trumpAccount * 2); // $10,000, full
+    expect(k.tiers.find((t) => t.key === "529").amount).toBe(15000 - 4000 - 10000); // $1,000 overflow
+    expect(k.tiers.reduce((s, t) => s + t.amount, 0)).toBe(15000);
+  });
+
+  it("recommendedFunding attaches kids with a non-negative retirement cost", () => {
+    const rec = recommendedFunding(earlySaver({ numDependents: 2, educationAnnualContrib: 12000 }));
+    expect(rec.kids).toBeTruthy();
+    expect(rec.kids.dependents).toBe(2);
+    expect(rec.kids.cost).toBeGreaterThanOrEqual(0);
+    expect(rec.kids.tiers[0].label).toBe("Coverdell ESA");
+  });
+
+  it("no kids block when there are no dependents", () => {
+    expect(recommendedFunding(earlySaver()).kids).toBeNull();
   });
 });

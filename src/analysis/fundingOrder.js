@@ -24,7 +24,7 @@
 //  onto the contribution inputs so the caller can apply it.
 // ─────────────────────────────────────────────────────────────
 
-import { CONTRIB_LIMITS } from "../constants/brackets.js";
+import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
 import { makePlan } from "./plan.js";
 import { sustainableSpend } from "./sustainableSpend.js";
 
@@ -139,6 +139,18 @@ export function recommendedFunding(plan) {
 
   const leftover = Math.round(Math.max(0, remaining));
 
+  // Kids' education (Phase 2): a diverted GOAL, not part of the retirement
+  // optimization (it's the child's money — it never enters the user's drawdown).
+  // Split by fixed best-practice order, and price the OPPORTUNITY COST: the safe
+  // monthly spend the user forgoes vs. keeping that money in their best account.
+  let kids = null;
+  const eduContrib = Math.round(plan.educationAnnualContrib ?? 0);
+  if ((plan.numDependents ?? 0) > 0 && eduContrib > 0) {
+    const bestOv = cand[0]?.ov ?? "brokerageAnnual";
+    const withRedirect = sustainableSpend(plan, { iterations: RANK_ITERS, overrides: { [bestOv]: eduContrib } });
+    kids = { ...kidsFundingSplit(plan), cost: Math.max(0, Math.round(withRedirect - base)) };
+  }
+
   // Payoff: sustainable spend at the recommended split vs. today's — non-negative
   // by construction for the growth tiers (the rule tiers may trim it slightly).
   const after = makePlan({ ...plan, ...fundingContribOverrides({ tiers }) });
@@ -146,7 +158,32 @@ export function recommendedFunding(plan) {
   const baseSpend = sustainableSpend(plan, { iterations: IMPACT_ITERS });
   const impact = { base: Math.round(baseSpend), after: Math.round(afterSpend), delta: Math.round(afterSpend - baseSpend) };
 
-  return { budget, tiers, leftover, available: true, impact };
+  return { budget, tiers, leftover, available: true, impact, kids };
+}
+
+/**
+ * Split the user's yearly education savings across kids' accounts in fixed
+ * best-practice order (Coverdell ESA → 530A Trump → 529), sized by dependents.
+ * Pure (no sims). Returns { contrib, dependents, tiers[] }. The engine can't rank
+ * these — they're off the retirement model — so the order is a documented rule.
+ */
+export function kidsFundingSplit(plan) {
+  const n = Math.max(0, Math.floor(plan.numDependents ?? 0));
+  const contrib = Math.round(plan.educationAnnualContrib ?? 0);
+  if (n <= 0 || contrib <= 0) return { contrib: 0, dependents: n, tiers: [] };
+  let rem = contrib;
+  const tiers = [];
+  const add = (key, label, reason, cap) => {
+    if (rem <= 0) return;
+    const amount = cap == null ? rem : Math.min(rem, cap);
+    if (amount <= 0) return;
+    rem -= amount;
+    tiers.push({ key, label, reason, amount: Math.round(amount), cap: cap == null ? null : Math.round(cap), filled: cap != null && amount >= cap - 0.5 });
+  };
+  add("esa", "Coverdell ESA", "tax-free for school", KIDS_LIMITS.coverdellEsa * n);
+  add("trump", "530A Trump Account", "gov + employer match", KIDS_LIMITS.trumpAccount * n);
+  add("529", "529 Plan", "tax-free, no cap", null);
+  return { contrib, dependents: n, tiers };
 }
 
 // Deterministic tie-break when two accounts score equal marginal value.

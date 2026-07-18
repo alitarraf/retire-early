@@ -43,4 +43,19 @@ describe("FundingOrderCard render", () => {
     const html = render(plan, null);
     expect(html).toContain("Where your money sits");
   });
+
+  it("kids' education block renders the ESA → 530A Trump → 529 split + cost", () => {
+    const plan = makePlan({
+      ...DEFAULTS, currentAge: 40, retireAge: 55, salary: 200000, employerMatchPct: 5,
+      k401AnnualContrib: 20000, rothAnnualContrib: 0, hsaBalance: 6000, brokerageMonthlyContrib: 0,
+      cashDeposit: 100000, monthlyExpense: 10000, numDependents: 2, educationAnnualContrib: 16000,
+    });
+    const rec = recommendedFunding(plan);
+    const html = render(plan, rec);
+    expect(rec.kids).toBeTruthy();
+    expect(html).toContain("Coverdell ESA");
+    expect(html).toContain("530A Trump Account");
+    expect(html).toContain("529 Plan");
+    expect(html).toContain("children"); // "Kids' education · 2 children" (apostrophe → &#x27;)
+  });
 });

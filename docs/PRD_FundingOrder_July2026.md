@@ -113,17 +113,32 @@ tier order, cap enforcement + catch-ups, overflow, match/HSA first, aggressive�
 conservation, apply patch, render smoke. Invariants A–E unchanged; `toolDrift` auto-covers the
 new tool. **475 tests green, build clean.**
 
-## Phase 2 — Goal buckets (529, Coverdell ESA, Trump, annuity) — net-new sleeves
+## Phase 2 — Goal buckets
 
-- **Input:** `numDependents` (new; only `householdSize` exists). Drives ESA ×$2k, Trump ×$5k + seed.
-- **Constants:** ESA $2,000/child; Trump $5,000 + $1,000 seed + $2,500 employer (§530A, ≥2026-07-04);
-  529 (no federal cap — gift-exclusion + state aggregate). Verify vs. pubs.
-- **Kids' goals as sinks:** balances excluded from `simulate` drawdown; they lower the retirement
-  verdict, shown transparently ("funding kids' accounts costs ~N months of runway").
-- **Annuity accumulation → future income stream** on existing `incomeStreams`; honest non-qualified
-  tax + penalty gate.
-- **Decision D1:** kids' goals reduce the retirement verdict (recommended, honest) vs. parallel
-  goals shown without dinging retirement. Ship recommended, clearly labeled.
+**Decisions (user, 2026-07-17):** A1 kids' education is **diverted from retirement** (honest cost);
+B1 entered as a **$/yr amount**; C **kids' accounts first, annuity follow-up**; name it **530A Trump
+Account**.
+
+### Kids' education — BUILT ✅
+- **Inputs:** `numDependents` + `educationAnnualContrib` (DEFAULTS; sidebar in `YouFields` /
+  `MoneyFields`, gated on dependents; `fieldHelp` entries; auto agent-writable via `update_inputs`).
+- **Constants:** `KIDS_LIMITS` in `brackets.js` — ESA $2,000/child, 530A Trump $5,000/child + $1,000
+  seed (born 2025–2028) + $2,500 employer (§530A, ≥2026-07-04), 529 gift-exclusion $19k.
+- **Model (diverted, off the retirement sim):** `kidsFundingSplit(plan)` splits the yearly education
+  savings by fixed best-practice order **Coverdell ESA → 530A Trump → 529** (sized by dependents; the
+  engine can't rank the child's own accounts). `recommendedFunding` attaches `rec.kids` with the
+  **opportunity cost** = safe monthly spend forgone vs. keeping that money in the user's best account.
+- **UI:** `KidsBlock` subsection in `FundingOrderCard` (split + %+caps + honest cost line). RETI:
+  context line when set. **Docs:** `DocsPanel` "Account types compared" — two tables (retirement &
+  savings; kids' & education) matching the user's spec columns, + a 530A Trump caveat callout.
+- **Tests:** `fundingOrder.test.js` (kids split, conservation, cost≥0), render smokes for the card
+  block + the docs tables. **483 green, build clean.**
+
+### Annuity accumulation — NOT YET BUILT (follow-up)
+- Convert accumulation contributions into a **future income stream** on the existing `incomeStreams`
+  plumbing; honest non-qualified tax (ordinary income on gains, no step-up) + pre-59½ penalty gate.
+- Custodial Roth IRA is documented in the comparison table but not yet a routing tier (needs a
+  child-earned-income input).
 
 ## Consistency with the Maximize "next $1k/yr" card (marginalValue.js)
 

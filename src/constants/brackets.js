@@ -77,6 +77,17 @@ export const CONTRIB_LIMITS = {
   hsaCatchup: 1000,      // additional catch-up at age 55+
 };
 
+// 2026 education & children's-account limits (Phase 2). Verify against final IRS
+// pubs each tax year — several of these are new/unsettled.
+export const KIDS_LIMITS = {
+  coverdellEsa: 2000,     // Coverdell ESA, per beneficiary/yr (statutory, not inflation-indexed)
+  trumpAccount: 5000,     // Trump account (IRC §530A), per child/yr, 2026–27 (indexed $100 from 2028)
+  trumpSeed: 1000,        // one-time federal seed, per child born 2025–2028 (doesn't count vs the cap)
+  trumpEmployer: 2500,    // optional employer contribution/yr, per employee (counts toward the $5k)
+  trumpStartYear: 2026,   // §530A contributions cannot be made before Jul 4, 2026
+  giftAnnualExclusion: 19000, // 529 has no federal cap; gift-tax annual exclusion (per donor/beneficiary; superfund = 5×)
+};
+
 // Long-term capital-gains rate options offered in the UI (manual override
 // when autoLtcg is off).
 export const LTCG_RATES = [0, 15, 20];

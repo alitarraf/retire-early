@@ -206,6 +206,67 @@ export function deferredAnnuityStream(plan) {
 }
 
 /**
+ * Fixed annuity / MYGA comparison — a "tax-deferred CD". PURE after-tax
+ * compounding (no sim), so it works in any mode. Compares the after-tax value at
+ * cash-out of: the MYGA (tax-deferred, ordinary tax on the gain + 10% penalty if
+ * cashed out before 59½), a taxable CD at the same rate (interest taxed yearly),
+ * and an equity portfolio (grows at stockReturn, LTCG on the gain — but risky).
+ */
+export function mygaAnalysis(plan) {
+  const capital = Math.round(plan.mygaCapital ?? 0);
+  if (capital <= 0) return null;
+  const currentAge = plan.currentAge ?? 0;
+  const term = Math.max(1, Math.round(plan.mygaTermYears ?? 3));
+  const cashOutAge = (plan.mygaCashOutAge ?? 0) > currentAge ? plan.mygaCashOutAge : currentAge + term;
+  const n = Math.max(1, cashOutAge - currentAge);
+  const ord = (plan.accumulationOrdinaryRate ?? 0) / 100; // ordinary income rate (fed + state)
+  const ltcg = (plan.brokerageLtcgRate ?? 0) / 100;
+  const grow = (ratePct) => capital * Math.pow(1 + (ratePct ?? 0) / 100, n);
+
+  // Compared against the user's OWN assumptions, each at its real yield + tax:
+  //   MYGA   — tax-deferred at mygaRate; ordinary tax (+10% penalty pre-59½) on the gain at cash-out
+  //   CD/HYSA— their cashDepositRate, interest taxed yearly (uses the derived after-tax rate)
+  //   Munis  — their muniReturn, tax-free (federal, + state if double-tax-free)
+  //   Stocks — their stockReturn, LTCG on the gain at cash-out — but risky, no guarantee
+  // Treasuries are federal-taxable but STATE-exempt → tax them at the federal-only
+  // ordinary rate (back out the state portion). That's their edge over a CD.
+  const fedOrd = Math.max(0, (plan.accumulationOrdinaryRate ?? 0) - (plan.effectiveStateTax ?? 0)) / 100;
+  const treasuryAfterRate = (plan.treasuryRate ?? 0) * (1 - fedOrd);
+
+  const mygaValue = grow(plan.mygaRate);
+  const mygaGain = mygaValue - capital;
+  const penalty = cashOutAge < 59.5 ? mygaGain * 0.1 : 0;
+  const mygaNet = mygaValue - mygaGain * ord - penalty;
+  const cdNet = grow(plan.depositAfterTaxRate); // after-tax annual growth at the user's cash rate
+  const treasuryNet = grow(treasuryAfterRate); // state-exempt: taxed federal-only, yearly
+  const muniNet = grow(plan.muniReturn); // tax-free
+  const eqValue = grow(plan.stockReturn);
+  const eqNet = eqValue - (eqValue - capital) * ltcg;
+
+  const safe = [
+    { net: cdNet, label: "a CD" },
+    { net: treasuryNet, label: "Treasuries" },
+    { net: muniNet, label: "munis" },
+  ].sort((a, b) => b.net - a.net);
+  return {
+    capital, rate: plan.mygaRate ?? 5, term, cashOutAge, years: n,
+    penaltyHit: cashOutAge < 59.5,
+    cdRate: plan.cashDepositRate ?? 0,
+    treasuryRate: plan.treasuryRate ?? 0,
+    muniRate: plan.muniReturn ?? 0,
+    stockRate: plan.stockReturn ?? 0,
+    mygaNet: Math.round(mygaNet),
+    cdNet: Math.round(cdNet),
+    treasuryNet: Math.round(treasuryNet),
+    muniNet: Math.round(muniNet),
+    eqNet: Math.round(eqNet),
+    bestSafeLabel: safe[0].label,
+    vsBestSafe: Math.round(mygaNet - safe[0].net), // MYGA vs the best safe alternative (CD / Treasury / muni)
+    vsEq: Math.round(mygaNet - eqNet), // usually negative — equities win but with risk
+  };
+}
+
+/**
  * Split the user's yearly education savings across kids' accounts in fixed
  * best-practice order (Coverdell ESA → 530A Trump → 529), sized by dependents.
  * Pure (no sims). Returns { contrib, dependents, tiers[] }. The engine can't rank

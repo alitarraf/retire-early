@@ -69,8 +69,16 @@ describe("FundingOrderCard render", () => {
       annuityContribAnnual: 10000, annuityStartAge: 65,
     });
     const html = render(plan);
-    expect(html).toContain("Deferred annuity");
+    expect(html).toContain("Lifetime income annuity");
     expect(html).toContain("guaranteed income");
     expect(html).toContain("longevity hedge");
+  });
+
+  it("MYGA block renders the tax-deferred-CD comparison (works in retired mode too)", () => {
+    const plan = makePlan({ ...DEFAULTS, alreadyRetired: true, currentAge: 62, mygaCapital: 100000, mygaRate: 5, mygaTermYears: 3 });
+    const html = render(plan);
+    expect(html).toContain("Fixed annuity (MYGA)");
+    expect(html).toContain("Munis"); // compares against the user's real muni yield
+    expect(html).toContain("Where your money sits"); // retired branch + MYGA appended
   });
 });

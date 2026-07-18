@@ -12,6 +12,7 @@ import {
   currentSplit,
   kidsFundingSplit,
   deferredAnnuityStream,
+  mygaAnalysis,
 } from "../analysis/fundingOrder.js";
 import { makePlan, DEFAULTS } from "../analysis/plan.js";
 import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
@@ -193,5 +194,48 @@ describe("deferred annuity comparison (Phase 2b)", () => {
 
   it("no annuity comparison when the contribution is zero", () => {
     expect(recommendedFunding(earlySaver()).annuity).toBeNull();
+  });
+});
+
+describe("mygaAnalysis: fixed annuity / tax-deferred CD", () => {
+  const p = (over) => makePlan({ ...DEFAULTS, salary: 200000, mygaCapital: 100000, mygaRate: 5, mygaTermYears: 3, ...over });
+
+  it("is null without capital", () => {
+    expect(mygaAnalysis(makePlan({ ...DEFAULTS, mygaCapital: 0 }))).toBeNull();
+  });
+
+  it("flags the pre-59½ penalty; equities beat the fixed rate (with risk)", () => {
+    const m = mygaAnalysis(p({ currentAge: 45, mygaCashOutAge: 60 })); // 15-yr, no penalty at cash-out
+    expect(m.years).toBe(15);
+    expect(mygaAnalysis(p({ currentAge: 45 })).penaltyHit).toBe(true); // 3-yr → cashes out at 48
+    expect(m.eqNet).toBeGreaterThan(m.mygaNet); // stocks win over a long hold
+    expect(m.muniNet).toBeGreaterThan(0);
+    expect(m.cdNet).toBeGreaterThan(0);
+    expect(typeof m.vsBestSafe).toBe("number");
+    expect(["munis", "a CD"]).toContain(m.bestSafeLabel);
+  });
+
+  it("uses the user's OWN cash & muni yields (more specific than a same-rate CD)", () => {
+    const lowCd = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 2 }));
+    const highCd = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 8 }));
+    expect(highCd.cdNet).toBeGreaterThan(lowCd.cdNet); // CD outcome tracks the user's rate
+    expect(highCd.cdRate).toBe(8);
+    const lowMuni = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, muniReturn: 3 }));
+    const highMuni = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, muniReturn: 6 }));
+    expect(highMuni.muniNet).toBeGreaterThan(lowMuni.muniNet); // muni outcome tracks the user's yield
+  });
+
+  it("cash-out age 0 defaults to the end of the first term", () => {
+    expect(mygaAnalysis(p({ currentAge: 50, mygaCashOutAge: 0 })).cashOutAge).toBe(53);
+  });
+
+  it("Treasury line is state-exempt → never worse than a CD at the same rate, and tracks its yield", () => {
+    // Same rate: Treasury is taxed federal-only, a CD is taxed fed+state → Treasury ≥ CD.
+    const m = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 5, treasuryRate: 5 }));
+    expect(m.treasuryNet).toBeGreaterThanOrEqual(m.cdNet);
+    expect(m.treasuryRate).toBe(5);
+    const hi = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, treasuryRate: 6 }));
+    const lo = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, treasuryRate: 3 }));
+    expect(hi.treasuryNet).toBeGreaterThan(lo.treasuryNet);
   });
 });

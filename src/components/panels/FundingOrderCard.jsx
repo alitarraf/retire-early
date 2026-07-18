@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useMemo } from "react";
-import { recommendedFunding, currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
+import { recommendedFunding, mygaAnalysis, currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
 import { fmt, fmtK } from "../../format.js";
 
 // Tax-character palette — encodes a true fact (which dollars grow tax-free),
@@ -75,7 +75,7 @@ function Dot({ color }) {
 }
 
 // Retired / not-saving: nothing to route — show where the money sits today.
-function BalanceView({ plan, style }) {
+function BalanceView({ plan, style, myga }) {
   const bal = [
     { key: "k401", label: "401(k)", tax: TAX_DEFERRED, amount: plan.k401Today ?? 0 },
     { key: "roth", label: "Roth", tax: TAX_FREE, amount: plan.rothTotal ?? 0 },
@@ -98,6 +98,8 @@ function BalanceView({ plan, style }) {
           ? "You're no longer contributing, so there's nothing to route. This is the tax mix of what you hold."
           : "You're not adding to any account yet, so there's nothing to route. This is the tax mix of what you hold."}
       </div>
+      {myga && <AnnuitiesHeading />}
+      {myga && <MygaBlock myga={myga} />}
     </div>
   );
 }
@@ -107,8 +109,9 @@ export function FundingOrderCard({ plan, onApply, embedded = false }) {
   // is actually mounted — it lives inside "Show details", collapsed by default,
   // so a slider drag with details closed costs nothing.
   const rec = useMemo(() => recommendedFunding(plan), [plan]);
+  const myga = useMemo(() => mygaAnalysis(plan), [plan]); // pure — shows in any mode
   const style = { ...cardStyle, ...(embedded ? { margin: "14px 0 0" } : null) };
-  if (!rec || !rec.available) return <BalanceView plan={plan} style={style} />;
+  if (!rec || !rec.available) return <BalanceView plan={plan} style={style} myga={myga} />;
 
   const now = currentSplit(plan);
   const TAX_OF = { k401: TAX_DEFERRED, roth: TAX_FREE, hsa: TAX_FREE };
@@ -174,7 +177,17 @@ export function FundingOrderCard({ plan, onApply, embedded = false }) {
       </div>
 
       {rec.kids && rec.kids.tiers.length > 0 && <KidsBlock kids={rec.kids} plan={plan} />}
+      {(rec.annuity || myga) && <AnnuitiesHeading />}
       {rec.annuity && <AnnuityBlock annuity={rec.annuity} plan={plan} />}
+      {myga && <MygaBlock myga={myga} />}
+    </div>
+  );
+}
+
+function AnnuitiesHeading() {
+  return (
+    <div style={{ marginTop: 16, fontSize: 11, color: FAINT, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>
+      Annuities — should you?
     </div>
   );
 }
@@ -186,8 +199,8 @@ function AnnuityBlock({ annuity, plan }) {
   const lags = annuity.delta < 0;
   return (
     <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #dbe6e2" }}>
-      <div style={{ fontSize: 11, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>
-        Deferred annuity · should you?
+      <div style={{ fontSize: 11.5, color: INK, fontWeight: 700, marginBottom: 4 }}>
+        1 · Lifetime income annuity
       </div>
       <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
         {fmtK(annuity.contrib)}/yr would buy about <strong style={{ color: INK, fontFamily: mono }}>{fmt(annuity.income)}/mo</strong> of
@@ -216,6 +229,37 @@ function Stat({ label, value, accent }) {
     <div>
       <div style={{ fontSize: 15, fontWeight: 700, fontFamily: mono, color: accent ? "#3d8c78" : INK }}>{value}</div>
       <div style={{ fontSize: 10, color: FAINT }}>{label}</div>
+    </div>
+  );
+}
+
+// Fixed annuity / MYGA — a "tax-deferred CD". Pure after-tax comparison: the MYGA
+// vs. a taxable CD (its real rival) vs. investing (higher but risky).
+function MygaBlock({ myga }) {
+  const beatsSafe = myga.vsBestSafe > 0;
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed #dbe6e2" }}>
+      <div style={{ fontSize: 11.5, color: INK, fontWeight: 700, marginBottom: 4 }}>
+        2 · Fixed annuity (MYGA)
+      </div>
+      <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
+        <strong style={{ color: INK, fontFamily: mono }}>{fmtK(myga.capital)}</strong> at {myga.rate}% for {myga.years} {myga.years === 1 ? "year" : "years"}, cashed out at age {myga.cashOutAge} — after-tax value vs. your other options:
+      </div>
+      <div style={{ display: "flex", gap: 14, margin: "8px 0 6px", flexWrap: "wrap" }}>
+        <Stat label={`MYGA ${myga.rate}%`} value={fmt(myga.mygaNet)} accent />
+        <Stat label={`CD ${myga.cdRate}%`} value={fmt(myga.cdNet)} />
+        <Stat label={`Treasury ${myga.treasuryRate}%`} value={fmt(myga.treasuryNet)} />
+        <Stat label={`Munis ${myga.muniRate}%`} value={fmt(myga.muniNet)} />
+        <Stat label={`Stocks ${myga.stockRate}%`} value={fmt(myga.eqNet)} />
+      </div>
+      <div style={{ fontSize: 11.5, color: "#4a5e58", lineHeight: 1.5 }}>
+        {beatsSafe ? (
+          <>Best safe option: the MYGA nets <strong style={{ color: "#3d8c78", fontFamily: mono }}>{fmt(myga.vsBestSafe)}</strong> more than {myga.bestSafeLabel} here — the tax-deferral edge grows the longer you hold and the lower your bracket at cash-out.</>
+        ) : (
+          <>Here <strong>{myga.bestSafeLabel}</strong> actually beat the MYGA by <strong style={{ color: "#c97c1a", fontFamily: mono }}>{fmt(-myga.vsBestSafe)}</strong>{myga.penaltyHit ? " — the 10% penalty for cashing out before 59½ outweighs the deferral." : " (tax-free munis or a liquid CD, no surrender lock-up)."}</>
+        )}{" "}
+        All three are safe; <strong>stocks</strong> could reach <span style={{ fontFamily: mono }}>{fmt(myga.eqNet)}</span> but with market risk and no guarantee.
+      </div>
     </div>
   );
 }

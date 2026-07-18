@@ -159,9 +159,11 @@ export function DocsPanel() {
           ["Roth IRA", "Retirement", "After-tax; growth & qualified withdrawals 100% tax-free", "$7,000 (+$1,100 at 50)", "Contributions anytime; earnings at 59½"],
           ["HSA", "Medical → retirement", "Triple tax-free: deduct, grow, spend on medical", "$4,300 self / $8,550 family (+$1,000 at 55)", "Medical anytime; else 65+ (or penalty)"],
           ["Taxable brokerage", "Flexible / bridge", "Only gains taxed (long-term cap-gains); step-up at death", "No limit", "Fully accessible"],
-          ["Cash / CDs / HYSA", "Emergency / short-term", "Interest taxed as ordinary income", "No limit", "Fully liquid"],
+          ["Cash / CDs / HYSA", "Emergency / short-term", "Interest taxed as ordinary income (fed + state)", "No limit", "Fully liquid"],
+          ["Treasuries / T-bills", "Safe yield", "Interest federal-taxable but state-tax-EXEMPT", "No limit", "Liquid (secondary market)"],
           ["Municipal bonds", "Tax-free income", "Interest federally tax-free (often state-free too)", "No limit", "Liquid"],
-          ["Deferred annuity", "Guaranteed lifetime income", "Tax-deferred; gains taxed as ordinary income, no step-up", "No IRS cap (non-qualified)", "Surrender charges + 10% penalty"],
+          ["Income annuity (SPIA)", "Guaranteed lifetime income", "Tax-deferred; gains taxed as ordinary income, no step-up", "No IRS cap (non-qualified)", "Illiquid — annuitized"],
+          ["Fixed annuity (MYGA)", "Guaranteed growth (tax-deferred CD)", "Tax-deferred; gains taxed as ordinary income at cash-out", "No IRS cap (non-qualified)", "Surrender charges + 10% penalty"],
         ]}
       />
 

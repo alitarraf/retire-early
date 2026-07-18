@@ -86,7 +86,8 @@ export const DEFAULTS = {
   mygaRate: 5.0,       // guaranteed rate (%)
   mygaTermYears: 3,    // product term (renewable)
   mygaCashOutAge: 0,   // age you'd cash out; 0 = end of the first term (currentAge + term)
-  treasuryRate: 4.5,   // Treasury yield for the MYGA comparison — federal-taxable, state-EXEMPT
+  treasuryRate: 4.5,   // Treasury yield — federal-taxable, state-EXEMPT
+  treasuryBalance: 0,  // held Treasuries (Invest tab; becomes a real drawn-down sleeve in Phase 3)
 
   // Tax
   employmentBracket: 22,

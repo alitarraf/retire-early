@@ -16,6 +16,7 @@ import { RetireAtControl } from "../panels/RetireAtControl.jsx";
 import { EarlyPanel } from "../panels/EarlyPanel.jsx";
 import { RetiredPanel } from "../panels/RetiredPanel.jsx";
 import { MaximizeCenter } from "../panels/MaximizeCenter.jsx";
+import { InvestPanel } from "../panels/InvestPanel.jsx";
 import { AdvicePanel } from "../panels/AdvicePanel.jsx";
 import { DocsPanel } from "../panels/DocsPanel.jsx";
 import { INPUT_SECTIONS, FINE_TUNING_KEYS } from "../panels/InputsSidebar.jsx";
@@ -266,6 +267,10 @@ function Results(props) {
         <DocsPanel />
       </div>
     );
+  }
+
+  if (mode === "invest") {
+    return <InvestPanel embedded inputs={props.inputs} set={props.set} plan={props.plan} funding={props.funding} />;
   }
 
   // early / maximize need a valid result (retire age ≥ current age)

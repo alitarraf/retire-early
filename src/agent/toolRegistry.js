@@ -550,9 +550,9 @@ export const TOOL_REGISTRY = {
   set_view: {
     kind: "write",
     description:
-      "Switch the dashboard to a different tab so the user sees the panel you're discussing: 'early' (Retire Early / My Retirement), 'maximize' (optimizer + where-to-save), 'advice', or 'docs'. Optionally trigger the Maximize tab's on-demand Monte Carlo run. Never needs confirmation.",
+      "Switch the dashboard to a different tab so the user sees the panel you're discussing: 'early' (Retire Early / My Retirement), 'maximize' (optimizer), 'invest' (the instrument list + priority to maximize return), 'advice', or 'docs'. Optionally trigger the Maximize tab's on-demand Monte Carlo run. Never needs confirmation.",
     schema: {
-      tab: { type: "string", enum: ["early", "maximize", "advice", "docs"], description: "Tab to show." },
+      tab: { type: "string", enum: ["early", "maximize", "invest", "advice", "docs"], description: "Tab to show." },
       runMonteCarlo: { type: "boolean", description: "Also run the Maximize tab's 500-path Monte Carlo." },
     },
     returnKeys: ["status", "changes"],

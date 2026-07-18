@@ -206,6 +206,47 @@ export function deferredAnnuityStream(plan) {
 }
 
 /**
+ * Fixed annuity / MYGA comparison — a "tax-deferred CD". PURE after-tax
+ * compounding (no sim), so it works in any mode. Compares the after-tax value at
+ * cash-out of: the MYGA (tax-deferred, ordinary tax on the gain + 10% penalty if
+ * cashed out before 59½), a taxable CD at the same rate (interest taxed yearly),
+ * and an equity portfolio (grows at stockReturn, LTCG on the gain — but risky).
+ */
+export function mygaAnalysis(plan) {
+  const capital = Math.round(plan.mygaCapital ?? 0);
+  if (capital <= 0) return null;
+  const currentAge = plan.currentAge ?? 0;
+  const term = Math.max(1, Math.round(plan.mygaTermYears ?? 3));
+  const cashOutAge = (plan.mygaCashOutAge ?? 0) > currentAge ? plan.mygaCashOutAge : currentAge + term;
+  const n = Math.max(1, cashOutAge - currentAge);
+  const ord = (plan.accumulationOrdinaryRate ?? 0) / 100; // ordinary income rate (fed + state)
+  const ltcg = (plan.brokerageLtcgRate ?? 0) / 100;
+  const g = (plan.mygaRate ?? 5) / 100;
+  const eq = (plan.stockReturn ?? 10) / 100;
+
+  // MYGA: tax-deferred growth; ordinary tax (+ pre-59½ penalty) on the gain at cash-out.
+  const mygaValue = capital * Math.pow(1 + g, n);
+  const mygaGain = mygaValue - capital;
+  const penalty = cashOutAge < 59.5 ? mygaGain * 0.1 : 0;
+  const mygaNet = mygaValue - mygaGain * ord - penalty;
+  // Taxable CD at the same rate — interest taxed annually (lower effective compounding).
+  const cdNet = capital * Math.pow(1 + g * (1 - ord), n);
+  // Equity portfolio — grows at stockReturn, LTCG on the gain at cash-out (but risky).
+  const eqValue = capital * Math.pow(1 + eq, n);
+  const eqNet = eqValue - (eqValue - capital) * ltcg;
+
+  return {
+    capital, rate: plan.mygaRate ?? 5, term, cashOutAge, years: n,
+    penaltyHit: cashOutAge < 59.5,
+    mygaNet: Math.round(mygaNet),
+    cdNet: Math.round(cdNet),
+    eqNet: Math.round(eqNet),
+    vsCd: Math.round(mygaNet - cdNet), // MYGA's tax-deferral edge over a taxable CD
+    vsEq: Math.round(mygaNet - eqNet), // usually negative — equities win but with risk
+  };
+}
+
+/**
  * Split the user's yearly education savings across kids' accounts in fixed
  * best-practice order (Coverdell ESA → 530A Trump → 529), sized by dependents.
  * Pure (no sims). Returns { contrib, dependents, tiers[] }. The engine can't rank

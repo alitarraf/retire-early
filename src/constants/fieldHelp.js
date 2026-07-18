@@ -103,6 +103,23 @@ export const FIELD_HELP = {
     label: "Annuity payout rate",
     context: "Annual income as a % of the annuity's value at the start age (SPIA-style, e.g. ~6% at 65). Higher for older start ages.",
   },
+  mygaCapital: {
+    label: "MYGA lump sum",
+    context:
+      "A fixed annuity (MYGA) is a 'tax-deferred CD': a lump grows at a guaranteed rate, gains taxed as ordinary income (+10% penalty before 59½) at cash-out. The card compares it to a taxable CD and to investing. 0 = off.",
+  },
+  mygaRate: {
+    label: "MYGA guaranteed rate",
+    context: "The fixed annual rate the MYGA credits for the term. Compare it to current CD/Treasury yields — the annuity's only edge over a CD is the tax deferral.",
+  },
+  mygaTermYears: {
+    label: "MYGA term",
+    context: "The guarantee period (e.g. 3 years). Cashing out before the term ends usually triggers surrender charges; you can renew at the then-current rate.",
+  },
+  mygaCashOutAge: {
+    label: "MYGA cash-out age",
+    context: "The age you actually take the money (0 = end of the first term). Setting it past the term models renewing — the tax deferral compounds, and cashing out in a low-bracket retirement year (and after 59½) helps most.",
+  },
   spouseSsAge: {
     label: "Spouse SS at",
     context: "The age your spouse claims Social Security. Their benefit is added to the household pool at that age.",

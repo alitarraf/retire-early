@@ -79,6 +79,14 @@ export const DEFAULTS = {
   annuityRate: 4.5,         // guaranteed accumulation return (%) — annuities pay conservative rates
   annuityPayoutRate: 6.0,   // annual payout as % of the annuity value at start (SPIA-style)
 
+  // Fixed annuity / MYGA (multi-year guaranteed annuity) — a "tax-deferred CD".
+  // A lump grows tax-deferred at a guaranteed rate; gains are ordinary-income taxed
+  // (+10% penalty pre-59½) at cash-out. Pure comparison, no sim. 0 capital = off.
+  mygaCapital: 0,      // lump sum you'd put in
+  mygaRate: 5.0,       // guaranteed rate (%)
+  mygaTermYears: 3,    // product term (renewable)
+  mygaCashOutAge: 0,   // age you'd cash out; 0 = end of the first term (currentAge + term)
+
   // Tax
   employmentBracket: 22,
   ltcgBracket: 15, // manual LTCG rate; only used when autoLtcg is false

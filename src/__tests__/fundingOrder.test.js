@@ -12,6 +12,7 @@ import {
   currentSplit,
   kidsFundingSplit,
   deferredAnnuityStream,
+  mygaAnalysis,
 } from "../analysis/fundingOrder.js";
 import { makePlan, DEFAULTS } from "../analysis/plan.js";
 import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
@@ -193,5 +194,31 @@ describe("deferred annuity comparison (Phase 2b)", () => {
 
   it("no annuity comparison when the contribution is zero", () => {
     expect(recommendedFunding(earlySaver()).annuity).toBeNull();
+  });
+});
+
+describe("mygaAnalysis: fixed annuity / tax-deferred CD", () => {
+  const p = (over) => makePlan({ ...DEFAULTS, salary: 200000, mygaCapital: 100000, mygaRate: 5, mygaTermYears: 3, ...over });
+
+  it("is null without capital", () => {
+    expect(mygaAnalysis(makePlan({ ...DEFAULTS, mygaCapital: 0 }))).toBeNull();
+  });
+
+  it("flags the pre-59½ penalty and lets a plain CD win over a short term", () => {
+    const m = mygaAnalysis(p({ currentAge: 45 }));
+    expect(m.years).toBe(3);
+    expect(m.penaltyHit).toBe(true);
+    // The 10% penalty on the gain outweighs 3 years of deferral → CD nets more.
+    expect(m.vsCd).toBeLessThan(0);
+    expect(m.eqNet).toBeGreaterThan(m.mygaNet); // equities win (with risk)
+  });
+
+  it("beats a taxable CD once held past 59½ (no penalty, deferral compounds)", () => {
+    expect(mygaAnalysis(p({ currentAge: 62 })).penaltyHit).toBe(false);
+    expect(mygaAnalysis(p({ currentAge: 45, mygaCashOutAge: 60 })).vsCd).toBeGreaterThan(0); // 15-yr renew
+  });
+
+  it("cash-out age 0 defaults to the end of the first term", () => {
+    expect(mygaAnalysis(p({ currentAge: 50, mygaCashOutAge: 0 })).cashOutAge).toBe(53);
   });
 });

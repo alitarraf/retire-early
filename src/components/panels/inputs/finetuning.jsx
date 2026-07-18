@@ -155,10 +155,12 @@ export function StrategyFields({ inputs, set, plan }) {
       </Grid2>
 
       <Divider />
-      <SubTitle>Deferred annuity — should you?</SubTitle>
+      <SubTitle>Annuities — should you?</SubTitle>
       <div style={{ fontSize: 10, color: "#9db4ae", margin: "-4px 0 8px", lineHeight: 1.5 }}>
-        A "what if" comparison — the Funding Order card weighs routing this money to a guaranteed-income annuity vs. investing it.
+        Two "what if" comparisons — the Funding Order card weighs each against simply investing the money.
       </div>
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a2e28", margin: "4px 0 6px" }}>1 · Lifetime income annuity</div>
       <Grid2>
         <Field label="Into an annuity /yr" help="annuityContribAnnual">
           <NumInput value={inputs.annuityContribAnnual} onChange={set("annuityContribAnnual")} prefix="$" step={500} width={100} />
@@ -177,6 +179,27 @@ export function StrategyFields({ inputs, set, plan }) {
           </Field>
         </Grid2>
       )}
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a2e28", margin: "12px 0 6px" }}>2 · Fixed annuity (MYGA) — a tax-deferred CD</div>
+      <Grid2>
+        <Field label="Lump sum in" help="mygaCapital">
+          <NumInput value={inputs.mygaCapital} onChange={set("mygaCapital")} prefix="$" step={1000} width={110} />
+        </Field>
+        <Field label="Guaranteed rate %" help="mygaRate">
+          <NumInput value={inputs.mygaRate} onChange={set("mygaRate")} suffix="%" step={0.1} width={70} />
+        </Field>
+      </Grid2>
+      <Grid2>
+        <Field label="Term (years)" help="mygaTermYears">
+          <NumInput value={inputs.mygaTermYears} onChange={set("mygaTermYears")} min={1} max={20} width={62} />
+        </Field>
+        <Field label="Cash out at age" help="mygaCashOutAge">
+          <NumInput value={inputs.mygaCashOutAge} onChange={set("mygaCashOutAge")} min={0} max={95} width={70} />
+        </Field>
+      </Grid2>
+      <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 4 }}>
+        Cash-out age 0 = end of the first term. Set it later to model renewing (deferral compounds; a low-bracket retirement year helps).
+      </div>
     </>
   );
 }

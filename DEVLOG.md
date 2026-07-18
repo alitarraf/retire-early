@@ -95,6 +95,15 @@ risk mix. Phase 1 shipped; Phase 2 (529/Trump/annuity/dependents) next.
   Decision: keep calm core-accounts money step, no checkbox wall.
 - **487 green**, build clean.
 
+**Phase 2c (same day) — Annuities section, two types (added MYGA):** user's actual product was a
+MYGA (multi-year guaranteed annuity = "tax-deferred CD"), not the lifetime-income annuity first
+built. Added `mygaAnalysis` (PURE after-tax compounding, no sim): lump grows tax-deferred at the
+guaranteed rate; gains ordinary-income taxed +10% penalty pre-59½ at cash-out; compares to a taxable
+CD (its real rival) and to investing. `MygaBlock` in FundingOrderCard (shows in ANY mode incl.
+retired, since it's pure). Regrouped the card + `StrategyFields` into "Annuities — should you?" with
+**1 · Lifetime income annuity** and **2 · Fixed annuity (MYGA)**. Docs table split into SPIA vs MYGA
+rows. **492 green**, build clean.
+
 ## Session: 2026-07-13 — Connected charts: Asset-mix lens + mix-at-milestones
 
 **PRD:** `docs/PRD_ConnectedCharts_July2026.md` (Threads 3+2 of the

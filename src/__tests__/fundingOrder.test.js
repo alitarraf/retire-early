@@ -228,4 +228,14 @@ describe("mygaAnalysis: fixed annuity / tax-deferred CD", () => {
   it("cash-out age 0 defaults to the end of the first term", () => {
     expect(mygaAnalysis(p({ currentAge: 50, mygaCashOutAge: 0 })).cashOutAge).toBe(53);
   });
+
+  it("Treasury line is state-exempt → never worse than a CD at the same rate, and tracks its yield", () => {
+    // Same rate: Treasury is taxed federal-only, a CD is taxed fed+state → Treasury ≥ CD.
+    const m = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 5, treasuryRate: 5 }));
+    expect(m.treasuryNet).toBeGreaterThanOrEqual(m.cdNet);
+    expect(m.treasuryRate).toBe(5);
+    const hi = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, treasuryRate: 6 }));
+    const lo = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, treasuryRate: 3 }));
+    expect(hi.treasuryNet).toBeGreaterThan(lo.treasuryNet);
+  });
 });

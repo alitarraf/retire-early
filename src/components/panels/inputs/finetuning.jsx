@@ -197,8 +197,13 @@ export function StrategyFields({ inputs, set, plan }) {
           <NumInput value={inputs.mygaCashOutAge} onChange={set("mygaCashOutAge")} min={0} max={95} width={70} />
         </Field>
       </Grid2>
+      <Grid2>
+        <Field label="Treasury yield %" help="treasuryRate">
+          <NumInput value={inputs.treasuryRate} onChange={set("treasuryRate")} suffix="%" step={0.1} width={70} />
+        </Field>
+      </Grid2>
       <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 4 }}>
-        Cash-out age 0 = end of the first term. Set it later to model renewing (deferral compounds; a low-bracket retirement year helps).
+        The card compares the MYGA to a CD (your cash rate), Treasuries (state-tax-free), munis (tax-free) and stocks. Cash-out age 0 = end of the first term; set it later to model renewing.
       </div>
     </>
   );

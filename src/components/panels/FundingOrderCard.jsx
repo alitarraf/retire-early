@@ -248,6 +248,7 @@ function MygaBlock({ myga }) {
       <div style={{ display: "flex", gap: 14, margin: "8px 0 6px", flexWrap: "wrap" }}>
         <Stat label={`MYGA ${myga.rate}%`} value={fmt(myga.mygaNet)} accent />
         <Stat label={`CD ${myga.cdRate}%`} value={fmt(myga.cdNet)} />
+        <Stat label={`Treasury ${myga.treasuryRate}%`} value={fmt(myga.treasuryNet)} />
         <Stat label={`Munis ${myga.muniRate}%`} value={fmt(myga.muniNet)} />
         <Stat label={`Stocks ${myga.stockRate}%`} value={fmt(myga.eqNet)} />
       </div>

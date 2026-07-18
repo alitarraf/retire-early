@@ -120,6 +120,11 @@ export const FIELD_HELP = {
     label: "MYGA cash-out age",
     context: "The age you actually take the money (0 = end of the first term). Setting it past the term models renewing — the tax deferral compounds, and cashing out in a low-bracket retirement year (and after 59½) helps most.",
   },
+  treasuryRate: {
+    label: "Treasury yield",
+    context:
+      "The yield on Treasuries/T-bills for the MYGA comparison. Treasury interest is federal-taxable but state-tax-EXEMPT — so in a high-tax state a Treasury can beat a CD at the same rate. Munis are tax-free at both levels.",
+  },
   spouseSsAge: {
     label: "Spouse SS at",
     context: "The age your spouse claims Social Security. Their benefit is added to the household pool at that age.",

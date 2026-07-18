@@ -52,7 +52,7 @@ function heroFmt(n) {
   return fmt(n);
 }
 
-export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, funding, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, marginalRows, embedded = false }) {
+export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, funding, totalAtRetirement, sustainable, dynamicOpt, onApplyOptimized, scenario, mcResult = null, onRunMc, atRetirement, embedded = false }) {
   const { snaps, estateGainTax = 0 } = result;
   const endVal = (snaps[snaps.length - 1]?.total ?? 0) - estateGainTax;
 
@@ -284,9 +284,9 @@ export function MaximizeCenter({ plan, result, earliestByRisk, onPickRisk, fundi
       {detailsOpen && (
         <>
           <AllocationCard plan={plan} earliestByRisk={earliestByRisk} onPickRisk={onPickRisk} embedded={embedded} />
-          <FundingOrderCard plan={plan} rec={funding?.rec} onApply={funding?.onApply} embedded={embedded} />
+          <FundingOrderCard plan={plan} onApply={funding?.onApply} embedded={embedded} />
           <ProjectedBalancesCard plan={plan} atRetirement={atRetirement} />
-          <MarginalValueCard plan={plan} marginalRows={marginalRows} />
+          <MarginalValueCard plan={plan} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />
           <TaxTransparency plan={plan} result={result} />

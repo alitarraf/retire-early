@@ -71,6 +71,14 @@ export const DEFAULTS = {
   existingBrokerageBasis: 0,
   brokerageMonthlyContrib: 0, // ongoing $/mo into taxable brokerage
 
+  // Deferred annuity (Phase 2b) — a "should I?" comparison, not a baked-in sleeve.
+  // Contributions grow at a guaranteed rate to the start age, then annuitize into
+  // a fixed lifetime income stream (ordinary-income tax). 0 contrib = feature off.
+  annuityContribAnnual: 0,  // $/yr you'd route to a deferred annuity instead of your portfolio
+  annuityStartAge: 65,      // age the guaranteed income begins
+  annuityRate: 4.5,         // guaranteed accumulation return (%) — annuities pay conservative rates
+  annuityPayoutRate: 6.0,   // annual payout as % of the annuity value at start (SPIA-style)
+
   // Tax
   employmentBracket: 22,
   ltcgBracket: 15, // manual LTCG rate; only used when autoLtcg is false

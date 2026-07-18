@@ -4,7 +4,6 @@ import { earliestRetireAge } from "./analysis/earliestRetireAge.js";
 import { profileEarliestAges } from "./analysis/allocationCompare.js";
 import { retireByAge } from "./analysis/retireByAge.js";
 import { sensitivity } from "./analysis/sensitivity.js";
-import { marginalValues } from "./analysis/marginalValue.js";
 import { recommendedFunding, fundingContribOverrides } from "./analysis/fundingOrder.js";
 import { dynamicOptimizer } from "./analysis/dynamicOptimizer.js";
 import { sustainableSpend } from "./analysis/sustainableSpend.js";
@@ -124,16 +123,13 @@ export default function App() {
   const pickRisk = (key) =>
     setInputs((prev) => ({ ...prev, allocationEnabled: true, riskProfile: key, pinAllocation: false }));
 
-  // Funding order (account-location axis): engine-derived order for re-routing
-  // the SAME savings — each account ranked by its marginal effect on sustainable
-  // spend (bridge-aware: a locked 401k sinks for early retirees). Runs a handful
-  // of drawdown searches, so it's memoized on `plan` (frozen during a slider drag)
-  // like earliestByRisk. Apply writes the split onto the contribution inputs and
-  // the projection chart + verdict re-shape.
-  const fundingRec = useMemo(() => recommendedFunding(plan), [plan]);
+  // Funding order (account-location axis): the recommendation runs drawdown
+  // searches, so it's computed INSIDE FundingOrderCard (which mounts only when
+  // "Show details" is open) — not here — to keep the retire-age slider snappy.
+  // App only owns the Apply action (writes the split onto the contribution inputs).
   const applyFunding = () =>
     setInputs((prev) => ({ ...prev, ...fundingContribOverrides(recommendedFunding(makePlan(prev))) }));
-  const funding = { rec: fundingRec, onApply: applyFunding };
+  const funding = { onApply: applyFunding };
   const sensitivityRows = useMemo(
     () => (mode === "early" && !retired ? sensitivity(plan) : []),
     [plan, mode, retired],
@@ -210,7 +206,6 @@ export default function App() {
 
   // Maximize-mode analysis (the optimizer also powers the retiree dashboard's
   // "this year's moves" card, so it runs in retired mode on any tab)
-  const marginalRows = useMemo(() => (mode === "maximize" ? marginalValues(plan) : []), [plan, mode]);
   const dynamicOpt = useMemo(
     () => (mode === "maximize" || retired ? dynamicOptimizer(plan) : null),
     [plan, mode, retired],
@@ -343,7 +338,6 @@ export default function App() {
           appliedLevers={appliedLevers}
           undoLevers={undoLevers}
           atRetirement={liveAtRetirement}
-          marginalRows={marginalRows}
           dynamicOpt={dynamicOpt}
           applyOptimized={applyOptimized}
           onRunMc={() => setMaxMcOn(true)}
@@ -546,7 +540,6 @@ export default function App() {
                   mcResult={mcResult}
                   onRunMc={() => setMaxMcOn(true)}
                   atRetirement={liveAtRetirement}
-                  marginalRows={marginalRows}
                   funding={funding}
                 />
               )}

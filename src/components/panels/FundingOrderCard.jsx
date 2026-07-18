@@ -17,7 +17,8 @@
 //  contribution inputs. Retired / zero-savings → shows where money sits.
 // ─────────────────────────────────────────────────────────────
 
-import { currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
+import { useMemo } from "react";
+import { recommendedFunding, currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
 import { fmt, fmtK } from "../../format.js";
 
 // Tax-character palette — encodes a true fact (which dollars grow tax-free),
@@ -101,7 +102,11 @@ function BalanceView({ plan, style }) {
   );
 }
 
-export function FundingOrderCard({ plan, rec, onApply, embedded = false }) {
+export function FundingOrderCard({ plan, onApply, embedded = false }) {
+  // Computed here (not in App) so the drawdown searches only run when this card
+  // is actually mounted — it lives inside "Show details", collapsed by default,
+  // so a slider drag with details closed costs nothing.
+  const rec = useMemo(() => recommendedFunding(plan), [plan]);
   const style = { ...cardStyle, ...(embedded ? { margin: "14px 0 0" } : null) };
   if (!rec || !rec.available) return <BalanceView plan={plan} style={style} />;
 

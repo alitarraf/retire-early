@@ -241,7 +241,7 @@ function Results(props) {
   const {
     mode, plan, result, earliest, earliestByRisk, onPickRisk, funding, mcResult, scenario, totalAtRetirement, sustainable, retireBy,
     sensitivityRows, applyLever, appliedLevers, undoLevers,
-    atRetirement, marginalRows, dynamicOpt, applyOptimized, onRunMc,
+    atRetirement, dynamicOpt, applyOptimized, onRunMc,
     inputs,
   } = props;
 
@@ -301,7 +301,6 @@ function Results(props) {
         mcResult={mcResult}
         onRunMc={onRunMc}
         atRetirement={atRetirement}
-        marginalRows={marginalRows}
         funding={funding}
       />
     );

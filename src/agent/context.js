@@ -17,6 +17,7 @@
 import { fmt } from "../format.js";
 import { renderChangeLogForContext } from "./changeLog.js";
 import { allocationAt } from "../engine/allocation.js";
+import { annualSavingsBudget } from "../analysis/fundingOrder.js";
 
 // Keep this many of the most recent turns verbatim (a turn = one message).
 export const VERBATIM_MESSAGES = 12; // ~6 user/assistant exchanges
@@ -46,6 +47,11 @@ export function buildPlanContext(inputs, plan, results = {}, changeLog = []) {
     );
   } else {
     L.push(`- Allocation: not modeled (flat ${inputs.stockReturn}% growth). Enable it and pick a risk profile with set_allocation.`);
+  }
+  if (!plan.alreadyRetired) {
+    const budget = annualSavingsBudget(plan);
+    if (budget > 0)
+      L.push(`- Funding order: saving ~${fmt(Math.round(budget))}/yr across accounts. Re-route the SAME budget tax-optimally (match → HSA → Roth → 401k → brokerage overflow) with route_savings.`);
   }
   L.push(`- Scenario overlay: ${inputs.scenarioMode}.`);
   if (results.tab) L.push(`- Dashboard tab the user is viewing: ${results.tab} (switchable via set_view).`);

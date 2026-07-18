@@ -22,6 +22,7 @@ import { historicalSequence } from "../analysis/historicalSequence.js";
 import { sensitivity } from "../analysis/sensitivity.js";
 import { marginalValues } from "../analysis/marginalValue.js";
 import { retireByAge } from "../analysis/retireByAge.js";
+import { recommendedFunding, fundingContribOverrides } from "../analysis/fundingOrder.js";
 import { monteCarlo } from "../engine/monteCarlo.js";
 import { RISK_PROFILE_KEYS } from "../engine/allocation.js";
 import { HISTORICAL_SCENARIOS } from "../constants/historicalReturns.js";
@@ -472,7 +473,7 @@ export const TOOL_REGISTRY = {
   run_analysis: {
     kind: "read",
     description:
-      "Run one of the dashboard's deeper analyses: 'sensitivity' = which levers buy the most years of earlier retirement; 'marginal_value' = where the next $1k/yr of savings adds the most end-of-life estate; 'retire_by_age' = what it takes (extra monthly savings or lower spending) to retire at a target age. Returns compact rows.",
+      "Run one of the dashboard's deeper analyses: 'sensitivity' = which levers buy the most years of earlier retirement; 'marginal_value' = where the next $1k/yr of savings adds the most SUSTAINABLE MONTHLY SPENDING (bridge-aware — a 401k locked until 59½ scores low for an early retiree; shares its objective with the funding-order card); 'retire_by_age' = what it takes (extra monthly savings or lower spending) to retire at a target age. Returns compact rows.",
     schema: {
       type: {
         type: "string",
@@ -495,7 +496,7 @@ export const TOOL_REGISTRY = {
       }
       if (type === "marginal_value") {
         const rows = marginalValues(plan)
-          .map((r) => ({ label: r.label, estateGain: Math.round(r.gain) }))
+          .map((r) => ({ label: r.label, monthlySpendGain: Math.round(r.gain) }))
           .slice(0, 10);
         return { type, rows };
       }
@@ -514,6 +515,35 @@ export const TOOL_REGISTRY = {
         };
       }
       throw new Error("type must be one of: sensitivity, marginal_value, retire_by_age.");
+    },
+  },
+
+  route_savings: {
+    kind: "write",
+    description:
+      "Route the user's ANNUAL SAVINGS across accounts in tax-optimal order (the 'funding order' waterfall): emergency cash buffer → capture the employer 401k match → max the HSA → fund the Roth IRA → max the 401k → overflow to taxable brokerage, each filled to its IRS limit. Re-allocates the SAME total savings (no new saving) to cut tax drag. Use when the user asks where to put their money, how to split their contributions, or which accounts to prioritize. Respects the risk profile (aggressive fills Roth before maxing the 401k). Rejects if the user is already retired / not saving. Writes the per-account contribution inputs; staged for confirmation.",
+    schema: {},
+    returnKeys: ["status", "changes"],
+    writeKind: "inputs",
+    buildProposal(_args, plan) {
+      const rec = recommendedFunding(plan);
+      if (!rec.available) {
+        throw new Error("There's nothing to route — this plan has no annual savings (already retired or zero contributions).");
+      }
+      const patch = fundingContribOverrides(rec);
+      const changes = [];
+      const payload = {};
+      for (const [field, to] of Object.entries(patch)) {
+        const from = plan[field] ?? 0;
+        if (Math.abs(to - from) > 0.5) {
+          changes.push({ field, from, to, scope: "input" });
+          payload[field] = to;
+        }
+      }
+      if (changes.length === 0) {
+        throw new Error("The savings are already routed in the recommended tax-optimal order — no change needed.");
+      }
+      return { kind: "inputs", changes, payload };
     },
   },
 

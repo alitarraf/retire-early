@@ -65,12 +65,16 @@ export const FED_BRACKETS = {
 };
 
 // 2026 contribution limits (under age-50 base, no catch-up).
+// Catch-ups per IRS Notice 2025-67; verify against final IRS pubs each tax year.
 export const CONTRIB_LIMITS = {
   k401: 24500,
+  k401Catchup50: 8000,   // additional elective-deferral catch-up at age 50+ (→ $32,500)
+  k401Catchup60: 11250,  // SECURE 2.0 super catch-up, ages 60–63 (REPLACES the 50+ amount → $35,750)
   rothIra: 7500,
-  hsaIndividual: 4300,  // 2026 HSA limit (self-only)
-  hsaFamily: 8550,      // 2026 HSA limit (family)
-  hsaCatchup: 1000,     // additional catch-up at age 55+
+  rothIraCatchup50: 1100, // additional IRA catch-up at age 50+ (→ $8,600; no 60–63 super catch-up for IRAs)
+  hsaIndividual: 4300,   // 2026 HSA limit (self-only)
+  hsaFamily: 8550,       // 2026 HSA limit (family)
+  hsaCatchup: 1000,      // additional catch-up at age 55+
 };
 
 // Long-term capital-gains rate options offered in the UI (manual override

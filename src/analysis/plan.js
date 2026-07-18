@@ -200,6 +200,8 @@ export function projectTo(plan, yrs, overrides = {}) {
   const rothExtra = overrides.rothAnnual ?? 0;
   const muniExtra = overrides.muniAdd ?? 0;
   const brokerageExtra = overrides.brokerageAnnual ?? 0;
+  const hsaExtra = overrides.hsaAnnual ?? 0;
+  const cashExtra = overrides.cashAnnual ?? 0;
   // Ongoing user contributions (entered as $/mo, annualized here).
   const brokContribAnnual = (plan.brokerageMonthlyContrib ?? 0) * 12;
   const cashContribAnnual = (plan.cashMonthlyContrib ?? 0) * 12;
@@ -231,13 +233,13 @@ export function projectTo(plan, yrs, overrides = {}) {
       fvAnnuity(plan.total401kAnnual + k401Extra, yrs, eqRate),
     cashDeposit:
       plan.cashDeposit * Math.pow(1 + rC, yrs) +
-      fvAnnuity(cashContribAnnual, yrs, plan.depositAfterTaxRate),
+      fvAnnuity(cashContribAnnual + cashExtra, yrs, plan.depositAfterTaxRate),
     muniBonds:
       (plan.muniBonds + muniExtra) * Math.pow(1 + rM, yrs) +
       fvAnnuity(muniContribAnnual, yrs, plan.muniReturn),
     hsaBalance:
       (plan.hsaBalance ?? 0) * eqBalFactor +
-      fvAnnuity(plan.hsaAnnualContrib ?? 0, yrs, eqRate),
+      fvAnnuity((plan.hsaAnnualContrib ?? 0) + hsaExtra, yrs, eqRate),
   };
 }
 

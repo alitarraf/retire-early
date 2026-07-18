@@ -6,9 +6,12 @@
 //  • ProjectedBalancesCard / MarginalValueCard — per-account balances + next-$1k value
 //    (Maximize details). All three moved out of the rails when the chat became
 //    the permanent right column.
+import { useState, useMemo } from "react";
 import { fmt, pct } from "../../format.js";
 import { TAX_YEAR } from "../../constants/brackets.js";
 import { cardTitleStyle, phase as phaseColor } from "../../theme.js";
+import { Toggle } from "../ui.jsx";
+import { marginalValues } from "../../analysis/marginalValue.js";
 
 const cardStyle = {
   margin: "12px 14px 0",
@@ -215,23 +218,45 @@ export function ProjectedBalancesCard({ plan, atRetirement }) {
   );
 }
 
-// Marginal value — extra estate at death from adding $1k/yr to each account.
-// Moved here from the old Maximize rail; shown in Maximize "details".
+// Marginal value — extra value from adding $1k/yr to each account, under a lens
+// the user toggles: "While alive" = sustainable monthly spend (shares the Funding
+// Order card's objective, so they agree); "Leave behind" = estate at death. The
+// two can rank accounts differently — a locked 401k is strong for estate, weak for
+// early-retirement spending — which is exactly why both lenses are offered.
+// Shown in Maximize "details". `marginalRows` is the spend lens (memoized in App);
+// the estate lens is computed lazily only when selected.
 export function MarginalValueCard({ plan, marginalRows }) {
-  if (!marginalRows?.length) return null;
-  const maxGain = Math.max(...marginalRows.map((m) => m.gain), 1);
+  const [lens, setLens] = useState("spend");
+  const estateRows = useMemo(() => (lens === "estate" ? marginalValues(plan, { objective: "estate" }) : null), [plan, lens]);
+  const rows = lens === "estate" ? estateRows : marginalRows;
+  if (!rows?.length) return null;
+
+  const maxGain = Math.max(...rows.map((m) => m.gain), 1);
+  const spend = lens === "spend";
   return (
     <div style={cardStyle}>
-      <div style={labelStyle}>Where should your next $1,000/yr go?</div>
-      <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
-        Extra estate value at death from adding $1k/yr to each account — after taxes, growth, and drawdown.
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+        <div style={labelStyle}>Where should your next $1,000/yr go?</div>
+        <Toggle
+          value={lens}
+          onChange={setLens}
+          options={[
+            { value: "spend", label: "While alive" },
+            { value: "estate", label: "Leave behind" },
+          ]}
+        />
       </div>
-      {marginalRows.map(({ label, gain }) => (
+      <div style={{ fontSize: 10, color: "#9db4ae", marginBottom: 14, lineHeight: 1.5 }}>
+        {spend
+          ? "Ranked by the extra safe monthly spending each adds — maximize what you can spend while alive. Bridge-aware: a 401k you can't touch until 59½ scores low if you retire early."
+          : "Ranked by the extra estate each adds at death — maximize what you leave behind. A sleeve you never spend can rank higher here than under “While alive.”"}
+      </div>
+      {rows.map(({ label, gain }) => (
         <div key={label} style={{ marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
             <span style={{ fontSize: 11, color: "#4a5e58" }}>{label}</span>
             <span style={{ fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: "#3d8c78" }}>
-              +{fmt(Math.round(gain))}
+              +{fmt(Math.round(gain))}{spend ? "/mo" : ""}
             </span>
           </div>
           <div style={{ background: "#e2e8e6", borderRadius: 99, height: 4, overflow: "hidden" }}>
@@ -240,7 +265,9 @@ export function MarginalValueCard({ plan, marginalRows }) {
         </div>
       ))}
       <div style={{ fontSize: 10, color: "#9db4ae", lineHeight: 1.5, marginTop: 4 }}>
-        Gain = additional estate at age {plan.lifeExpect}. Full simulation per account.
+        {spend
+          ? `Gain = extra safe monthly spend. Full simulation per account.`
+          : `Gain = extra estate at age ${plan.lifeExpect}. Full simulation per account.`}
       </div>
     </div>
   );

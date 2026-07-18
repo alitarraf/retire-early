@@ -1,0 +1,170 @@
+// ─────────────────────────────────────────────────────────────
+//  FundingOrderCard — the ACCOUNT-LOCATION axis, woven in right below
+//  the AllocationCard (asset mix). Answers "where should this year's
+//  savings go?" with an order COMPUTED FROM THIS PLAN (see
+//  analysis/fundingOrder.js): each account ranked by its marginal effect
+//  on sustainable spend, so a locked 401k correctly sinks for early
+//  retirees. Because the order maximizes safe spend, Apply can only raise
+//  (or match) it.
+//
+//  Signature — "the cascade": priority-ordered account rows (the order IS
+//  the finding). Each row carries a capacity bar (dollars routed vs. its
+//  IRS cap), the % of the annual savings it takes, and its tax character
+//  as color (tax-free green → deferred mint → taxable muted).
+//
+//  Pure display: `rec` comes memoized from App (it runs drawdown searches).
+//  Read-only + one action: Apply re-routes the SAME budget onto the
+//  contribution inputs. Retired / zero-savings → shows where money sits.
+// ─────────────────────────────────────────────────────────────
+
+import { currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
+import { fmt, fmtK } from "../../format.js";
+
+// Tax-character palette — encodes a true fact (which dollars grow tax-free),
+// deliberately distinct from the stock/bond/cash greens above it.
+const TAX_COLOR = { [TAX_FREE]: "#3d8c78", [TAX_DEFERRED]: "#7ecfbb", taxable: "#9db4ae" };
+const FAINT = "#9db4ae";
+const INK = "#1a2e28";
+
+const cardStyle = { margin: "14px 14px 0", background: "#fff", borderRadius: 14, padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" };
+const eyebrowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: FAINT, marginBottom: 8 };
+const mono = "'JetBrains Mono', monospace";
+const roundMarks = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"];
+
+// A slim horizontal split bar (the "where it goes now" read).
+function SplitBar({ rows }) {
+  return (
+    <div style={{ display: "flex", height: 10, borderRadius: 99, overflow: "hidden", gap: 1, marginTop: 6 }}>
+      {rows.map((r) => (
+        <div key={r.key} title={`${r.label} ${Math.round(r.share * 100)}%`} style={{ width: `${r.share * 100}%`, background: TAX_COLOR[r.tax] ?? FAINT, minWidth: r.share > 0 ? 2 : 0 }} />
+      ))}
+    </div>
+  );
+}
+
+// One tier of the cascade: rank, label, capacity bar (routed vs. cap), % + $.
+function TierRow({ tier, budget }) {
+  const share = budget > 0 ? tier.amount / budget : 0;
+  const fill = tier.cap ? Math.min(1, tier.amount / tier.cap) : 1; // uncapped brokerage = full
+  const color = TAX_COLOR[tier.tax] ?? FAINT;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "16px 1fr 46px", gap: 10, alignItems: "center", padding: "5px 0" }}>
+      <div style={{ fontSize: 13, color: FAINT, fontFamily: mono }}>{roundMarks[tier.step - 1] ?? tier.step}</div>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+          <span style={{ color: INK, fontWeight: 600 }}>{tier.label}</span>
+          <span style={{ color: FAINT }}>
+            {tier.reason}
+            <span style={{ fontFamily: mono, marginLeft: 6 }}>
+              {fmtK(tier.amount)}{tier.cap ? (tier.filled ? " · full" : ` / ${fmtK(tier.cap)}`) : ""}
+            </span>
+          </span>
+        </div>
+        <div style={{ height: 7, borderRadius: 99, background: "#eef4f2", overflow: "hidden" }}>
+          <div style={{ width: `${fill * 100}%`, height: "100%", background: color, borderRadius: 99 }} />
+        </div>
+      </div>
+      <div style={{ textAlign: "right", fontSize: 14, fontWeight: 700, color: INK, fontFamily: mono }}>{Math.round(share * 100)}%</div>
+    </div>
+  );
+}
+
+function Dot({ color }) {
+  return <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: color, marginRight: 5, verticalAlign: "middle" }} />;
+}
+
+// Retired / not-saving: nothing to route — show where the money sits today.
+function BalanceView({ plan, style }) {
+  const bal = [
+    { key: "k401", label: "401(k)", tax: TAX_DEFERRED, amount: plan.k401Today ?? 0 },
+    { key: "roth", label: "Roth", tax: TAX_FREE, amount: plan.rothTotal ?? 0 },
+    { key: "hsa", label: "HSA", tax: TAX_FREE, amount: plan.hsaBalance ?? 0 },
+    { key: "brokerage", label: "Brokerage", tax: "taxable", amount: plan.existingBrokerage ?? 0 },
+    { key: "cash", label: "Cash", tax: "taxable", amount: plan.cashDeposit ?? 0 },
+    { key: "muni", label: "Muni", tax: "taxable", amount: plan.muniBonds ?? 0 },
+  ].filter((r) => r.amount > 0);
+  const total = bal.reduce((s, r) => s + r.amount, 0);
+  const rows = bal.map((r) => ({ ...r, share: total > 0 ? r.amount / total : 0 }));
+  return (
+    <div style={style}>
+      <div style={eyebrowStyle}><span>Where your money sits</span></div>
+      <SplitBar rows={rows} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", fontSize: 11, color: "#4a5e58", marginTop: 8 }}>
+        {rows.map((r) => <span key={r.key} style={{ fontFamily: mono }}>{r.label} {Math.round(r.share * 100)}%</span>)}
+      </div>
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>
+        {plan.alreadyRetired
+          ? "You're no longer contributing, so there's nothing to route. This is the tax mix of what you hold."
+          : "You're not adding to any account yet, so there's nothing to route. This is the tax mix of what you hold."}
+      </div>
+    </div>
+  );
+}
+
+export function FundingOrderCard({ plan, rec, onApply, embedded = false }) {
+  const style = { ...cardStyle, ...(embedded ? { margin: "14px 0 0" } : null) };
+  if (!rec || !rec.available) return <BalanceView plan={plan} style={style} />;
+
+  const now = currentSplit(plan);
+  const TAX_OF = { k401: TAX_DEFERRED, roth: TAX_FREE, hsa: TAX_FREE };
+  const nowRows = now.rows.map((r) => ({ ...r, tax: TAX_OF[r.key] ?? "taxable" }));
+  const gain = rec.impact?.delta ?? 0; // monthly sustainable-spend change
+  // Does applying actually change the split? (cheap, no sim) — so we never show a
+  // live "Apply" next to falsely-reassuring copy when there's a real move to make.
+  const patch = fundingContribOverrides(rec);
+  const changed = Object.entries(patch).some(([f, v]) => Math.abs((plan[f] ?? 0) - v) > 0.5);
+
+  return (
+    <div style={style}>
+      <div style={eyebrowStyle}>
+        <span>Funding order</span>
+        <span style={{ color: FAINT, letterSpacing: 0 }}>computed from your plan</span>
+      </div>
+
+      {now.total > 0 && (
+        <>
+          <div style={{ fontSize: 12, color: "#4a5e58" }}>
+            Where your <strong style={{ color: INK, fontFamily: mono }}>{fmtK(rec.budget)}/yr</strong> goes now:
+          </div>
+          <SplitBar rows={nowRows} />
+        </>
+      )}
+
+      <div style={{ fontSize: 11, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, margin: "14px 0 2px" }}>
+        Best order for your plan
+      </div>
+      {rec.tiers.map((t) => <TierRow key={`${t.key}-${t.step}`} tier={t} budget={rec.budget} />)}
+
+      {/* Color key: which dollars grow tax-free. */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", fontSize: 10.5, color: "#4a5e58", marginTop: 10 }}>
+        <span><Dot color={TAX_COLOR[TAX_FREE]} />Tax-free</span>
+        <span><Dot color={TAX_COLOR[TAX_DEFERRED]} />Tax-deferred</span>
+        <span><Dot color={TAX_COLOR.taxable} />Taxable</span>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+        {changed && (
+          <button type="button" onClick={onApply} style={{ border: "none", background: INK, color: "#dceee8", fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 9, cursor: "pointer" }}>
+            Apply this split
+          </button>
+        )}
+        <div style={{ fontSize: 11.5, color: "#4a5e58", flex: 1, minWidth: 170 }}>
+          {!changed ? (
+            <>This is already how your {fmtK(rec.budget)}/yr is split — nothing to change.</>
+          ) : gain > 60 ? (
+            <>Same {fmtK(rec.budget)}/yr → safe spend <strong style={{ color: "#3d8c78", fontFamily: mono }}>+{fmt(gain)}/mo</strong> (to {fmt(rec.impact.after)}/mo).</>
+          ) : (
+            <>Mostly this just captures your employer match — free money. The model shows little else, since it's locked until 59½.</>
+          )}
+        </div>
+      </div>
+
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 10, lineHeight: 1.5 }}>
+        Ranked by how much each account lifts your safe spending, from your plan — not a fixed rule.
+        The model scores the drawdown only (it doesn't credit the upfront deduction on pre-tax
+        401(k) beyond the match, so that can rank higher for you in a high bracket). Education
+        accounts (529, Trump), annuities and dependents come next.
+      </div>
+    </div>
+  );
+}

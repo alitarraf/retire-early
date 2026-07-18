@@ -31,6 +31,8 @@ const cardStyle = { margin: "14px 14px 0", background: "#fff", borderRadius: 14,
 const eyebrowStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: FAINT, marginBottom: 8 };
 const mono = "'JetBrains Mono', monospace";
 const roundMarks = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"];
+const SHORT_LABEL = { "Max HSA": "HSA", "Fund Roth IRA": "Roth", "Max 401(k)": "401k", "Taxable brokerage": "Brokerage", Treasuries: "Treasuries", "Fixed annuity (MYGA)": "MYGA" };
+const shortLabel = (l) => SHORT_LABEL[l] ?? l;
 
 // A slim horizontal split bar (the "where it goes now" read).
 function SplitBar({ rows }) {
@@ -142,6 +144,16 @@ export function FundingOrderCard({ plan, onApply, embedded = false }) {
         Best order for your plan
       </div>
       {rec.tiers.map((t) => <TierRow key={`${t.key}-${t.step}`} tier={t} budget={rec.budget} />)}
+
+      {rec.ranking && rec.ranking.length > 0 && (
+        <div style={{ fontSize: 10.5, color: FAINT, marginTop: 8, lineHeight: 1.6 }}>
+          <span style={{ fontWeight: 700 }}>Full return ranking</span> (every account, best→worst for growth):{" "}
+          {rec.ranking.map((r, i) => (
+            <span key={r.key} style={{ fontFamily: mono }}>{i > 0 ? " · " : ""}{i + 1} {shortLabel(r.label)}</span>
+          ))}
+          . Safe/fixed sleeves (Treasuries, MYGA) trail equities, so they're held &amp; drawn down but rarely take new savings.
+        </div>
+      )}
 
       {/* Color key: which dollars grow tax-free. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", fontSize: 10.5, color: "#4a5e58", marginTop: 10 }}>

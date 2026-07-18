@@ -106,7 +106,7 @@ export function recommendedFunding(plan) {
   };
   // True when the user has $0 in an account today — the recommendation still
   // names it (that's the value), flagged so the card can say "open one".
-  const held = { hsa: hasHsa, roth: (plan.rothTotal ?? 0) > 0 || (plan.rothAnnualContrib ?? 0) > 0, k401: (plan.k401Today ?? 0) > 0 || (plan.k401AnnualContrib ?? 0) > 0, brokerage: (plan.existingBrokerage ?? 0) > 0 || (plan.brokerageMonthlyContrib ?? 0) > 0 };
+  const held = { hsa: hasHsa, roth: (plan.rothTotal ?? 0) > 0 || (plan.rothAnnualContrib ?? 0) > 0, k401: (plan.k401Today ?? 0) > 0 || (plan.k401AnnualContrib ?? 0) > 0, brokerage: (plan.existingBrokerage ?? 0) > 0 || (plan.brokerageMonthlyContrib ?? 0) > 0, treasury: (plan.treasuryBalance ?? 0) > 0, myga: (plan.mygaCapital ?? 0) > 0 };
 
   // 1 — Emergency buffer (RULE, not engine-ranked): a deterministic drawdown
   //     can't price sequence-risk, so top cash toward N months of spending,
@@ -138,10 +138,19 @@ export function recommendedFunding(plan) {
     { key: "roth", field: "rothAnnualContrib", ov: "rothAnnual", label: "Fund Roth IRA", reason: held.roth ? "tax-free growth" : "tax-free growth · open one", tax: TAX_FREE, cap: caps.ira, needsOpen: !held.roth },
     { key: "k401", field: "k401AnnualContrib", ov: "k401Annual", label: "Max 401(k)", reason: "pre-tax, locked to 59½", tax: TAX_DEFERRED, cap: caps.k401, needsOpen: !held.k401 },
     { key: "brokerage", field: "brokerageMonthlyContrib", ov: "brokerageAnnual", label: "Taxable brokerage", reason: "flexible, accessible", tax: TAXABLE, cap: null, needsOpen: !held.brokerage },
+    // Safe/fixed sleeves — real accounts now, so the engine can rank them. They
+    // trail equities for growth, so they show in the full ranking but rarely take
+    // new savings in a maximize-return split.
+    { key: "treasury", field: "treasuryBalance", ov: "treasuryAnnual", label: "Treasuries", reason: "safe, state-tax-free", tax: "stateExempt", cap: null, needsOpen: !held.treasury },
+    { key: "myga", field: "mygaCapital", ov: "mygaAnnual", label: "Fixed annuity (MYGA)", reason: "guaranteed, tax-deferred", tax: TAX_DEFERRED, cap: null, needsOpen: !held.myga },
   ];
   for (const c of cand) c.marginal = Math.round(probe(c.ov) * 100) / 100;
   // Rank by marginal spend gain; stable tie-break keeps tax-free ahead of taxable.
   cand.sort((a, b) => b.marginal - a.marginal || rankHint(a) - rankHint(b));
+  // The FULL return ranking of every account (shown so the safe/fixed sleeves —
+  // Treasuries/MYGA — "translate to the funding order" once simulated, even though
+  // they trail equities and rarely take new savings).
+  const ranking = cand.map((c) => ({ key: c.key, label: c.label, tax: c.tax, marginal: c.marginal }));
   for (const c of cand) add(c);
 
   const leftover = Math.round(Math.max(0, remaining));
@@ -187,7 +196,7 @@ export function recommendedFunding(plan) {
   const baseSpend = sustainableSpend(plan, { iterations: IMPACT_ITERS });
   const impact = { base: Math.round(baseSpend), after: Math.round(afterSpend), delta: Math.round(afterSpend - baseSpend) };
 
-  return { budget, tiers, leftover, available: true, impact, kids, annuity };
+  return { budget, tiers, leftover, available: true, impact, kids, annuity, ranking };
 }
 
 /**

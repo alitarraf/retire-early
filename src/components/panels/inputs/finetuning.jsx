@@ -81,6 +81,7 @@ export function TaxesFields({ inputs, set, plan, previewWithdrawal: pwProp, setP
 }
 
 export function StrategyFields({ inputs, set, plan }) {
+  const expert = useExpertMode();
   return (
     <>
       <SubTitle>Roth conversion ladder</SubTitle>
@@ -152,6 +153,30 @@ export function StrategyFields({ inputs, set, plan }) {
           />
         </Field>
       </Grid2>
+
+      <Divider />
+      <SubTitle>Deferred annuity — should you?</SubTitle>
+      <div style={{ fontSize: 10, color: "#9db4ae", margin: "-4px 0 8px", lineHeight: 1.5 }}>
+        A "what if" comparison — the Funding Order card weighs routing this money to a guaranteed-income annuity vs. investing it.
+      </div>
+      <Grid2>
+        <Field label="Into an annuity /yr" help="annuityContribAnnual">
+          <NumInput value={inputs.annuityContribAnnual} onChange={set("annuityContribAnnual")} prefix="$" step={500} width={100} />
+        </Field>
+        <Field label="Income starts at age" help="annuityStartAge">
+          <NumInput value={inputs.annuityStartAge} onChange={set("annuityStartAge")} min={inputs.currentAge} max={85} width={70} />
+        </Field>
+      </Grid2>
+      {expert && (
+        <Grid2>
+          <Field label="Guaranteed rate %" help="annuityRate">
+            <NumInput value={inputs.annuityRate} onChange={set("annuityRate")} suffix="%" step={0.1} width={70} />
+          </Field>
+          <Field label="Payout rate %" help="annuityPayoutRate">
+            <NumInput value={inputs.annuityPayoutRate} onChange={set("annuityPayoutRate")} suffix="%" step={0.1} width={70} />
+          </Field>
+        </Grid2>
+      )}
     </>
   );
 }

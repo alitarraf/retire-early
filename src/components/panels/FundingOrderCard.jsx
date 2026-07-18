@@ -17,7 +17,8 @@
 //  contribution inputs. Retired / zero-savings → shows where money sits.
 // ─────────────────────────────────────────────────────────────
 
-import { currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
+import { useMemo } from "react";
+import { recommendedFunding, currentSplit, fundingContribOverrides, TAX_FREE, TAX_DEFERRED } from "../../analysis/fundingOrder.js";
 import { fmt, fmtK } from "../../format.js";
 
 // Tax-character palette — encodes a true fact (which dollars grow tax-free),
@@ -101,7 +102,11 @@ function BalanceView({ plan, style }) {
   );
 }
 
-export function FundingOrderCard({ plan, rec, onApply, embedded = false }) {
+export function FundingOrderCard({ plan, onApply, embedded = false }) {
+  // Computed here (not in App) so the drawdown searches only run when this card
+  // is actually mounted — it lives inside "Show details", collapsed by default,
+  // so a slider drag with details closed costs nothing.
+  const rec = useMemo(() => recommendedFunding(plan), [plan]);
   const style = { ...cardStyle, ...(embedded ? { margin: "14px 0 0" } : null) };
   if (!rec || !rec.available) return <BalanceView plan={plan} style={style} />;
 
@@ -163,9 +168,54 @@ export function FundingOrderCard({ plan, rec, onApply, embedded = false }) {
         Ranked by how much each account lifts your safe spending, from your plan — not a fixed rule.
         The model scores the drawdown only (it doesn't credit the upfront deduction on pre-tax
         401(k) beyond the match, so that can rank higher for you in a high bracket).
+        {rec.tiers.some((t) => t.key === "hsa" && t.needsOpen) && (
+          <> An <strong>HSA</strong> is your strongest account here but needs an HSA-eligible (high-deductible) health plan to open.</>
+        )}
       </div>
 
       {rec.kids && rec.kids.tiers.length > 0 && <KidsBlock kids={rec.kids} plan={plan} />}
+      {rec.annuity && <AnnuityBlock annuity={rec.annuity} plan={plan} />}
+    </div>
+  );
+}
+
+// Deferred annuity: an honest "should I?" comparison. The model reuses the income-
+// stream machinery, so it shows what the app believes — annuities usually lag a
+// diversified portfolio; their value is guaranteed income you can't outlive.
+function AnnuityBlock({ annuity, plan }) {
+  const lags = annuity.delta < 0;
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px dashed #dbe6e2" }}>
+      <div style={{ fontSize: 11, color: FAINT, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, marginBottom: 6 }}>
+        Deferred annuity · should you?
+      </div>
+      <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
+        {fmtK(annuity.contrib)}/yr would buy about <strong style={{ color: INK, fontFamily: mono }}>{fmt(annuity.income)}/mo</strong> of
+        guaranteed income from age {annuity.startAge}.
+      </div>
+      <div style={{ display: "flex", gap: 18, margin: "8px 0 6px", flexWrap: "wrap" }}>
+        <Stat label="Annuity route" value={`${fmt(annuity.sAnnuity)}/mo`} />
+        <Stat label="Invest it instead" value={`${fmt(annuity.sPortfolio)}/mo`} accent />
+      </div>
+      <div style={{ fontSize: 11.5, color: "#4a5e58", lineHeight: 1.5 }}>
+        {lags ? (
+          <>In this model, investing the same money supports <strong style={{ color: "#3d8c78", fontFamily: mono }}>{fmt(-annuity.delta)}/mo</strong> more
+          safe spending than the annuity — its gains are taxed as ordinary income with no step-up. The annuity's real edge is
+          guaranteed income you can't outlive (a longevity hedge), not growth.</>
+        ) : (
+          <>Here the annuity edges out investing by <strong style={{ color: "#3d8c78", fontFamily: mono }}>{fmt(annuity.delta)}/mo</strong> —
+          usually that means a long horizon or heavy reliance on guaranteed income. Still a longevity hedge, not a growth play.</>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }) {
+  return (
+    <div>
+      <div style={{ fontSize: 15, fontWeight: 700, fontFamily: mono, color: accent ? "#3d8c78" : INK }}>{value}</div>
+      <div style={{ fontSize: 10, color: FAINT }}>{label}</div>
     </div>
   );
 }

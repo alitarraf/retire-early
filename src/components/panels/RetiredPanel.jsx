@@ -246,7 +246,7 @@ export function RetiredPanel({ plan, result, mcResult, scenario, totalAtRetireme
       {detailsOpen && (
         <>
           <AllocationCard plan={plan} earliestByRisk={null} onPickRisk={onPickRisk} embedded={embedded} />
-          <FundingOrderCard plan={plan} rec={funding?.rec} onApply={funding?.onApply} embedded={embedded} />
+          <FundingOrderCard plan={plan} onApply={funding?.onApply} embedded={embedded} />
           <PhaseBreakdownCard plan={plan} result={result} />
           <MonteCarloCard mcResult={mcResult} plan={plan} runs={500} />
           <ScenarioCard scenario={scenario} plan={plan} />

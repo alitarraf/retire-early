@@ -86,6 +86,23 @@ export const FIELD_HELP = {
     context:
       "Dollars per year you set aside for kids' education. It's diverted from your own retirement savings, so the Funding Order tool shows both the tax-smart split (Coverdell → 530A Trump → 529) and what it costs your own safe spending.",
   },
+  annuityContribAnnual: {
+    label: "Into an annuity /yr",
+    context:
+      "A 'what if' amount — the Funding Order card compares routing this to a deferred annuity (guaranteed income) vs. investing it. In this model a diversified portfolio usually wins; the annuity's edge is income you can't outlive. 0 = off.",
+  },
+  annuityStartAge: {
+    label: "Annuity income start age",
+    context: "The age the deferred annuity begins paying its fixed lifetime income.",
+  },
+  annuityRate: {
+    label: "Annuity guaranteed rate",
+    context: "The guaranteed accumulation return the annuity credits before payout — deliberately conservative (annuities trade growth for a guarantee).",
+  },
+  annuityPayoutRate: {
+    label: "Annuity payout rate",
+    context: "Annual income as a % of the annuity's value at the start age (SPIA-style, e.g. ~6% at 65). Higher for older start ages.",
+  },
   spouseSsAge: {
     label: "Spouse SS at",
     context: "The age your spouse claims Social Security. Their benefit is added to the household pool at that age.",

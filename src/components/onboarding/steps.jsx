@@ -310,6 +310,18 @@ function Depth({ vals, set, setMany, nav }) {
         </WizField>
       </DepthCard>
 
+      <DepthCard emoji="🎓" title="Saving for kids' education" open={open === "kids"} onToggle={() => toggle("kids")}>
+        <Guide>Money for the kids comes out of your own savings — Reti splits it tax-smart (Coverdell → 530A Trump → 529) and shows what it costs your retirement.</Guide>
+        <WizField label="How many kids are you saving for?">
+          <NumInput value={vals.numDependents} onChange={set("numDependents")} min={0} max={10} width={70} />
+        </WizField>
+        {vals.numDependents > 0 && (
+          <WizField label="Saving for them each year">
+            <NumInput value={vals.educationAnnualContrib} onChange={set("educationAnnualContrib")} prefix="$" step={500} width={110} />
+          </WizField>
+        )}
+      </DepthCard>
+
       <DepthCard emoji="💰" title="Pension, annuity or part-time income" open={open === "inc"} onToggle={() => toggle("inc")}>
         <div style={lbl}>Income streams</div>
         <StreamEditor value={vals.incomeStreams} onChange={set("incomeStreams")} kind="income" defaultStartAge={startAge} />

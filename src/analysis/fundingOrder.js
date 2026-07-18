@@ -27,6 +27,7 @@
 import { CONTRIB_LIMITS, KIDS_LIMITS } from "../constants/brackets.js";
 import { makePlan } from "./plan.js";
 import { sustainableSpend } from "./sustainableSpend.js";
+import { fvAnnuity } from "../engine/accounts.js";
 
 const EMERGENCY_MONTHS = 6; // cash buffer target (months of spending)
 const EMERGENCY_MAX_SHARE = 0.2; // never let the buffer eat >20% of a year's savings
@@ -88,7 +89,7 @@ export function recommendedFunding(plan) {
   let remaining = budget;
   let k401Used = 0;
   const tiers = [];
-  const add = ({ key, field, label, reason, tax, cap, marginal = null }) => {
+  const add = ({ key, field, label, reason, tax, cap, marginal = null, needsOpen = false }) => {
     if (remaining <= 0) return;
     const room = cap == null ? remaining : Math.max(0, cap - (key === "k401" ? k401Used : 0));
     const amount = Math.min(remaining, room);
@@ -97,12 +98,15 @@ export function recommendedFunding(plan) {
     if (key === "k401") k401Used += amount;
     tiers.push({
       step: tiers.length + 1,
-      key, field, label, reason, tax, marginal,
+      key, field, label, reason, tax, marginal, needsOpen,
       amount: Math.round(amount),
       cap: cap == null ? null : Math.round(cap),
       filled: cap != null && amount >= room - 0.5,
     });
   };
+  // True when the user has $0 in an account today — the recommendation still
+  // names it (that's the value), flagged so the card can say "open one".
+  const held = { hsa: hasHsa, roth: (plan.rothTotal ?? 0) > 0 || (plan.rothAnnualContrib ?? 0) > 0, k401: (plan.k401Today ?? 0) > 0 || (plan.k401AnnualContrib ?? 0) > 0, brokerage: (plan.existingBrokerage ?? 0) > 0 || (plan.brokerageMonthlyContrib ?? 0) > 0 };
 
   // 1 — Emergency buffer (RULE, not engine-ranked): a deterministic drawdown
   //     can't price sequence-risk, so top cash toward N months of spending,
@@ -126,12 +130,15 @@ export function recommendedFunding(plan) {
   //      exactly why a locked 401k drops out for early retirees).
   const base = sustainableSpend(plan, { iterations: RANK_ITERS });
   const probe = (ov) => sustainableSpend(plan, { iterations: RANK_ITERS, overrides: { [ov]: BUMP } }) - base;
+  // Every account is ranked whether or not the user holds one — recommending a
+  // better account they haven't opened (esp. the HSA) IS the value. `needsOpen`
+  // lets the card flag it; HSA also carries an HDHP-eligibility caveat.
   const cand = [
-    hasHsa && { key: "hsa", field: "hsaAnnualContrib", ov: "hsaAnnual", label: "Max HSA", reason: "triple tax-free", tax: TAX_FREE, cap: caps.hsa },
-    { key: "roth", field: "rothAnnualContrib", ov: "rothAnnual", label: "Fund Roth IRA", reason: "tax-free growth", tax: TAX_FREE, cap: caps.ira },
-    { key: "k401", field: "k401AnnualContrib", ov: "k401Annual", label: "Max 401(k)", reason: "pre-tax, locked to 59½", tax: TAX_DEFERRED, cap: caps.k401 },
-    { key: "brokerage", field: "brokerageMonthlyContrib", ov: "brokerageAnnual", label: "Taxable brokerage", reason: "flexible, accessible", tax: TAXABLE, cap: null },
-  ].filter(Boolean);
+    { key: "hsa", field: "hsaAnnualContrib", ov: "hsaAnnual", label: "Max HSA", reason: held.hsa ? "triple tax-free" : "triple tax-free · open one", tax: TAX_FREE, cap: caps.hsa, needsOpen: !held.hsa },
+    { key: "roth", field: "rothAnnualContrib", ov: "rothAnnual", label: "Fund Roth IRA", reason: held.roth ? "tax-free growth" : "tax-free growth · open one", tax: TAX_FREE, cap: caps.ira, needsOpen: !held.roth },
+    { key: "k401", field: "k401AnnualContrib", ov: "k401Annual", label: "Max 401(k)", reason: "pre-tax, locked to 59½", tax: TAX_DEFERRED, cap: caps.k401, needsOpen: !held.k401 },
+    { key: "brokerage", field: "brokerageMonthlyContrib", ov: "brokerageAnnual", label: "Taxable brokerage", reason: "flexible, accessible", tax: TAXABLE, cap: null, needsOpen: !held.brokerage },
+  ];
   for (const c of cand) c.marginal = Math.round(probe(c.ov) * 100) / 100;
   // Rank by marginal spend gain; stable tie-break keeps tax-free ahead of taxable.
   cand.sort((a, b) => b.marginal - a.marginal || rankHint(a) - rankHint(b));
@@ -151,6 +158,28 @@ export function recommendedFunding(plan) {
     kids = { ...kidsFundingSplit(plan), cost: Math.max(0, Math.round(withRedirect - base)) };
   }
 
+  // Deferred annuity (Phase 2b): a "should I?" comparison — route this money to a
+  // guaranteed-income annuity vs. your best portfolio account. Reuses the tested
+  // income-stream machinery (no simulate draw-order change), so it's honest about
+  // the app's stance: annuities usually lag a diversified portfolio, their value
+  // is income you can't outlive.
+  let annuity = null;
+  const annContrib = Math.round(plan.annuityContribAnnual ?? 0);
+  if (annContrib > 0) {
+    const stream = deferredAnnuityStream(plan);
+    const bestOv = cand[0]?.ov ?? "brokerageAnnual";
+    const sAnnuity = sustainableSpend(plan, { iterations: RANK_ITERS, overrides: { incomeStreams: [...(plan.incomeStreams ?? []), stream] } });
+    const sPortfolio = sustainableSpend(plan, { iterations: RANK_ITERS, overrides: { [bestOv]: annContrib } });
+    annuity = {
+      contrib: annContrib,
+      startAge: plan.annuityStartAge,
+      income: Math.round(stream.monthly),
+      sAnnuity: Math.round(sAnnuity),
+      sPortfolio: Math.round(sPortfolio),
+      delta: Math.round(sAnnuity - sPortfolio), // >0 = annuity wins (rare); <0 = portfolio wins
+    };
+  }
+
   // Payoff: sustainable spend at the recommended split vs. today's — non-negative
   // by construction for the growth tiers (the rule tiers may trim it slightly).
   const after = makePlan({ ...plan, ...fundingContribOverrides({ tiers }) });
@@ -158,7 +187,22 @@ export function recommendedFunding(plan) {
   const baseSpend = sustainableSpend(plan, { iterations: IMPACT_ITERS });
   const impact = { base: Math.round(baseSpend), after: Math.round(afterSpend), delta: Math.round(afterSpend - baseSpend) };
 
-  return { budget, tiers, leftover, available: true, impact, kids };
+  return { budget, tiers, leftover, available: true, impact, kids, annuity };
+}
+
+/**
+ * The lifetime income stream a deferred annuity would pay: grow the yearly
+ * contribution at the guaranteed rate to the start age, then annuitize at the
+ * payout rate. Fixed nominal (cola:false), ordinary-income tax — the honest,
+ * least-favorable treatment. Pure. Reused as an incomeStream in the comparison.
+ */
+export function deferredAnnuityStream(plan) {
+  const contrib = Math.round(plan.annuityContribAnnual ?? 0);
+  const startAge = plan.annuityStartAge ?? 65;
+  const yrs = Math.max(0, startAge - (plan.currentAge ?? 0));
+  const value = fvAnnuity(contrib, yrs, plan.annuityRate ?? 4.5);
+  const monthly = (value * ((plan.annuityPayoutRate ?? 6) / 100)) / 12;
+  return { label: "Deferred annuity", monthly, startAge, endAge: null, cola: false, taxType: "ordinary" };
 }
 
 /**

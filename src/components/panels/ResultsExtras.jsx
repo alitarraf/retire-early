@@ -225,10 +225,12 @@ export function ProjectedBalancesCard({ plan, atRetirement }) {
 // early-retirement spending — which is exactly why both lenses are offered.
 // Shown in Maximize "details". `marginalRows` is the spend lens (memoized in App);
 // the estate lens is computed lazily only when selected.
-export function MarginalValueCard({ plan, marginalRows }) {
+export function MarginalValueCard({ plan }) {
   const [lens, setLens] = useState("spend");
-  const estateRows = useMemo(() => (lens === "estate" ? marginalValues(plan, { objective: "estate" }) : null), [plan, lens]);
-  const rows = lens === "estate" ? estateRows : marginalRows;
+  // Computed here (not in App) and keyed on the lens, so the marginal searches
+  // only run while this card is mounted (Maximize "details", collapsed by
+  // default) — keeping the retire-age slider snappy.
+  const rows = useMemo(() => marginalValues(plan, { objective: lens }), [plan, lens]);
   if (!rows?.length) return null;
 
   const maxGain = Math.max(...rows.map((m) => m.gain), 1);

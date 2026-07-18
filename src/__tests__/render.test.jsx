@@ -14,7 +14,6 @@ import { AdvicePanel } from "../components/panels/AdvicePanel.jsx";
 import { Onboarding } from "../components/onboarding/Onboarding.jsx";
 import { InfoDot } from "../components/ui.jsx";
 import { DEFAULTS, makePlan, runMain, simParamsAt, projectAtRetirement } from "../analysis/plan.js";
-import { marginalValues } from "../analysis/marginalValue.js";
 import { buildPlanSummary } from "../analysis/planSummary.js";
 import { dynamicOptimizer } from "../analysis/dynamicOptimizer.js";
 import { monteCarlo, buildHistogram } from "../engine/monteCarlo.js";
@@ -519,14 +518,14 @@ describe("render smoke tests", () => {
 
   it("MarginalValueCard renders the next-$1k bars without NaN", () => {
     const plan = makePlan(DEFAULTS);
-    const marginalRows = marginalValues(plan);
-    const html = renderToString(<MarginalValueCard plan={plan} marginalRows={marginalRows} />);
+    const html = renderToString(<MarginalValueCard plan={plan} />);
     expect(html).toContain("next $1,000");
     expect(html).not.toMatch(/NaN/);
   });
 
   it("MarginalValueCard and ProjectedBalancesCard no-op on missing data", () => {
-    expect(renderToString(<MarginalValueCard plan={makePlan(DEFAULTS)} marginalRows={[]} />)).toBe("");
+    // Retired plan → no future contributions to add → marginalValues returns [] → null.
+    expect(renderToString(<MarginalValueCard plan={makePlan({ ...DEFAULTS, alreadyRetired: true })} />)).toBe("");
     expect(renderToString(<ProjectedBalancesCard plan={makePlan(DEFAULTS)} atRetirement={null} />)).toBe("");
   });
 

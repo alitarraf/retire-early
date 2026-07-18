@@ -236,27 +236,28 @@ function Stat({ label, value, accent }) {
 // Fixed annuity / MYGA — a "tax-deferred CD". Pure after-tax comparison: the MYGA
 // vs. a taxable CD (its real rival) vs. investing (higher but risky).
 function MygaBlock({ myga }) {
-  const beatsCd = myga.vsCd > 0;
+  const beatsSafe = myga.vsBestSafe > 0;
   return (
     <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px dashed #dbe6e2" }}>
       <div style={{ fontSize: 11.5, color: INK, fontWeight: 700, marginBottom: 4 }}>
         2 · Fixed annuity (MYGA)
       </div>
       <div style={{ fontSize: 12, color: "#4a5e58", lineHeight: 1.6 }}>
-        <strong style={{ color: INK, fontFamily: mono }}>{fmtK(myga.capital)}</strong> at {myga.rate}% for {myga.years} {myga.years === 1 ? "year" : "years"}, cashed out at age {myga.cashOutAge}:
+        <strong style={{ color: INK, fontFamily: mono }}>{fmtK(myga.capital)}</strong> at {myga.rate}% for {myga.years} {myga.years === 1 ? "year" : "years"}, cashed out at age {myga.cashOutAge} — after-tax value vs. your other options:
       </div>
-      <div style={{ display: "flex", gap: 16, margin: "8px 0 6px", flexWrap: "wrap" }}>
-        <Stat label="MYGA (after tax)" value={fmt(myga.mygaNet)} accent />
-        <Stat label="Taxable CD" value={fmt(myga.cdNet)} />
-        <Stat label="Invested (risky)" value={fmt(myga.eqNet)} />
+      <div style={{ display: "flex", gap: 14, margin: "8px 0 6px", flexWrap: "wrap" }}>
+        <Stat label={`MYGA ${myga.rate}%`} value={fmt(myga.mygaNet)} accent />
+        <Stat label={`CD ${myga.cdRate}%`} value={fmt(myga.cdNet)} />
+        <Stat label={`Munis ${myga.muniRate}%`} value={fmt(myga.muniNet)} />
+        <Stat label={`Stocks ${myga.stockRate}%`} value={fmt(myga.eqNet)} />
       </div>
       <div style={{ fontSize: 11.5, color: "#4a5e58", lineHeight: 1.5 }}>
-        {beatsCd ? (
-          <>The tax-deferral nets <strong style={{ color: "#3d8c78", fontFamily: mono }}>{fmt(myga.vsCd)}</strong> more than a taxable CD here — the edge grows the longer you hold and the lower your bracket at cash-out.</>
+        {beatsSafe ? (
+          <>Best safe option: the MYGA nets <strong style={{ color: "#3d8c78", fontFamily: mono }}>{fmt(myga.vsBestSafe)}</strong> more than {myga.bestSafeLabel} here — the tax-deferral edge grows the longer you hold and the lower your bracket at cash-out.</>
         ) : (
-          <>A plain taxable CD actually nets <strong style={{ color: "#c97c1a", fontFamily: mono }}>{fmt(-myga.vsCd)}</strong> more here{myga.penaltyHit ? " — the 10% penalty for cashing out before 59½ outweighs the short-term deferral." : "."}</>
+          <>Here <strong>{myga.bestSafeLabel}</strong> actually beat the MYGA by <strong style={{ color: "#c97c1a", fontFamily: mono }}>{fmt(-myga.vsBestSafe)}</strong>{myga.penaltyHit ? " — the 10% penalty for cashing out before 59½ outweighs the deferral." : " (tax-free munis or a liquid CD, no surrender lock-up)."}</>
         )}{" "}
-        It's safe fixed income — investing instead could reach <span style={{ fontFamily: mono }}>{fmt(myga.eqNet)}</span>, but with market risk and no guarantee.
+        All three are safe; <strong>stocks</strong> could reach <span style={{ fontFamily: mono }}>{fmt(myga.eqNet)}</span> but with market risk and no guarantee.
       </div>
     </div>
   );

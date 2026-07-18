@@ -221,27 +221,36 @@ export function mygaAnalysis(plan) {
   const n = Math.max(1, cashOutAge - currentAge);
   const ord = (plan.accumulationOrdinaryRate ?? 0) / 100; // ordinary income rate (fed + state)
   const ltcg = (plan.brokerageLtcgRate ?? 0) / 100;
-  const g = (plan.mygaRate ?? 5) / 100;
-  const eq = (plan.stockReturn ?? 10) / 100;
+  const grow = (ratePct) => capital * Math.pow(1 + (ratePct ?? 0) / 100, n);
 
-  // MYGA: tax-deferred growth; ordinary tax (+ pre-59½ penalty) on the gain at cash-out.
-  const mygaValue = capital * Math.pow(1 + g, n);
+  // Compared against the user's OWN assumptions, each at its real yield + tax:
+  //   MYGA   — tax-deferred at mygaRate; ordinary tax (+10% penalty pre-59½) on the gain at cash-out
+  //   CD/HYSA— their cashDepositRate, interest taxed yearly (uses the derived after-tax rate)
+  //   Munis  — their muniReturn, tax-free (federal, + state if double-tax-free)
+  //   Stocks — their stockReturn, LTCG on the gain at cash-out — but risky, no guarantee
+  const mygaValue = grow(plan.mygaRate);
   const mygaGain = mygaValue - capital;
   const penalty = cashOutAge < 59.5 ? mygaGain * 0.1 : 0;
   const mygaNet = mygaValue - mygaGain * ord - penalty;
-  // Taxable CD at the same rate — interest taxed annually (lower effective compounding).
-  const cdNet = capital * Math.pow(1 + g * (1 - ord), n);
-  // Equity portfolio — grows at stockReturn, LTCG on the gain at cash-out (but risky).
-  const eqValue = capital * Math.pow(1 + eq, n);
+  const cdNet = grow(plan.depositAfterTaxRate); // after-tax annual growth at the user's cash rate
+  const muniNet = grow(plan.muniReturn); // tax-free
+  const eqValue = grow(plan.stockReturn);
   const eqNet = eqValue - (eqValue - capital) * ltcg;
 
+  const bestSafeNet = Math.max(cdNet, muniNet);
+  const bestSafeLabel = muniNet >= cdNet ? "munis" : "a CD";
   return {
     capital, rate: plan.mygaRate ?? 5, term, cashOutAge, years: n,
     penaltyHit: cashOutAge < 59.5,
+    cdRate: plan.cashDepositRate ?? 0,
+    muniRate: plan.muniReturn ?? 0,
+    stockRate: plan.stockReturn ?? 0,
     mygaNet: Math.round(mygaNet),
     cdNet: Math.round(cdNet),
+    muniNet: Math.round(muniNet),
     eqNet: Math.round(eqNet),
-    vsCd: Math.round(mygaNet - cdNet), // MYGA's tax-deferral edge over a taxable CD
+    bestSafeLabel,
+    vsBestSafe: Math.round(mygaNet - bestSafeNet), // MYGA vs the best safe alternative (CD or munis)
     vsEq: Math.round(mygaNet - eqNet), // usually negative — equities win but with risk
   };
 }

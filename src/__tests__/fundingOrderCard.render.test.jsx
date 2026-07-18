@@ -78,7 +78,7 @@ describe("FundingOrderCard render", () => {
     const plan = makePlan({ ...DEFAULTS, alreadyRetired: true, currentAge: 62, mygaCapital: 100000, mygaRate: 5, mygaTermYears: 3 });
     const html = render(plan);
     expect(html).toContain("Fixed annuity (MYGA)");
-    expect(html).toContain("Taxable CD");
+    expect(html).toContain("Munis"); // compares against the user's real muni yield
     expect(html).toContain("Where your money sits"); // retired branch + MYGA appended
   });
 });

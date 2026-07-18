@@ -204,18 +204,25 @@ describe("mygaAnalysis: fixed annuity / tax-deferred CD", () => {
     expect(mygaAnalysis(makePlan({ ...DEFAULTS, mygaCapital: 0 }))).toBeNull();
   });
 
-  it("flags the pre-59½ penalty and lets a plain CD win over a short term", () => {
-    const m = mygaAnalysis(p({ currentAge: 45 }));
-    expect(m.years).toBe(3);
-    expect(m.penaltyHit).toBe(true);
-    // The 10% penalty on the gain outweighs 3 years of deferral → CD nets more.
-    expect(m.vsCd).toBeLessThan(0);
-    expect(m.eqNet).toBeGreaterThan(m.mygaNet); // equities win (with risk)
+  it("flags the pre-59½ penalty; equities beat the fixed rate (with risk)", () => {
+    const m = mygaAnalysis(p({ currentAge: 45, mygaCashOutAge: 60 })); // 15-yr, no penalty at cash-out
+    expect(m.years).toBe(15);
+    expect(mygaAnalysis(p({ currentAge: 45 })).penaltyHit).toBe(true); // 3-yr → cashes out at 48
+    expect(m.eqNet).toBeGreaterThan(m.mygaNet); // stocks win over a long hold
+    expect(m.muniNet).toBeGreaterThan(0);
+    expect(m.cdNet).toBeGreaterThan(0);
+    expect(typeof m.vsBestSafe).toBe("number");
+    expect(["munis", "a CD"]).toContain(m.bestSafeLabel);
   });
 
-  it("beats a taxable CD once held past 59½ (no penalty, deferral compounds)", () => {
-    expect(mygaAnalysis(p({ currentAge: 62 })).penaltyHit).toBe(false);
-    expect(mygaAnalysis(p({ currentAge: 45, mygaCashOutAge: 60 })).vsCd).toBeGreaterThan(0); // 15-yr renew
+  it("uses the user's OWN cash & muni yields (more specific than a same-rate CD)", () => {
+    const lowCd = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 2 }));
+    const highCd = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, cashDepositRate: 8 }));
+    expect(highCd.cdNet).toBeGreaterThan(lowCd.cdNet); // CD outcome tracks the user's rate
+    expect(highCd.cdRate).toBe(8);
+    const lowMuni = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, muniReturn: 3 }));
+    const highMuni = mygaAnalysis(p({ currentAge: 62, mygaCashOutAge: 75, muniReturn: 6 }));
+    expect(highMuni.muniNet).toBeGreaterThan(lowMuni.muniNet); // muni outcome tracks the user's yield
   });
 
   it("cash-out age 0 defaults to the end of the first term", () => {

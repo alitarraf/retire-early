@@ -36,6 +36,27 @@ components/ + App.jsx    React UI
 
 ---
 
+## Session: 2026-07-18 — Invest tab (instrument registry) + real Treasury/MYGA sleeves
+
+**PRD:** `docs/PRD_InvestTab_July2026.md`. Now shipping DIRECTLY to `main` (Netlify auto-deploys;
+user dropped the branch/PR flow). New **Invest** tab: one instrument REGISTRY
+(`constants/instruments.js`) drives a unified editable list + the priority recommendation —
+adding a future instrument is one registry entry that appears everywhere.
+
+- **Invest tab** (`InvestPanel.jsx`): left = editable list grouped by category (kids shown
+  separate as "not your retirement money"); right = the Funding Order priority. Rows expose each
+  instrument's params incl. MYGA term/cash-out + annuity start/payout (`extraFields`).
+- **Treasuries + MYGA are now REAL drawn-down sim sleeves** (the careful crown-jewel step, A–E
+  BYTE-IDENTICAL via 0-defaults + value-guards): Treasury = state-exempt cash-clone; MYGA =
+  tax-deferred, LIFO draw (gain: ordinary + 10% penalty pre-59½, then basis tax-free). Both flow
+  into simulate, projectTo (+probe overrides), the Portfolio chart, asset-mix lens, Projected
+  balances. Funding order ranks all accounts (`rec.ranking`) — bridge-aware (accessible
+  Treasuries/MYGA outrank the locked 401k for early retirees).
+- **Phase 4 (option 2):** removed the redundant sidebar **Annuities** section (Invest covers it);
+  kept **Money** for quick edits. Income annuity stays a "should I?" comparison (per user).
+- **504 tests green**, build clean throughout. WSL localhost unreachable this session → no
+  headless screenshots; relied on render tests + node checks.
+
 ## Session: 2026-07-17 — Funding Order (account-location axis) + Maximize card unification
 
 **PRD:** `docs/PRD_FundingOrder_July2026.md`. New feature: **where should this year's savings

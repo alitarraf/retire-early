@@ -156,64 +156,6 @@ export function StrategyFields({ inputs, set, plan }) {
   );
 }
 
-// Annuities — its own section (a comparison, not accounts the sim draws down). Two
-// "what if" types; the Funding Order card (Show details) shows the verdict.
-export function AnnuitiesFields({ inputs, set }) {
-  const expert = useExpertMode();
-  return (
-    <>
-      <div style={{ fontSize: 11, color: "#4a5e58", margin: "0 0 10px", lineHeight: 1.5 }}>
-        Two "what if" comparisons — the <strong>Funding Order</strong> card (in <em>Show details</em>) weighs each against simply investing the money. Leave amounts at 0 to skip.
-      </div>
-
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a2e28", margin: "4px 0 6px" }}>1 · Lifetime income annuity</div>
-      <Grid2>
-        <Field label="Into an annuity /yr" help="annuityContribAnnual">
-          <NumInput value={inputs.annuityContribAnnual} onChange={set("annuityContribAnnual")} prefix="$" step={500} width={100} />
-        </Field>
-        <Field label="Income starts at age" help="annuityStartAge">
-          <NumInput value={inputs.annuityStartAge} onChange={set("annuityStartAge")} min={inputs.currentAge} max={85} width={70} />
-        </Field>
-      </Grid2>
-      {expert && (
-        <Grid2>
-          <Field label="Guaranteed rate %" help="annuityRate">
-            <NumInput value={inputs.annuityRate} onChange={set("annuityRate")} suffix="%" step={0.1} width={70} />
-          </Field>
-          <Field label="Payout rate %" help="annuityPayoutRate">
-            <NumInput value={inputs.annuityPayoutRate} onChange={set("annuityPayoutRate")} suffix="%" step={0.1} width={70} />
-          </Field>
-        </Grid2>
-      )}
-
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#1a2e28", margin: "12px 0 6px" }}>2 · Fixed annuity (MYGA) — a tax-deferred CD</div>
-      <Grid2>
-        <Field label="Lump sum in" help="mygaCapital">
-          <NumInput value={inputs.mygaCapital} onChange={set("mygaCapital")} prefix="$" step={1000} width={110} />
-        </Field>
-        <Field label="Guaranteed rate %" help="mygaRate">
-          <NumInput value={inputs.mygaRate} onChange={set("mygaRate")} suffix="%" step={0.1} width={70} />
-        </Field>
-      </Grid2>
-      <Grid2>
-        <Field label="Term (years)" help="mygaTermYears">
-          <NumInput value={inputs.mygaTermYears} onChange={set("mygaTermYears")} min={1} max={20} width={62} />
-        </Field>
-        <Field label="Cash out at age" help="mygaCashOutAge">
-          <NumInput value={inputs.mygaCashOutAge} onChange={set("mygaCashOutAge")} min={0} max={95} width={70} />
-        </Field>
-      </Grid2>
-      <Grid2>
-        <Field label="Treasury yield %" help="treasuryRate">
-          <NumInput value={inputs.treasuryRate} onChange={set("treasuryRate")} suffix="%" step={0.1} width={70} />
-        </Field>
-      </Grid2>
-      <div style={{ fontSize: 10, color: "#9db4ae", marginTop: 4 }}>
-        The card compares the MYGA to a CD (your cash rate), Treasuries (state-tax-free), munis (tax-free) and stocks. Cash-out age 0 = end of the first term; set it later to model renewing.
-      </div>
-    </>
-  );
-}
 
 export function HealthcareFields({ inputs, set }) {
   const expert = useExpertMode();

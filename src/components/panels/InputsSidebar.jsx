@@ -12,7 +12,7 @@ import { useState, useEffect, useRef } from "react";
 import { AccSection, FineTuningHeader, GroupLabel, ExpertToggle, useExpertMode } from "./inputs/atoms.jsx";
 import { YouFields, MoneyFields, SpendingFields, AssumptionsFields } from "./inputs/essentials.jsx";
 import {
-  TaxesFields, StrategyFields, AnnuitiesFields, HealthcareFields, EstateFields,
+  TaxesFields, StrategyFields, HealthcareFields, EstateFields,
   LeversFields, AdvancedFields, ScenarioFields,
 } from "./inputs/finetuning.jsx";
 import { FED_BRACKETS } from "../../constants/brackets.js";
@@ -27,7 +27,6 @@ const CAPTIONS = {
   assumptions: `Real return = stock − inflation. S&P 500 long-run: ~10% nominal, ~3% CPI, ~7% real — the biggest lever on your projections. Turn on a risk glide path to model a stock/bond/cash mix that de-risks with age instead of one flat return.`,
   tax: "Employment bracket applies only to interest while working. Retirement withdrawals use real brackets on the actual draw — typically far lower than your working rate.",
   strategy: "Roth conversions during the bridge fill low brackets cheaply; converted principal is spendable 5 years later at any age. Rule of 55 unlocks your 401k penalty-free if you left that employer at 55+. Guardrails auto-adjust spending.",
-  annuities: "Thinking about an annuity? Compare a lifetime-income annuity or a fixed annuity (MYGA — a tax-deferred CD) against just investing the money. The Funding Order card shows the after-tax verdict — usually a diversified portfolio, or even tax-free munis, wins.",
   healthcare: "Enter the ACA benchmark premium only if your monthly expenses don't already include health insurance. Below 400% FPL you pay a sliding share of income; at 65 Medicare replaces ACA.",
   estate: "Step-up in basis erases unrealized brokerage gains for your heirs — leave it on unless you plan to liquidate before death. Expert mode adds the survivor (widow's-tax) scenario.",
   levers: "Each lever applies one change to your inputs — more savings, lower spending, a later SS claim — and reports how many years it shaves off your earliest retirement age, all else equal. Apply writes it in; Undo all reverts.",
@@ -36,7 +35,7 @@ const CAPTIONS = {
 };
 
 const ESSENTIAL_KEYS = ["you", "money", "spending", "assumptions"];
-const FINE_TUNING_KEYS = ["tax", "strategy", "annuities", "healthcare", "estate", "levers", "advanced", "scenario"];
+const FINE_TUNING_KEYS = ["tax", "strategy", "healthcare", "estate", "levers", "advanced", "scenario"];
 const FILING_SHORT = { single: "Single", mfj: "MFJ", hoh: "HOH" };
 
 // Section registry — { title, Body }. The desktop accordion and the mobile
@@ -48,7 +47,6 @@ const INPUT_SECTIONS = {
   assumptions: { title: "Assumptions", Body: AssumptionsFields },
   tax: { title: "Taxes", Body: TaxesFields },
   strategy: { title: "Strategy", Body: StrategyFields },
-  annuities: { title: "Annuities", Body: AnnuitiesFields },
   healthcare: { title: "Healthcare", Body: HealthcareFields },
   estate: { title: "Estate", Body: EstateFields },
   levers: { title: "Levers", Body: LeversFields },
@@ -95,11 +93,6 @@ export function sectionSummary(key, inputs, plan) {
           ? `fill ${Math.round((FED_BRACKETS[inputs.filingStatus]?.find((b) => b.upTo === inputs.conversionCeiling)?.rate ?? 0) * 100)}%`
           : `${fmtK(inputs.annualRothConversion)}/yr`
       } · R55 ${inputs.rule55 ? "on" : "off"} · SEPP ${fmtK(inputs.annualSepp)}/yr · GK ${inputs.guardrailUpper > 0 ? "on" : "off"}`;
-    case "annuities": {
-      const income = (inputs.annuityContribAnnual ?? 0) > 0 ? `income ${fmtK(inputs.annuityContribAnnual)}/yr` : "";
-      const myga = (inputs.mygaCapital ?? 0) > 0 ? `MYGA ${fmtK(inputs.mygaCapital)}@${inputs.mygaRate}%` : "";
-      return [income, myga].filter(Boolean).join(" · ") || "compare vs. investing";
-    }
     case "healthcare":
       return `ACA ${fmtK(inputs.monthlyAcaFullPremium)}/mo · Medicare ${inputs.autoMedicare ? "auto" : `${fmtK(inputs.monthlyIrmaaSurcharge)}/mo`}`;
     case "estate":

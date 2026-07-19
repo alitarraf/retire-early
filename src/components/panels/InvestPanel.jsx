@@ -47,6 +47,11 @@ function InstrumentRow({ inst, inputs, set }) {
             <NumInput value={inputs[inst.rateKey]} onChange={set(inst.rateKey)} suffix="%" step={0.1} width={66} />
           </Labeled>
         )}
+        {(inst.extraFields ?? []).map((f) => (
+          <Labeled key={f.key} label={f.label}>
+            <NumInput value={inputs[f.key]} onChange={set(f.key)} suffix={f.suffix} step={f.step ?? 1} min={f.min} max={f.max} width={f.suffix ? 66 : 72} />
+          </Labeled>
+        ))}
       </div>
       <div style={{ fontSize: 10.5, color: FAINT, paddingLeft: 17, marginTop: 4 }}>{inst.note}</div>
     </div>
